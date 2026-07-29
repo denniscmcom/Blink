@@ -1,0 +1,35 @@
+# Version 21.1.0
+# https://releases.llvm.org/21.1.0/tools/clang/docs/ClangFormatStyleOptions.html
+
+BasedOnStyle: Microsoft
+
+UseTab: Always
+IndentWidth: 4
+TabWidth: 4
+
+ColumnLimit: 120
+InsertNewlineAtEOF: true
+
+PointerAlignment: Left
+
+MaxEmptyLinesToKeep: 1
+
+BreakAfterReturnType: AllDefinitions 
+BreakTemplateDeclarations: Yes
+
+AlignAfterOpenBracket: BlockIndent
+AlignTrailingComments:
+  Kind: Always
+  OverEmptyLines: 3
+
+AllowAllArgumentsOnNextLine: false
+AllowAllParametersOfDeclarationOnNextLine: false
+
+BinPackArguments: false
+BinPackParameters: OnePerLine
+
+SpacesBeforeTrailingComments: 2
+
+ShortNamespaceLines: 0
+
+SeparateDefinitionBlocks: Always

@@ -1,0 +1,14 @@
+#pragma once
+
+// FIXME: Currently the launcher and renderer also includes ImGui. Ideally only this module include it.
+
+namespace blk
+{
+struct World;
+struct Input_State;
+struct Editor_Context;
+
+void create_editor(Editor_Context& context);
+void destroy_editor();
+void update_editor(Editor_Context& context, double delta_time, const Input_State& input_state);
+}  // namespace blk

@@ -1,0 +1,10 @@
+.claude/
+.idea/
+.svn/
+.venv/
+.vs/
+Assets/
+Build/
+External/
+Game/
+TODO.md

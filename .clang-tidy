@@ -1,0 +1,33 @@
+# Version 21.1.0
+# https://releases.llvm.org/21.1.0/tools/clang/tools/extra/docs/clang-tidy/index.html
+
+Checks: '
+-*,
+cert-*,
+clang-analyzer-*,
+
+cppcoreguidelines-*,
+-cppcoreguidelines-non-private-member-variables-in-classes,
+-cppcoreguidelines-owning-memory,
+-cppcoreguidelines-avoid-non-const-global-variables,
+-cppcoreguidelines-avoid-c-arrays,
+-cppcoreguidelines-avoid-do-while,
+-cppcoreguidelines-avoid-magic-numbers,
+-cppcoreguidelines-pro-type-union-access,
+-cppcoreguidelines-pro-bounds-pointer-arithmetic,
+-cppcoreguidelines-pro-type-reinterpret-cast,
+-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+-cppcoreguidelines-pro-bounds-constant-array-index,
+-cppcoreguidelines-pro-type-vararg,
+-cppcoreguidelines-macro-usage,
+-cppcoreguidelines-no-malloc,
+
+misc-*,
+-misc-non-private-member-variables-in-classes,
+
+objc-*,
+'
+
+WarningsAsErrors: '*'
+HeaderFilterRegex: '.*'
+ExcludeHeaderFilterRegex: '.*/(External|claude)/.*'

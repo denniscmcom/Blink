@@ -1,0 +1,43 @@
+{
+	"version": 4,
+	"configurePresets": [
+		{
+			"name": "base",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/Build/${generator}",
+			"cacheVariables": {
+				"CMAKE_MODULE_PATH": "${sourceDir}/CMake"
+			}
+		},
+		{
+			"name": "ninja",
+			"inherits": "base",
+			"generator": "Ninja Multi-Config",
+			"cacheVariables": {
+				"CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+			}
+		},	
+		{
+			"name": "visual-studio",
+			"inherits": "base",
+			"generator": "Visual Studio 17 2022",
+      		"condition": {
+				"type": "equals",
+				"lhs": "${hostSystemName}",
+				"rhs": "Windows"
+			}
+		}
+	],
+	"buildPresets": [
+		{
+			"name": "ninja-debug",
+			"configurePreset": "ninja",
+			"configuration": "Debug"
+		},
+		{
+			"name": "visual-studio-debug",
+			"configurePreset": "visual-studio",
+			"configuration": "Debug"
+		}
+	]
+}

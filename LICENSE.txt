@@ -1,0 +1,16 @@
+Blink Engine Source Access License
+
+Copyright (c) 2026 Dennis C. M. All rights reserved.
+
+This source code is made available for educational and reference purposes only.
+
+You MAY:
+- View and study the source code.
+- Use it as a reference for learning.
+
+You MAY NOT:
+- Use this code, in whole or in part, in any commercial product or project.
+- Redistribute the source code or any derivative works.
+- Use this code, in whole or in part, in your own engine, game, or software project.
+
+For commercial licensing inquiries, contact: dennis@denniscm.com
