@@ -1,11 +1,16 @@
-#include "Event.hpp"
-#include "Platform/Window.hpp"
+// ============================================================================
+// Blink Engine. Copyright (c) 2026 Dennis C. M. All Rights Reserved.
+// Licensed under the Blink Engine Source Access License, see LICENSE.txt
+// ============================================================================
 
-#include "Platform/Application.hpp"
-#include "Platform/Application_Internal.hpp"
-#include "Platform/Assert.hpp"
-#include "Platform/Log.hpp"
-#include "Platform/Window_Internal.hpp"
+#include "Engine/Platform/Window.hpp"
+
+#include "Engine/Platform/Application.hpp"
+#include "Engine/Platform/Application_Internal.hpp"
+#include "Engine/Platform/Assert.hpp"
+#include "Engine/Platform/Event.hpp"
+#include "Engine/Platform/Log.hpp"
+#include "Engine/Platform/Window_Internal.hpp"
 
 #include <Windows.h>
 #include <imgui.h>

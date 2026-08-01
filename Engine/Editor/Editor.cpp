@@ -1,21 +1,29 @@
-#include "Editor/Editor.hpp"
+// ============================================================================
+// Blink Engine. Copyright (c) 2026 Dennis C. M. All Rights Reserved.
+// Licensed under the Blink Engine Source Access License, see LICENSE.txt
+// ============================================================================
 
-#include "Context.hpp"
-#include "Editor/Camera.hpp"
-#include "Editor/Menu.hpp"
-#include "Editor/Stats.hpp"
-#include "Editor/Status_Bar.hpp"
-#include "Input/Input.hpp"
-#include "Platform/Application.hpp"
-#include "Platform/Log.hpp"
-#include "Platform/Window_Internal.hpp"
-#include "Renderer/Renderer_Internal.hpp"
-#include "World/World.hpp"
+#include "Engine/Editor/Editor.hpp"
 
-#include <Windows.h>
+#include "Engine/Editor/Camera.hpp"
+#include "Engine/Editor/Context.hpp"
+#include "Engine/Editor/Menu.hpp"
+#include "Engine/Editor/Stats.hpp"
+#include "Engine/Editor/Status_Bar.hpp"
+#include "Engine/Input/Input.hpp"
+#include "Engine/Platform/Application.hpp"
+#include "Engine/Platform/Assert.hpp"
+#include "Engine/Platform/Event.hpp"
+#include "Engine/Platform/Log.hpp"
+#include "Engine/Platform/Window_Internal.hpp"
+#include "Engine/Renderer/Renderer_Internal.hpp"
+#include "Engine/World/World.hpp"
+
 #include <imgui.h>
 #include <imgui_impl_vulkan.h>
 #include <imgui_impl_win32.h>
+
+#include <Windows.h>
 
 void
 blk::create_editor(Editor_Context& context)

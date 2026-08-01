@@ -1,13 +1,19 @@
-#include "Editor/Camera.hpp"
+// ============================================================================
+// Blink Engine. Copyright (c) 2026 Dennis C. M. All Rights Reserved.
+// Licensed under the Blink Engine Source Access License, see LICENSE.txt
+// ============================================================================
 
-#include "Core/Math/Matrix.hpp"
-#include "Core/Math/Vector.hpp"
-#include "Input/Input.hpp"
-#include "Scene/Node.hpp"
-#include "World/Camera.hpp"
+#include "Engine/Editor/Camera.hpp"
 
-#include "Context.hpp"
-#include "World/World.hpp"
+#include "Engine/Core/Math/Matrix.hpp"
+#include "Engine/Core/Math/Vector.hpp"
+#include "Engine/Editor/Context.hpp"
+#include "Engine/Input/Input.hpp"
+#include "Engine/Platform/Assert.hpp"
+#include "Engine/Platform/Event.hpp"
+#include "Engine/Scene/Node.hpp"
+#include "Engine/World/Camera.hpp"
+#include "Engine/World/World.hpp"
 
 namespace
 {

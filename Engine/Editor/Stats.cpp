@@ -1,10 +1,18 @@
-#include "Editor/Stats.hpp"
+// ============================================================================
+// Blink Engine. Copyright (c) 2026 Dennis C. M. All Rights Reserved.
+// Licensed under the Blink Engine Source Access License, see LICENSE.txt
+// ============================================================================
 
-#include "Editor/Context.hpp"
-#include "Editor/Helpers.hpp"
-#include "Resource/Mesh.hpp"
-#include "Scene/Mesh_Instance.hpp"
-#include "World/World.hpp"
+#include "Engine/Editor/Stats.hpp"
+
+#include "Engine/Editor/Context.hpp"
+#include "Engine/Editor/Helpers.hpp"
+#include "Engine/Platform/Application.hpp"
+#include "Engine/Platform/Assert.hpp"
+#include "Engine/Resource/Mesh.hpp"
+#include "Engine/Scene/Mesh_Instance.hpp"
+#include "Engine/Scene/Node.hpp"
+#include "Engine/World/World.hpp"
 
 #include <imgui.h>
 

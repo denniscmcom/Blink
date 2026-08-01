@@ -1,9 +1,15 @@
-#include "Renderer/Resource/Texture_Device.hpp"
+// ============================================================================
+// Blink Engine. Copyright (c) 2026 Dennis C. M. All Rights Reserved.
+// Licensed under the Blink Engine Source Access License, see LICENSE.txt
+// ============================================================================
 
-#include "Platform/Log.hpp"
-#include "Renderer/Lifetime/Buffer.hpp"
-#include "Renderer/Lifetime/Context.hpp"
-#include "Renderer/Resource/Arena.hpp"
+#include "Engine/Renderer/Resource/Texture_Device.hpp"
+
+#include "Engine/Platform/Log.hpp"
+#include "Engine/Renderer/Lifetime/Buffer.hpp"
+#include "Engine/Renderer/Lifetime/Context.hpp"
+#include "Engine/Renderer/Resource/Arena.hpp"
+#include "Engine/Resource/Texture.hpp"
 
 blk::Texture_Device
 blk::transfer_texture(const Context& context, Arena& arena, const Pool_Handle<Texture>& handle, const VkFormat format)

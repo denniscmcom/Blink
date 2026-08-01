@@ -1,3 +1,8 @@
+// ============================================================================
+// Blink Engine. Copyright (c) 2026 Dennis C. M. All Rights Reserved.
+// Licensed under the Blink Engine Source Access License, see LICENSE.txt
+// ============================================================================
+
 #include "Shared.slang"
 
 // FIXME: Fix these bindings to group them by usage.

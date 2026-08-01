@@ -1,13 +1,18 @@
-#include "Resource/Mesh.hpp"
+// ============================================================================
+// Blink Engine. Copyright (c) 2026 Dennis C. M. All Rights Reserved.
+// Licensed under the Blink Engine Source Access License, see LICENSE.txt
+// ============================================================================
 
-#include "Core/Pool.hpp"
-#include "Platform/Log.hpp"
-#include "Resource/Resource_Storage.hpp"
+#include "Engine/Resource/Mesh.hpp"
+
+#include "Engine/Core/Pool.hpp"
+#include "Engine/Platform/Log.hpp"
+#include "Engine/Resource/Resource_Storage.hpp"
 
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "Core/Math/Constants.hpp"
+#include "Engine/Core/Math/Constants.hpp"
 
 #include <tiny_gltf.h>
 

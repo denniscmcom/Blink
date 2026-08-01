@@ -1,6 +1,11 @@
-#include "Input/Input.hpp"
+// ============================================================================
+// Blink Engine. Copyright (c) 2026 Dennis C. M. All Rights Reserved.
+// Licensed under the Blink Engine Source Access License, see LICENSE.txt
+// ============================================================================
 
-#include "Platform/Event.hpp"
+#include "Engine/Input/Input.hpp"
+
+#include "Engine/Platform/Event.hpp"
 
 void
 blk::update_input_state(Input_State& state)

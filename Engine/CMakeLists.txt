@@ -16,8 +16,8 @@ find_package(Vulkan REQUIRED)
 
 target_link_libraries(BlkEngine
 		PRIVATE
-			BlkImGui
 			BlkStb
+			BlkImGui
 			BlkTinyGltf
 			BlkTinyObjLoader
 			Vulkan::Vulkan

@@ -1,9 +1,16 @@
-#include "Editor/Status_Bar.hpp"
+// ============================================================================
+// Blink Engine. Copyright (c) 2026 Dennis C. M. All Rights Reserved.
+// Licensed under the Blink Engine Source Access License, see LICENSE.txt
+// ============================================================================
 
-#include "Editor/Context.hpp"
-#include "Editor/Helpers.hpp"
-#include "Editor/Stats.hpp"
-#include "World/World.hpp"
+#include "Engine/Editor/Status_Bar.hpp"
+
+#include "Engine/Editor/Context.hpp"
+#include "Engine/Editor/Helpers.hpp"
+#include "Engine/Editor/Stats.hpp"
+#include "Engine/Platform/Application.hpp"
+#include "Engine/Platform/Assert.hpp"
+#include "Engine/World/World.hpp"
 
 #include <array>
 #include <imgui.h>
@@ -43,7 +50,10 @@ blk::draw_status_bar(Editor_Context& context)
 		draw_horizontal_separator();
 		ImGui::Text("Game: %s", context.is_game_simulation_paused ? "Paused" : "Running");
 		draw_horizontal_separator();
-		ImGui::Text("Camera: %s", context.editor_camera_handle == context.world->active_camera_handle ? "Editor" : "Game");
+		ImGui::Text(
+			"Camera: %s",
+			context.editor_camera_handle == context.world->active_camera_handle ? "Editor" : "Game"
+		);
 		draw_horizontal_separator();
 		draw_fps();
 		draw_horizontal_separator();

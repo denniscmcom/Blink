@@ -1,4 +1,17 @@
-#include "World/World.hpp"
+// ============================================================================
+// Blink Engine. Copyright (c) 2026 Dennis C. M. All Rights Reserved.
+// Licensed under the Blink Engine Source Access License, see LICENSE.txt
+// ============================================================================
+
+#include "Engine/World/World.hpp"
+
+#include "Engine/Core/Hash.hpp"
+#include "Engine/Core/Pool.hpp"
+#include "Engine/Scene/Node.hpp"
+#include "Engine/Scene/Scene_Graph.hpp"
+#include "Engine/World/Actor.hpp"
+#include "Engine/World/Camera.hpp"
+#include "Engine/World/Prop.hpp"
 
 namespace
 {

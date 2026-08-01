@@ -1,6 +1,11 @@
-#include "Editor/Helpers.hpp"
+// ============================================================================
+// Blink Engine. Copyright (c) 2026 Dennis C. M. All Rights Reserved.
+// Licensed under the Blink Engine Source Access License, see LICENSE.txt
+// ============================================================================
 
-#include "Platform/Application.hpp"
+#include "Engine/Editor/Helpers.hpp"
+
+#include "Engine/Platform/Application.hpp"
 
 ImVec2
 blk::to_imvec2(const Rect<float>& rect)

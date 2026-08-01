@@ -1,6 +1,13 @@
-#include "Resource/Texture.hpp"
+// ============================================================================
+// Blink Engine. Copyright (c) 2026 Dennis C. M. All Rights Reserved.
+// Licensed under the Blink Engine Source Access License, see LICENSE.txt
+// ============================================================================
 
-#include "Resource/Resource_Storage.hpp"
+#include "Engine/Resource/Texture.hpp"
+
+#include "Engine/Core/Pool.hpp"
+#include "Engine/Platform/Log.hpp"
+#include "Engine/Resource/Resource_Storage.hpp"
 
 #include "stb_image.h"
 

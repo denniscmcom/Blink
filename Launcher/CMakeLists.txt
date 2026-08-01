@@ -24,11 +24,13 @@ add_custom_command(
 	COMMENT "Copying shaders to output directory..."
 )
 
+add_dependencies(BlkLauncher BlkAssets)
+
 add_custom_command(
 	TARGET BlkLauncher
 	POST_BUILD
 	COMMAND ${CMAKE_COMMAND} -E copy_directory
-		${CMAKE_SOURCE_DIR}/Assets
+		${CMAKE_BINARY_DIR}/Assets
 		${CMAKE_CURRENT_BINARY_DIR}/Assets
 	COMMENT "Copying assets to output directory..."
 )

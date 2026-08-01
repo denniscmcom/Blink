@@ -2,7 +2,7 @@ target_sources(BlkEngine
 	PUBLIC
 		FILE_SET publicHeaders
 		TYPE HEADERS
-		BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/..
+		BASE_DIRS ${CMAKE_SOURCE_DIR}
 		FILES
 			Application.hpp
 			Assert.hpp
@@ -13,7 +13,7 @@ target_sources(BlkEngine
 	PRIVATE
 		FILE_SET privateHeaders
 		TYPE HEADERS
-		BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/..
+		BASE_DIRS ${CMAKE_SOURCE_DIR}
 		FILES
 			Application_Internal.hpp
 			Window_Internal.hpp

@@ -1,7 +1,12 @@
+// ============================================================================
+// Blink Engine. Copyright (c) 2026 Dennis C. M. All Rights Reserved.
+// Licensed under the Blink Engine Source Access License, see LICENSE.txt
+// ============================================================================
+
 #pragma once
 
-#include "Core/Iterator.hpp"
-#include "Platform/Assert.hpp"
+#include "Engine/Core/Iterator.hpp"
+#include "Engine/Platform/Assert.hpp"
 
 #include <functional>
 #include <stdint.h>
@@ -38,11 +43,12 @@ class Pool
 	Pool() = default;
 	explicit Pool(size_t capacity);
 
-	// TODO: Implement.
 	Pool(const Pool& other) = delete;
 	Pool(Pool&& other) noexcept = delete;
 	Pool& operator=(const Pool& other) = delete;
 	Pool& operator=(Pool&& other) noexcept = delete;
+
+	~Pool();
 
 	Pool_Iterator<Pool_Slot<Type>> begin();
 	Pool_Iterator<Pool_Slot<Type>> end();
@@ -84,6 +90,11 @@ template <typename Type>
 Pool<Type>::Pool(const size_t capacity)
 {
 	resize(capacity);
+}
+
+template <typename Type>
+Pool<Type>::~Pool()
+{
 }
 
 template <typename Type>

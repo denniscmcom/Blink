@@ -1,4 +1,17 @@
-#include "Renderer/Resource/Arena.hpp"
+// ============================================================================
+// Blink Engine. Copyright (c) 2026 Dennis C. M. All Rights Reserved.
+// Licensed under the Blink Engine Source Access License, see LICENSE.txt
+// ============================================================================
+
+#include "Engine/Renderer/Resource/Arena.hpp"
+
+#include "Engine/Core/Pool.hpp"
+#include "Engine/Renderer/Resource/Material_Device.hpp"
+#include "Engine/Renderer/Resource/Mesh_Device.hpp"
+#include "Engine/Renderer/Resource/Texture_Device.hpp"
+#include "Engine/Resource/Material.hpp"
+#include "Engine/Resource/Mesh.hpp"
+#include "Engine/Resource/Texture.hpp"
 
 #include <optional>
 

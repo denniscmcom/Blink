@@ -1,13 +1,20 @@
+// ============================================================================
+// Blink Engine. Copyright (c) 2026 Dennis C. M. All Rights Reserved.
+// Licensed under the Blink Engine Source Access License, see LICENSE.txt
+// ============================================================================
+
 #pragma once
 
-#include "Core/Pool.hpp"
-#include "Scene/Scene_Graph.hpp"
-#include "World/Actor.hpp"
-#include "World/Camera.hpp"
-#include "World/Prop.hpp"
+#include "Engine/Core/Pool.hpp"
+#include "Engine/Scene/Scene_Graph.hpp"
+#include "Engine/World/Actor.hpp"
+#include "Engine/World/Camera.hpp"
+#include "Engine/World/Prop.hpp"
 
 namespace blk
 {
+struct Node;
+
 enum class Entity_Type : uint8_t
 {
 	Actor,

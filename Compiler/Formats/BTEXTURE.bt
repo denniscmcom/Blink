@@ -1,0 +1,39 @@
+//------------------------------------------------
+//--- 010 Editor v16.0.4 Binary Template
+//
+//      File: BTEXTURE.bt
+//   Authors: Dennis C. M.
+//   Version: 1
+//   Purpose: Blink Engine Texture
+//  Category: Game
+// File Mask: *.btexture
+//  ID Bytes: 42 4C 4E 4B 54 45 58 54
+//   History:
+//------------------------------------------------
+
+LittleEndian();
+
+typedef struct
+{
+	char blink_magic[4];
+	char file_magic[4];
+	uint8 version;
+} Header;
+
+typedef struct
+{
+	uint8 r;
+	uint8 g;
+	uint8 b;
+	uint8 a;
+} Color_RGBA;
+
+typedef struct
+{
+	uint32 width;
+	uint32 height;
+	Color_RGBA pixels[width * height];
+} Texture;
+
+Header header;
+Texture texture;

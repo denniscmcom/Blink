@@ -1,16 +1,25 @@
+// ============================================================================
+// Blink Engine. Copyright (c) 2026 Dennis C. M. All Rights Reserved.
+// Licensed under the Blink Engine Source Access License, see LICENSE.txt
+// ============================================================================
+
 #pragma once
 
-#include "Renderer/Lifetime/Buffer.hpp"
-#include "Renderer/Lifetime/Image.hpp"
-#include "Renderer/Resource/Material_Device.hpp"
-#include "Renderer/Resource/Mesh_Device.hpp"
-#include "Renderer/Resource/Texture_Device.hpp"
+#include "Engine/Core/Pool.hpp"
+#include "Engine/Renderer/Lifetime/Buffer.hpp"
+#include "Engine/Renderer/Resource/Material_Device.hpp"
+#include "Engine/Renderer/Resource/Mesh_Device.hpp"
+#include "Engine/Renderer/Resource/Texture_Device.hpp"
 
 #include <optional>
 #include <unordered_map>
 
 namespace blk
 {
+struct Material;
+struct Texture;
+struct Mesh;
+
 constexpr size_t MAX_VERTEX_COUNT = 10'000;
 constexpr size_t MAX_INDEX_COUNT = 10'000;
 constexpr size_t MAX_TEXTURE_COUNT = 5;

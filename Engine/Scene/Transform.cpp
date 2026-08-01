@@ -1,6 +1,11 @@
-#include "Scene/Transform.hpp"
+// ============================================================================
+// Blink Engine. Copyright (c) 2026 Dennis C. M. All Rights Reserved.
+// Licensed under the Blink Engine Source Access License, see LICENSE.txt
+// ============================================================================
 
-#include "Core/Math/Matrix.hpp"
+#include "Engine/Scene/Transform.hpp"
+
+#include "Engine/Core/Math/Matrix.hpp"
 
 blk::Matrix4
 blk::make_transform_matrix(const Transform& transform)

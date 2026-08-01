@@ -1,6 +1,12 @@
-#include "Core/Math/Matrix.hpp"
+// ============================================================================
+// Blink Engine. Copyright (c) 2026 Dennis C. M. All Rights Reserved.
+// Licensed under the Blink Engine Source Access License, see LICENSE.txt
+// ============================================================================
 
-#include "Core/Math/Unit.hpp"
+#include "Engine/Core/Math/Matrix.hpp"
+
+#include "Engine/Core/Math/Unit.hpp"
+#include "Engine/Core/Math/Vector.hpp"
 
 #include <math.h>
 

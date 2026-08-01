@@ -1,11 +1,17 @@
+// ============================================================================
+// Blink Engine. Copyright (c) 2026 Dennis C. M. All Rights Reserved.
+// Licensed under the Blink Engine Source Access License, see LICENSE.txt
+// ============================================================================
+
 #pragma once
 
-#include "Platform/Log.hpp"
+#include "Engine/Platform/Debug.hpp"
+#include "Engine/Platform/Log.hpp"
 
 #include <stdlib.h>
 
 #ifdef _DEBUG
-/// Triggers a debugger breakpoint if `expression` is false, outputs a message to the debugger and crashes the program.
+/// Triggers a debugger breakpoint if `expression` is false, logs a message and crashes the program.
 /// @warning Different behaviour on non-debug targets.
 #define BLK_CHECK(expression)                                                                                          \
 	do                                                                                                                 \
@@ -23,30 +29,45 @@
 #endif
 
 #ifdef _DEBUG
-/// Returns the value of `expression`. It triggers a debugger breakpoint if `expression` is false and outputs a message
-/// to the debugger.
+/// Triggers a debugger breakpoint if `expression` is false, logs a message and crashes the program.
 /// @warning Different behaviour on non-debug targets.
-#define BLK_VERIFY(expression) ((expression) ? true : (BLK_LOG("VERIFY FAILED", #expression), BLK_DEBUG_BREAK(), false))
+#define BLK_ENSURE(expression)                                                                                         \
+	do                                                                                                                 \
+	{                                                                                                                  \
+		if (!(expression))                                                                                             \
+		{                                                                                                              \
+			BLK_LOG("ENSURE FAILED", #expression);                                                                     \
+			BLK_DEBUG_BREAK();                                                                                         \
+			abort();                                                                                                   \
+		}                                                                                                              \
+	} while (0)
 #else
-/// Returns the value of `expression`.
-#define BLK_VERIFY(expression) (expression)
+/// Reports an error and crashes the program if `expression` is false.
+// TODO: This should call my custom crash reporter (when it's done).
+#define BLK_ENSURE(expression)                                                                                         \
+	do                                                                                                                 \
+	{                                                                                                                  \
+		if (!(expression))                                                                                             \
+		{                                                                                                              \
+			BLK_LOG("ENSURE FAILED", #expression);                                                                     \
+			abort();                                                                                                   \
+		}                                                                                                              \
+	} while (0)
 #endif
 
 #ifdef _DEBUG
-/// Returns the value of `expression`. It triggers a debugger breakpoint if `expression` is false, outputs a message
-/// to the debugger and crashes the program.
+/// Returns the value of `expression`. It triggers a debugger breakpoint if `expression` is false and logs a message.
 /// @warning Different behaviour on non-debug targets.
-#define BLK_ENSURE(expression) BLK_VERIFY(expression)
+#define BLK_VERIFY(expression) ((expression) ? true : (BLK_LOG("VERIFY FAILED", #expression), BLK_DEBUG_BREAK(), false))
 #else
-/// Returns the value of `expression`. It crashes the program if `expression` is `false`.
-// TODO: This should call my custom crash reporter (when it's done).
-#define BLK_ENSURE(expression) ((expression) ? true : abort())
+/// Returns the value of `expression`. Logs a message if `expression` is false.
+#define BLK_VERIFY(expression) ((expression) ? true : (BLK_LOG("VERIFY FAILED", #expression), false))
 #endif
 
 #define BLK_ASSUME(expression) __assume(expression)
 
 #ifdef _DEBUG
-/// Triggers a debugger breakpoint when reached and outputs a message to the debugger.
+/// Triggers a debugger breakpoint when reached and logs a message.
 /// @warning Different behaviour on non-debug targets.
 #define BLK_NOT_IMPLEMENTED()                                                                                          \
 	do                                                                                                                 \

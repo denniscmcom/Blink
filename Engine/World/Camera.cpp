@@ -1,9 +1,16 @@
-#include "World/Camera.hpp"
+// ============================================================================
+// Blink Engine. Copyright (c) 2026 Dennis C. M. All Rights Reserved.
+// Licensed under the Blink Engine Source Access License, see LICENSE.txt
+// ============================================================================
 
-#include "Core/Math/Matrix.hpp"
-#include "Platform/Assert.hpp"
-#include "Scene/Node.hpp"
-#include "Scene/Scene_Graph.hpp"
+#include "Engine/World/Camera.hpp"
+
+#include "Engine/Core/Math/Matrix.hpp"
+#include "Engine/Core/Math/Unit.hpp"
+#include "Engine/Core/Math/Vector.hpp"
+#include "Engine/Platform/Assert.hpp"
+#include "Engine/Scene/Node.hpp"
+#include "Engine/Scene/Scene_Graph.hpp"
 
 blk::Matrix4
 blk::make_view_matrix(const Scene_Graph& scene, const Camera& camera)

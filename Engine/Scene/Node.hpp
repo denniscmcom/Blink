@@ -1,9 +1,14 @@
+// ============================================================================
+// Blink Engine. Copyright (c) 2026 Dennis C. M. All Rights Reserved.
+// Licensed under the Blink Engine Source Access License, see LICENSE.txt
+// ============================================================================
+
 #pragma once
 
-#include "Core/Pool.hpp"
-#include "Scene/Light.hpp"
-#include "Scene/Mesh_Instance.hpp"
-#include "Scene/Transform.hpp"
+#include "Engine/Core/Pool.hpp"
+#include "Engine/Scene/Light.hpp"
+#include "Engine/Scene/Mesh_Instance.hpp"
+#include "Engine/Scene/Transform.hpp"
 
 #include <optional>
 #include <string>

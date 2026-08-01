@@ -1,9 +1,15 @@
+// ============================================================================
+// Blink Engine. Copyright (c) 2026 Dennis C. M. All Rights Reserved.
+// Licensed under the Blink Engine Source Access License, see LICENSE.txt
+// ============================================================================
+
 #pragma once
 
-#include "Core/Math/Matrix.hpp"
-#include "Renderer/Lifetime/Buffer.hpp"
-#include "Renderer/Resource/Material_Device.hpp"
-#include "Renderer/Resource/Mesh_Device.hpp"
+#include "Engine/Core/Math/Matrix.hpp"
+#include "Engine/Core/Math/Vector.hpp"
+#include "Engine/Renderer/Lifetime/Buffer.hpp"
+#include "Engine/Renderer/Resource/Material_Device.hpp"
+#include "Engine/Renderer/Resource/Mesh_Device.hpp"
 
 #include <vulkan/vulkan.h>
 
@@ -12,6 +18,7 @@
 
 namespace blk
 {
+struct Context;
 struct Pipeline;
 
 struct Camera_UBO

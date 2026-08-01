@@ -1,8 +1,12 @@
+// ============================================================================
+// Blink Engine. Copyright (c) 2026 Dennis C. M. All Rights Reserved.
+// Licensed under the Blink Engine Source Access License, see LICENSE.txt
+// ============================================================================
+
 #pragma once
 
-#include "Core/Pool.hpp"
-#include "Renderer/Lifetime/Image.hpp"
-#include "Resource/Texture.hpp"
+#include "Engine/Core/Pool.hpp"
+#include "Engine/Renderer/Lifetime/Image.hpp"
 
 #include <vulkan/vulkan.h>
 
@@ -10,6 +14,7 @@ namespace blk
 {
 struct Context;
 struct Arena;
+struct Texture;
 
 struct Texture_Device
 {
@@ -17,6 +22,10 @@ struct Texture_Device
 	Image image;
 };
 
-Texture_Device
-transfer_texture(const Context& context, Arena& arena, const Pool_Handle<Texture>& handle, VkFormat format);
+Texture_Device transfer_texture(
+	const Context& context,
+	Arena& arena,
+	const Pool_Handle<Texture>& handle,
+	VkFormat format
+);
 }  // namespace blk

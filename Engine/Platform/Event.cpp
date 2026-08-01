@@ -1,6 +1,11 @@
-#include "Platform/Event.hpp"
+// ============================================================================
+// Blink Engine. Copyright (c) 2026 Dennis C. M. All Rights Reserved.
+// Licensed under the Blink Engine Source Access License, see LICENSE.txt
+// ============================================================================
 
-#include "Platform/Assert.hpp"
+#include "Engine/Platform/Event.hpp"
+
+#include "Engine/Platform/Assert.hpp"
 
 #include <stdint.h>
 

@@ -1,12 +1,24 @@
-#include "Editor/Outliner.hpp"
+// ============================================================================
+// Blink Engine. Copyright (c) 2026 Dennis C. M. All Rights Reserved.
+// Licensed under the Blink Engine Source Access License, see LICENSE.txt
+// ============================================================================
 
-#include "Editor/Context.hpp"
-#include "Editor/Helpers.hpp"
-#include "Resource/Material.hpp"
-#include "Resource/Mesh.hpp"
-#include "Scene/Scene_Graph.hpp"
-#include "Scene/Transform.hpp"
-#include "World/World.hpp"
+#include "Engine/Editor/Outliner.hpp"
+
+#include "Engine/Core/Math/Unit.hpp"
+#include "Engine/Core/Math/Vector.hpp"
+#include "Engine/Core/Pool.hpp"
+#include "Engine/Editor/Context.hpp"
+#include "Engine/Editor/Helpers.hpp"
+#include "Engine/Platform/Application.hpp"
+#include "Engine/Platform/Assert.hpp"
+#include "Engine/Resource/Material.hpp"
+#include "Engine/Resource/Mesh.hpp"
+#include "Engine/Resource/Texture.hpp"
+#include "Engine/Scene/Light.hpp"
+#include "Engine/Scene/Node.hpp"
+#include "Engine/Scene/Scene_Graph.hpp"
+#include "Engine/World/World.hpp"
 
 #include <imgui.h>
 #include <imgui_stdlib.h>

@@ -1,6 +1,11 @@
-#include "Core/Math/Unit.hpp"
+// ============================================================================
+// Blink Engine. Copyright (c) 2026 Dennis C. M. All Rights Reserved.
+// Licensed under the Blink Engine Source Access License, see LICENSE.txt
+// ============================================================================
 
-#include "Core/Math/Constants.hpp"
+#include "Engine/Core/Math/Unit.hpp"
+
+#include "Engine/Core/Math/Constants.hpp"
 
 blk::Radians
 blk::operator+(const Radians radians, const float value)

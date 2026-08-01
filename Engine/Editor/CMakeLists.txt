@@ -2,13 +2,13 @@ target_sources(BlkEngine
 	PUBLIC
 		FILE_SET publicHeaders
 		TYPE HEADERS
-		BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/../
+		BASE_DIRS ${CMAKE_SOURCE_DIR}
 		FILES
 			Editor.hpp
 	PRIVATE
 		FILE_SET privateHeaders
 		TYPE HEADERS
-		BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/../
+		BASE_DIRS ${CMAKE_SOURCE_DIR}
 		FILES
 			Camera.hpp
 			Console.hpp

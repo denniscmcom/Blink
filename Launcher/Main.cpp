@@ -1,13 +1,22 @@
-#include "Core/Time.hpp"
-#include "Editor/Console.hpp"
-#include "Editor/Context.hpp"
-#include "Editor/Editor.hpp"
-#include "Game.hpp"
-#include "Input/Input.hpp"
-#include "Platform/Debug.hpp"
-#include "Platform/Log.hpp"
-#include "Platform/Window.hpp"
-#include "Renderer/Renderer.hpp"
+// ============================================================================
+// Blink Engine. Copyright (c) 2026 Dennis C. M. All Rights Reserved.
+// Licensed under the Blink Engine Source Access License, see LICENSE.txt
+// ============================================================================
+
+#include "Engine/Core/Time.hpp"
+#include "Engine/Editor/Console.hpp"
+#include "Engine/Editor/Context.hpp"
+#include "Engine/Editor/Editor.hpp"
+#include "Engine/Input/Input.hpp"
+#include "Engine/Platform/Application.hpp"
+#include "Engine/Platform/Debug.hpp"
+#include "Engine/Platform/Log.hpp"
+#include "Engine/Platform/Window.hpp"
+#include "Engine/Renderer/Renderer.hpp"
+#include "Engine/Scene/Node.hpp"
+#include "Engine/Scene/Scene_Graph.hpp"
+#include "Engine/World/Camera.hpp"
+#include "Game/Game.hpp"
 
 #include <Windows.h>
 #include <imgui.h>

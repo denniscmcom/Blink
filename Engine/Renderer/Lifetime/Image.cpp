@@ -1,8 +1,13 @@
-#include "Renderer/Lifetime/Image.hpp"
+// ============================================================================
+// Blink Engine. Copyright (c) 2026 Dennis C. M. All Rights Reserved.
+// Licensed under the Blink Engine Source Access License, see LICENSE.txt
+// ============================================================================
 
-#include "Platform/Log.hpp"
-#include "Renderer/Helpers.hpp"
-#include "Renderer/Lifetime/Context.hpp"
+#include "Engine/Renderer/Lifetime/Image.hpp"
+
+#include "Engine/Platform/Log.hpp"
+#include "Engine/Renderer/Helpers.hpp"
+#include "Engine/Renderer/Lifetime/Context.hpp"
 
 #include <vulkan/vulkan.h>
 

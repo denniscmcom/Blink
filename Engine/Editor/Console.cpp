@@ -1,7 +1,12 @@
-#include "Editor/Console.hpp"
+// ============================================================================
+// Blink Engine. Copyright (c) 2026 Dennis C. M. All Rights Reserved.
+// Licensed under the Blink Engine Source Access License, see LICENSE.txt
+// ============================================================================
 
-#include "Editor/Context.hpp"
-#include "Editor/Helpers.hpp"
+#include "Engine/Editor/Console.hpp"
+
+#include "Engine/Editor/Context.hpp"
+#include "Engine/Editor/Helpers.hpp"
 
 #include <imgui.h>
 

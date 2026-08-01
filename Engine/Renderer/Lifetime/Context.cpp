@@ -1,7 +1,12 @@
-#define VK_USE_PLATFORM_WIN32_KHR
-#include "Renderer/Lifetime/Context.hpp"
+// ============================================================================
+// Blink Engine. Copyright (c) 2026 Dennis C. M. All Rights Reserved.
+// Licensed under the Blink Engine Source Access License, see LICENSE.txt
+// ============================================================================
 
-#include "Platform/Log.hpp"
+#define VK_USE_PLATFORM_WIN32_KHR
+#include "Engine/Renderer/Lifetime/Context.hpp"
+
+#include "Engine/Platform/Log.hpp"
 
 #include <vulkan/vulkan_win32.h>
 

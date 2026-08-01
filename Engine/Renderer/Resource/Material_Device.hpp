@@ -1,8 +1,13 @@
+// ============================================================================
+// Blink Engine. Copyright (c) 2026 Dennis C. M. All Rights Reserved.
+// Licensed under the Blink Engine Source Access License, see LICENSE.txt
+// ============================================================================
+
 #pragma once
 
-#include "Renderer/Lifetime/Buffer.hpp"
-#include "Renderer/Resource/Texture_Device.hpp"
-#include "Resource/Material.hpp"
+#include "Engine/Core/Pool.hpp"
+#include "Engine/Renderer/Lifetime/Buffer.hpp"
+#include "Engine/Renderer/Resource/Texture_Device.hpp"
 
 #include <vulkan/vulkan.h>
 
@@ -11,6 +16,7 @@ namespace blk
 struct Context;
 struct Arena;
 struct Descriptor_Layouts;
+struct Material;
 
 // Layout must match Shaders/Shared.slang (std140).
 struct Material_UBO

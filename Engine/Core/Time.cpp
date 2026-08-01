@@ -1,4 +1,9 @@
-#include "Core/Time.hpp"
+// ============================================================================
+// Blink Engine. Copyright (c) 2026 Dennis C. M. All Rights Reserved.
+// Licensed under the Blink Engine Source Access License, see LICENSE.txt
+// ============================================================================
+
+#include "Engine/Core/Time.hpp"
 
 #include <chrono>
 

@@ -1,18 +1,33 @@
-#include "Renderer.hpp"
+// ============================================================================
+// Blink Engine. Copyright (c) 2026 Dennis C. M. All Rights Reserved.
+// Licensed under the Blink Engine Source Access License, see LICENSE.txt
+// ============================================================================
 
-#include "Core/Pool.hpp"
-#include "Platform/Window_Internal.hpp"
-#include "Renderer/Helpers.hpp"
-#include "Renderer/Lifetime/Context.hpp"
-#include "Renderer/Lifetime/Descriptor.hpp"
-#include "Renderer/Lifetime/Frame.hpp"
-#include "Renderer/Lifetime/Image.hpp"
-#include "Renderer/Lifetime/Pipeline.hpp"
-#include "Renderer/Lifetime/Swapchain.hpp"
-#include "Renderer/Renderer_Internal.hpp"
-#include "Renderer/Resource/Arena.hpp"
-#include "Scene/Node.hpp"
-#include "Scene/Scene_Graph.hpp"
+#include "Engine/Renderer/Renderer.hpp"
+
+#include "Engine/Core/Math/Matrix.hpp"
+#include "Engine/Core/Math/Vector.hpp"
+#include "Engine/Core/Pool.hpp"
+#include "Engine/Platform/Assert.hpp"
+#include "Engine/Platform/Log.hpp"
+#include "Engine/Platform/Window_Internal.hpp"
+#include "Engine/Renderer/Helpers.hpp"
+#include "Engine/Renderer/Lifetime/Context.hpp"
+#include "Engine/Renderer/Lifetime/Descriptor.hpp"
+#include "Engine/Renderer/Lifetime/Frame.hpp"
+#include "Engine/Renderer/Lifetime/Image.hpp"
+#include "Engine/Renderer/Lifetime/Pipeline.hpp"
+#include "Engine/Renderer/Lifetime/Swapchain.hpp"
+#include "Engine/Renderer/Renderer_Internal.hpp"
+#include "Engine/Renderer/Resource/Arena.hpp"
+#include "Engine/Renderer/Resource/Material_Device.hpp"
+#include "Engine/Renderer/Resource/Mesh_Device.hpp"
+#include "Engine/Resource/Mesh.hpp"
+#include "Engine/Scene/Light.hpp"
+#include "Engine/Scene/Mesh_Instance.hpp"
+#include "Engine/Scene/Node.hpp"
+#include "Engine/Scene/Scene_Graph.hpp"
+#include "Engine/Scene/Transform.hpp"
 
 #include <Windows.h>
 #include <vulkan/vulkan.h>

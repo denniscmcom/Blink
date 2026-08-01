@@ -1,13 +1,18 @@
+// ============================================================================
+// Blink Engine. Copyright (c) 2026 Dennis C. M. All Rights Reserved.
+// Licensed under the Blink Engine Source Access License, see LICENSE.txt
+// ============================================================================
+
 #pragma once
 
-#include "Core/Math/Unit.hpp"
-#include "Scene/Node.hpp"
-#include "Scene/Scene_Graph.hpp"
+#include "Engine/Core/Math/Unit.hpp"
+#include "Engine/Core/Pool.hpp"
 
 namespace blk
 {
-struct Vector3;
 struct Matrix4;
+struct Node;
+struct Scene_Graph;
 
 struct Camera
 {

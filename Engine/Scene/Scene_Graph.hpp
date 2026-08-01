@@ -1,6 +1,11 @@
+// ============================================================================
+// Blink Engine. Copyright (c) 2026 Dennis C. M. All Rights Reserved.
+// Licensed under the Blink Engine Source Access License, see LICENSE.txt
+// ============================================================================
+
 #pragma once
 
-#include "Core/Pool.hpp"
+#include "Engine/Core/Pool.hpp"
 
 #include <string>
 #include <unordered_map>
