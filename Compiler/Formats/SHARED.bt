@@ -1,0 +1,6 @@
+typedef struct
+{
+	char blink_magic[4];
+	char file_magic[4];
+	uint8 version;
+} Header;

@@ -10,11 +10,16 @@ target_sources(BlkCompiler
 		BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}
 		FILES
 			Log.hpp
-			Shared.hpp
+			Material.hpp
+			Mesh.hpp
+			Shader.hpp
 			Texture.hpp
 	PRIVATE
 		Log.cpp
 		Main.cpp
+		Material.cpp
+		Mesh.cpp
+		Shader.cpp
 		Texture.cpp
 )
 
@@ -22,5 +27,5 @@ target_link_libraries(BlkCompiler
 	PRIVATE
 		BlkEngine
 		BlkStb
-		BlkTinyGltf
+		BlkUfbx
 )

@@ -18,7 +18,5 @@ target_link_libraries(BlkEngine
 		PRIVATE
 			BlkStb
 			BlkImGui
-			BlkTinyGltf
-			BlkTinyObjLoader
 			Vulkan::Vulkan
 )

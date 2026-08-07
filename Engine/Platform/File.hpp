@@ -5,9 +5,21 @@
 
 #pragma once
 
+#include <stdint.h>
+
 namespace blk
 {
-class Serial;
+struct File;
 
-void compile_texture(Serial& input_serial, Serial& output_serial);
+enum class File_Access_Mode
+{
+	READ,
+	WRITE,
+};
+
+File* open_file(const char* path, File_Access_Mode mode);
+void close_file(File* file);
+uint64_t get_file_size(File* file);
+void read_file(File* file, char* buffer, uint64_t size);
+void write_file(File* file, char* buffer, uint64_t size);
 }  // namespace blk

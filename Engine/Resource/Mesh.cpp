@@ -5,17 +5,15 @@
 
 #include "Engine/Resource/Mesh.hpp"
 
+#include "Engine/Core/Math/Constants.hpp"
 #include "Engine/Core/Pool.hpp"
+#include "Engine/Core/Serial.hpp"
+#include "Engine/Platform/File.hpp"
 #include "Engine/Platform/Log.hpp"
+#include "Engine/Resource/Resource.hpp"
 #include "Engine/Resource/Resource_Storage.hpp"
 
-#define TINYGLTF_IMPLEMENTATION
-#define STB_IMAGE_IMPLEMENTATION
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "Engine/Core/Math/Constants.hpp"
-
-#include <tiny_gltf.h>
-
+#include <format>
 #include <string>
 #include <vector>
 
@@ -27,170 +25,72 @@ blk::Resource_Storage<blk::Mesh> mesh_storage = {};
 blk::Pool_Handle<blk::Mesh>
 blk::load_mesh(const char* stem)
 {
-	// TODO: (performance)
-	std::string path = "./Assets/Meshes/";
-	path += stem;
-	path += ".glb";
+	const uint64_t hash = get_resource_hash(stem, Resource_Type::MESH);
+	const std::string path = std::format("Assets/{}.bmesh", hash);
 
-	if (is_resource_loaded(mesh_storage, path.c_str()))
+	if (is_resource_loaded(mesh_storage, hash))
 	{
-		return get_resource_handle(mesh_storage, path.c_str());
+		return get_resource_handle(mesh_storage, hash);
 	}
 
-	tinygltf::Model model;
-	tinygltf::TinyGLTF loader;
-	std::string error;
-	std::string warning;
+	File* file = open_file(path.c_str(), File_Access_Mode::READ);
 
-	const bool result = loader.LoadBinaryFromFile(&model, &error, &warning, path);
-
-	if (!warning.empty())
+	if (!file)
 	{
-		BLK_WARNING("%s\n", warning.c_str());
+		BLK_FATAL("Failed to open asset: %s\n", path.c_str());
 	}
 
-	if (!error.empty())
+	const uint64_t file_size = get_file_size(file);
+	auto buffer = static_cast<char*>(malloc(file_size));
+	read_file(file, buffer, file_size);
+	close_file(file);
+
+	Serial src_serial(buffer, file_size);
+
+	if (src_serial.read<Magic>() != BLINK_MAGIC)
 	{
-		BLK_ERROR("%s\n", error.c_str());
+		BLK_FATAL("Source buffer is not Blink format\n");
 	}
 
-	if (!result)
+	if (src_serial.read<Magic>() != MESH_MAGIC)
 	{
-		BLK_FATAL("Failed to load mesh\n");
+		BLK_FATAL("Source buffer is not a Blink mesh\n");
+	}
+
+	if (src_serial.read<uint8_t>() != MESH_VERSION)
+	{
+		BLK_FATAL("Expected Blink mesh version %u\n", MESH_VERSION);
 	}
 
 	Mesh mesh = {};
 
-	for (const auto& gltf_mesh : model.meshes)
+	const auto vertex_count = src_serial.read<uint32_t>();
+	mesh.vertices.reserve(vertex_count);
+
+	const auto index_count = src_serial.read<uint32_t>();
+
+	for (uint32_t i = 0; i < vertex_count; i++)
 	{
-		for (const auto& gltf_primitive : gltf_mesh.primitives)
-		{
-			const tinygltf::Accessor& index_accessor = model.accessors[gltf_primitive.indices];
-			const tinygltf::BufferView& index_buffer_view = model.bufferViews[index_accessor.bufferView];
-			const tinygltf::Buffer& index_buffer = model.buffers[index_buffer_view.buffer];
+		Vertex_PNT vertex = {};
 
-			const tinygltf::Accessor& position_accessor = model.accessors[gltf_primitive.attributes.at("POSITION")];
-			const tinygltf::BufferView& position_buffer_view = model.bufferViews[position_accessor.bufferView];
-			const tinygltf::Buffer& position_buffer = model.buffers[position_buffer_view.buffer];
+		vertex.position.x = src_serial.read<float>();
+		vertex.position.y = src_serial.read<float>();
+		vertex.position.z = src_serial.read<float>();
 
-			const bool has_texture_coords = gltf_primitive.attributes.contains("TEXCOORD_0");
-			const tinygltf::Accessor* texture_coord_accessor = nullptr;
-			const tinygltf::BufferView* texture_coord_buffer_view = nullptr;
-			const tinygltf::Buffer* texture_coord_buffer = nullptr;
+		vertex.normal.x = src_serial.read<float>();
+		vertex.normal.y = src_serial.read<float>();
+		vertex.normal.z = src_serial.read<float>();
 
-			if (has_texture_coords)
-			{
-				texture_coord_accessor = &model.accessors[gltf_primitive.attributes.at("TEXCOORD_0")];
-				texture_coord_buffer_view = &model.bufferViews[texture_coord_accessor->bufferView];
-				texture_coord_buffer = &model.buffers[texture_coord_buffer_view->buffer];
-			}
+		vertex.texture_coord.x = src_serial.read<float>();
+		vertex.texture_coord.y = src_serial.read<float>();
 
-			const bool has_normals = gltf_primitive.attributes.contains("NORMAL");
-			const tinygltf::Accessor* normals_accessor = nullptr;
-			const tinygltf::BufferView* normals_buffer_view = nullptr;
-			const tinygltf::Buffer* normals_buffer = nullptr;
-
-			if (has_normals)
-			{
-				normals_accessor = &model.accessors[gltf_primitive.attributes.at("NORMAL")];
-				normals_buffer_view = &model.bufferViews[normals_accessor->bufferView];
-				normals_buffer = &model.buffers[normals_buffer_view->buffer];
-			}
-
-			for (size_t i = 0; i < position_accessor.count; i++)
-			{
-				Vertex_PNT vertex = {};
-
-				auto* position = reinterpret_cast<const float*>(
-					&position_buffer.data[position_buffer_view.byteOffset + position_accessor.byteOffset + i * 12]
-				);
-
-				// glTF uses a right-handed coordinate system with Y-up.
-				vertex.position.x = position[0];
-				vertex.position.y = position[1];
-				vertex.position.z = -position[2];
-
-				if (has_texture_coords)
-				{
-					BLK_CHECK(texture_coord_buffer);
-					BLK_CHECK(texture_coord_buffer_view);
-					BLK_CHECK(texture_coord_accessor);
-
-					auto* texture_coord = reinterpret_cast<const float*>(
-						&texture_coord_buffer
-							 ->data[texture_coord_buffer_view->byteOffset + texture_coord_accessor->byteOffset + i * 8]
-					);
-
-					vertex.texture_coord.x = texture_coord[0];
-					vertex.texture_coord.y = texture_coord[1];
-				}
-
-				if (has_normals)
-				{
-					BLK_CHECK(normals_buffer);
-					BLK_CHECK(normals_buffer_view);
-					BLK_CHECK(normals_accessor);
-
-					auto* normal = reinterpret_cast<const float*>(
-						&normals_buffer->data[normals_buffer_view->byteOffset + normals_accessor->byteOffset + i * 12]
-					);
-
-					// glTF uses a right-handed coordinate system with Y-up.
-					vertex.normal.x = normal[0];
-					vertex.normal.y = normal[1];
-					vertex.normal.z = -normal[2];
-				}
-
-				mesh.vertices.push_back(vertex);
-			}
-
-			const unsigned char* index_data =
-				&index_buffer.data[index_buffer_view.byteOffset + index_accessor.byteOffset];
-			const size_t index_count = index_accessor.count;
-			size_t index_stride = 0;
-
-			if (index_accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
-			{
-				index_stride = sizeof(uint16_t);
-			}
-			else if (index_accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
-			{
-				index_stride = sizeof(uint32_t);
-			}
-			else if (index_accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE)
-			{
-				index_stride = sizeof(uint8_t);
-			}
-			else
-			{
-				BLK_FATAL("Unsupported index component type");
-			}
-
-			mesh.indices.reserve(index_count);
-
-			for (size_t i = 0; i < index_count; i++)
-			{
-				uint32_t index = 0;
-
-				if (index_accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
-				{
-					index = *reinterpret_cast<const uint16_t*>(index_data + i * index_stride);
-				}
-				else if (index_accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
-				{
-					index = *reinterpret_cast<const uint32_t*>(index_data + i * index_stride);
-				}
-				else if (index_accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE)
-				{
-					index = *reinterpret_cast<const uint8_t*>(index_data + i * index_stride);
-				}
-
-				mesh.indices.push_back(index);
-			}
-		}
+		mesh.vertices.push_back(vertex);
 	}
 
-	return store_resource(mesh_storage, mesh, stem, path.c_str());
+	mesh.indices.resize(index_count);
+	memcpy(mesh.indices.data(), src_serial.buffer() + src_serial.position(), sizeof(Index) * index_count);
+
+	return store_resource(mesh_storage, mesh, hash, stem);
 }
 
 /// `segment_count`: number of vertical slices.
@@ -198,16 +98,12 @@ blk::load_mesh(const char* stem)
 blk::Pool_Handle<blk::Mesh>
 blk::compute_uv_sphere(const float radius, const uint32_t segment_count, const uint32_t ring_count)
 {
-	std::string path = "UV_Sphere:";
-	path += std::to_string(radius);
-	path += ":";
-	path += std::to_string(segment_count);
-	path += ":";
-	path += std::to_string(ring_count);
+	const std::string stem = std::format("UV_Sphere:{}:{}:{}", radius, segment_count, ring_count);
+	const uint64_t hash = get_resource_hash(stem.c_str(), Resource_Type::MESH);
 
-	if (is_resource_loaded(mesh_storage, path.c_str()))
+	if (is_resource_loaded(mesh_storage, hash))
 	{
-		return get_resource_handle(mesh_storage, path.c_str());
+		return get_resource_handle(mesh_storage, hash);
 	}
 
 	Mesh mesh = {};
@@ -258,7 +154,7 @@ blk::compute_uv_sphere(const float radius, const uint32_t segment_count, const u
 		}
 	}
 
-	return store_resource(mesh_storage, mesh, path.c_str(), path.c_str());
+	return store_resource(mesh_storage, mesh, hash, stem.c_str());
 }
 
 void

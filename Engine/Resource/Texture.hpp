@@ -6,6 +6,7 @@
 #pragma once
 
 #include "Engine/Core/Pool.hpp"
+#include "Engine/Resource/Resource.hpp"
 #include "Engine/Resource/Resource_Storage.hpp"
 
 #include <vector>
@@ -42,7 +43,11 @@ struct Texture
 	uint32_t height;
 };
 
+constexpr Magic TEXTURE_MAGIC = {'T', 'E', 'X', 'T'};
+constexpr uint8_t TEXTURE_VERSION = 1;
+
 Pool_Handle<Texture> load_texture(const char* stem);
+Pool_Handle<Texture> load_texture(uint64_t hash);
 void unload_texture(Pool_Handle<Texture> handle);
 Texture* get_texture(Pool_Handle<Texture> handle);
 }  // namespace blk

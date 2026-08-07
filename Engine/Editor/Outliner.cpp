@@ -126,60 +126,34 @@ blk::draw_outliner(Editor_Context& context)
 				{
 					if (node->mesh_instance.value().mesh_handle != POOL_HANDLE_NONE<Mesh>)
 					{
-						ImGui::SeparatorText("Mesh");
 						const Mesh* mesh = get_mesh(node->mesh_instance.value().mesh_handle);
-						std::string mesh_stem = mesh->metadata.stem;
+						std::string mesh_stem = "";
 
-						if (ImGui::InputText("Mesh stem", &mesh_stem, ImGuiInputTextFlags_EnterReturnsTrue))
+						if (mesh)
 						{
-							node->mesh_instance.value().mesh_handle = load_mesh(mesh_stem.c_str());
-							mesh = get_mesh(node->mesh_instance.value().mesh_handle);
+							mesh_stem = mesh->metadata.stem;
 						}
 
-						ImGui::Text("Vertex count: %llu", mesh->vertices.size());
-						ImGui::Text("Index count: %llu", mesh->indices.size());
+						if (ImGui::InputText("Mesh", &mesh_stem, ImGuiInputTextFlags_EnterReturnsTrue))
+						{
+							node->mesh_instance.value().mesh_handle = load_mesh(mesh_stem.c_str());
+						}
 					}
 
 					if (node->mesh_instance.value().material_handle != POOL_HANDLE_NONE<Material>)
 					{
-						ImGui::SeparatorText("Material");
-						Material* material = get_material(node->mesh_instance.value().material_handle);
+						const Material* material = get_material(node->mesh_instance.value().material_handle);
+						std::string material_stem = "";
 
-						if (material->diffuse_map != POOL_HANDLE_NONE<Texture>)
+						if (material)
 						{
-							const Texture* diffuse_map = get_texture(material->diffuse_map);
-							std::string diffuse_map_stem = diffuse_map->metadata.stem;
-
-							if (ImGui::InputText(
-									"Diffuse map stem",
-									&diffuse_map_stem,
-									ImGuiInputTextFlags_EnterReturnsTrue
-								))
-							{
-								// TODO: Pending (should I remove material as a resource and treat it Material_Instance
-								// or something?
-								node->mesh_instance.value().material_handle = load_material("");
-							}
+							material_stem = material->metadata.stem;
 						}
 
-						if (material->specular_map != POOL_HANDLE_NONE<Texture>)
+						if (ImGui::InputText("Material", &material_stem, ImGuiInputTextFlags_EnterReturnsTrue))
 						{
-							const Texture* specular_map = get_texture(material->specular_map);
-							std::string specular_map_stem = specular_map->metadata.stem;
-
-							if (ImGui::InputText(
-									"Specular map stem",
-									&specular_map_stem,
-									ImGuiInputTextFlags_EnterReturnsTrue
-								))
-							{
-							}
+							node->mesh_instance.value().material_handle = load_material(material_stem.c_str());
 						}
-
-						// FIXME: Currently this is not being modified on GPU (only CPU). I need a `dirty` flag to
-						// reupload
-						//  the changes to the GPU or something.
-						ImGui::DragFloat("Shininess", &material->shininess, 0.01f);
 					}
 
 					ImGui::TreePop();

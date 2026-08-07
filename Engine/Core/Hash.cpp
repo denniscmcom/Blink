@@ -5,6 +5,7 @@
 
 #include "Engine/Core/Hash.hpp"
 
+#include <stdlib.h>
 #include <string.h>
 
 namespace
@@ -20,6 +21,7 @@ blk::hash_fnv1a(const char* buffer, const size_t size)
 
 	for (size_t i = 0; i < size; i++)
 	{
+		// FIXME: Should I cast `buffer[i]` to unsigned char first because MSVC?
 		hash ^= static_cast<uint64_t>(buffer[i]);
 		hash *= FNV_PRIME;
 	}

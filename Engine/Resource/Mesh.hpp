@@ -29,7 +29,7 @@ struct Vertex_PNC
 	Color_RGB<float> color;
 };
 
-using Index = uint16_t;
+using Index = uint32_t;
 
 struct Mesh
 {
@@ -37,6 +37,9 @@ struct Mesh
 	std::vector<Vertex_PNT> vertices;
 	std::vector<Index> indices;
 };
+
+constexpr Magic MESH_MAGIC = {'M', 'E', 'S', 'H'};
+constexpr uint8_t MESH_VERSION = 1;
 
 Pool_Handle<Mesh> load_mesh(const char* stem);
 Pool_Handle<Mesh> compute_uv_sphere(float radius, uint32_t segment_count, uint32_t ring_count);

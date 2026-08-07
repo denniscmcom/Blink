@@ -3,16 +3,11 @@
 // Licensed under the Blink Engine Source Access License, see LICENSE.txt
 // ============================================================================
 
-#include "Compiler/Log.hpp"
+#pragma once
 
-#include <stdio.h>
-
-void
-blk::log_console(const char* msg)
+namespace blk
 {
-	printf("%s", msg);
+struct Editor_Context;
 
-	// Stdout is fully buffered when redirected to a pipe -e.g. the build system-, and `BLK_DEBUG_BREAK` kills the
-	// process before the buffer is flushed.
-	fflush(stdout);
-}
+void draw_material_creator(Editor_Context& context);
+}  // namespace blk

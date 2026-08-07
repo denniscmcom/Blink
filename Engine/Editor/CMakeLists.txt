@@ -14,6 +14,7 @@ target_sources(BlkEngine
 			Console.hpp
 			Context.hpp
 			Helpers.hpp
+			Material_Creator.hpp
 			Menu.hpp
 			Outliner.hpp
 			Stats.hpp
@@ -23,8 +24,14 @@ target_sources(BlkEngine
 		Console.cpp
 		Editor.cpp
 		Helpers.cpp
+		Material_Creator.cpp
 		Menu.cpp
 		Outliner.cpp
 		Stats.cpp
 		Status_Bar.cpp
+)
+
+target_compile_definitions(BlkEngine
+	PRIVATE
+		BLK_SOURCE_ASSETS_DIRECTORY="${CMAKE_SOURCE_DIR}/Assets"
 )

@@ -7,6 +7,7 @@
 
 #include "Engine/Editor/Console.hpp"
 #include "Engine/Editor/Context.hpp"
+#include "Engine/Editor/Material_Creator.hpp"
 #include "Engine/Editor/Outliner.hpp"
 #include "Engine/Editor/Stats.hpp"
 #include "Engine/Platform/Assert.hpp"
@@ -50,6 +51,7 @@ blk::draw_menu(Editor_Context& context)
 
 			if (ImGui::MenuItem("Create material"))
 			{
+				context.show_material_creator = true;
 			}
 
 			ImGui::EndMenu();
@@ -130,5 +132,10 @@ blk::draw_menu(Editor_Context& context)
 	if (context.show_console)
 	{
 		draw_console(context);
+	}
+
+	if (context.show_material_creator)
+	{
+		draw_material_creator(context);
 	}
 }

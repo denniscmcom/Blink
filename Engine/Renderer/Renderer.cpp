@@ -401,7 +401,8 @@ blk::render_frame()
 		vertex_buffer_offsets.data()
 	);
 
-	vkCmdBindIndexBuffer(frame.command_buffer, arena.index_buffer.device.buffer, 0, VK_INDEX_TYPE_UINT16);
+	static_assert(sizeof(Index) == sizeof(uint32_t), "Index buffer is bound as VK_INDEX_TYPE_UINT32");
+	vkCmdBindIndexBuffer(frame.command_buffer, arena.index_buffer.device.buffer, 0, VK_INDEX_TYPE_UINT32);
 
 	std::array frame_descriptor_sets = {frame.camera_descriptor_set, frame.light_descriptor_set};
 

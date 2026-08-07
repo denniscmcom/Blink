@@ -5,9 +5,23 @@
 
 #pragma once
 
+#include <array>
+#include <stdint.h>
+
 namespace blk
 {
-class Serial;
+using Magic = std::array<char, 4>;
 
-void compile_texture(Serial& input_serial, Serial& output_serial);
+constexpr Magic BLINK_MAGIC = {'B', 'L', 'N', 'K'};
+constexpr size_t MAX_RESOURCE_LOGICAL_PATH_SIZE = 256;
+
+enum class Resource_Type
+{
+	MATERIAL,
+	MESH,
+	SHADER,
+	TEXTURE,
+};
+
+uint64_t get_resource_hash(const char* stem, Resource_Type resource_type);
 }  // namespace blk

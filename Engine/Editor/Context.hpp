@@ -36,6 +36,7 @@ struct Editor_Context
 	bool show_outliner = true;
 	bool show_stats = true;
 	bool show_console = true;
+	bool show_material_creator = false;
 
 	float left_column_width = 550.0f;
 	float right_column_width = 650.0f;
@@ -63,5 +64,8 @@ struct Editor_Context
 
 	Rect<float> console_position;
 	Rect<float> console_size;
+
+	Rect<float> material_creator_position;
+	Rect<float> material_creator_size;
 };
 }  // namespace blk

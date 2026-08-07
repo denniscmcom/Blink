@@ -8,6 +8,7 @@ target_sources(BlkEngine
 			Assert.hpp
 			Debug.hpp
 			Event.hpp
+			File.hpp
 			Log.hpp
 			Window.hpp
 	PRIVATE
@@ -21,6 +22,7 @@ target_sources(BlkEngine
 		Application_Win32.cpp
 		Debug_Win32.cpp
 		Event.cpp
+		File.cpp
 		Log.cpp
 		Window_Win32.cpp
 )

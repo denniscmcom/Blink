@@ -6,6 +6,7 @@
 #pragma once
 
 #include "Engine/Core/Pool.hpp"
+#include "Engine/Resource/Resource.hpp"
 #include "Engine/Resource/Resource_Storage.hpp"
 
 namespace blk
@@ -19,6 +20,9 @@ struct Material
 	Pool_Handle<Texture> specular_map;
 	float shininess;
 };
+
+constexpr Magic MATERIAL_MAGIC = {'M', 'A', 'T', 'R'};
+constexpr uint8_t MATERIAL_VERSION = 1;
 
 Pool_Handle<Material> load_material(const char* stem);
 void unload_material(Pool_Handle<Material> handle);

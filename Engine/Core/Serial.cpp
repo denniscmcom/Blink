@@ -16,6 +16,7 @@ blk::Serial::Serial(size_t size)
 	resize(size);
 }
 
+// FIXME: I think this should be non-owning to avoid the allocation.
 blk::Serial::Serial(const char* buffer, size_t size)
 {
 	BLK_CHECK(buffer);

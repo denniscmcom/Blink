@@ -1,0 +1,19 @@
+//------------------------------------------------
+//--- 010 Editor v16.0.4 Binary Template
+//
+//      File: BSHADER.bt
+//   Authors: Dennis C. M.
+//   Version: 1
+//   Purpose: Blink Engine Shader
+//  Category: Game
+// File Mask: *.bshader
+//  ID Bytes: 42 4C 4E 4B 53 48 44 52
+//   History:
+//------------------------------------------------
+
+#include "SHARED.bt"
+
+LittleEndian();
+
+Header header;
+uint32 spirv[(FileSize() - FTell())/ 4];

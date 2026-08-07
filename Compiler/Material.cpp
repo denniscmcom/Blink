@@ -3,9 +3,13 @@
 // Licensed under the Blink Engine Source Access License, see LICENSE.txt
 // ============================================================================
 
-#pragma once
+#include "Compiler/Material.hpp"
 
-namespace blk
+#include "Engine/Core/Serial.hpp"
+#include "Engine/Resource/Material.hpp"
+
+void
+blk::compile_material(Serial& input_serial, Serial& output_serial)
 {
-constexpr char BLINK_MAGIC[4] = {'B', 'L', 'N', 'K'};
-}  // namespace blk
+	output_serial.write(input_serial.buffer(), input_serial.size());
+}

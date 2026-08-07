@@ -1,0 +1,47 @@
+//------------------------------------------------
+//--- 010 Editor v16.0.4 Binary Template
+//
+//      File: BMESH.bt
+//   Authors: Dennis C. M.
+//   Version: 1
+//   Purpose: Blink Engine Mesh
+//  Category: Game
+// File Mask: *.bmesh
+//  ID Bytes: 42 4C 4E 4B 4D 45 53 48
+//   History:
+//------------------------------------------------
+
+#include "SHARED.bt"
+
+LittleEndian();
+
+typedef struct
+{
+	float x;
+	float y;
+	float z;
+} Vector3;
+
+typedef struct
+{
+	float x;
+	float y;
+} Vector2;
+
+typedef struct
+{
+	Vector3 position;
+	Vector3 normal;
+	Vector2 texture_coord;
+} Vertex;
+
+typedef struct
+{
+	uint32 vertex_count;
+	uint32 index_count;
+	Vertex vertices[vertex_count];
+	uint32 indices[index_count];
+} Mesh;
+
+Header header;
+Mesh mesh;

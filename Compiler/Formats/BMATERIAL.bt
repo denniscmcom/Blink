@@ -1,13 +1,13 @@
 //------------------------------------------------
 //--- 010 Editor v16.0.4 Binary Template
 //
-//      File: BTEXTURE.bt
+//      File: BMATERIAL.bt
 //   Authors: Dennis C. M.
 //   Version: 1
-//   Purpose: Blink Engine Texture
+//   Purpose: Blink Engine Material
 //  Category: Game
-// File Mask: *.btexture
-//  ID Bytes: 42 4C 4E 4B 54 45 58 54
+// File Mask: *.bmaterial
+//  ID Bytes: 42 4C 4E 4B 4D 45 53 48
 //   History:
 //------------------------------------------------
 
@@ -17,18 +17,10 @@ LittleEndian();
 
 typedef struct
 {
-	uint8 r;
-	uint8 g;
-	uint8 b;
-	uint8 a;
-} Color_RGBA;
-
-typedef struct
-{
-	uint32 width;
-	uint32 height;
-	Color_RGBA pixels[width * height];
-} Texture;
+	uint64 diffuse_map;
+	uint64 specular_map;
+	float shininess;
+} Material;
 
 Header header;
-Texture texture;
+Material material;

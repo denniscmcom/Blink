@@ -15,22 +15,10 @@ target_link_libraries(BlkLauncher
 		BlkImGui
 )
 
-add_custom_command(
-	TARGET BlkLauncher 
-	POST_BUILD
-	COMMAND ${CMAKE_COMMAND} -E copy_directory
-		${CMAKE_BINARY_DIR}/Engine/Renderer/Shaders
-		${CMAKE_CURRENT_BINARY_DIR}/Shaders
-	COMMENT "Copying shaders to output directory..."
-)
+add_dependencies(BlkLauncher BlkAssets BlkShaders)
 
-add_dependencies(BlkLauncher BlkAssets)
-
-add_custom_command(
-	TARGET BlkLauncher
-	POST_BUILD
-	COMMAND ${CMAKE_COMMAND} -E copy_directory
-		${CMAKE_BINARY_DIR}/Assets
-		${CMAKE_CURRENT_BINARY_DIR}/Assets
-	COMMENT "Copying assets to output directory..."
+# TODO: What's this?
+set_target_properties(BlkLauncher PROPERTIES
+	RUNTIME_OUTPUT_DIRECTORY ${BLK_RUNTIME_DIRECTORY}
+	VS_DEBUGGER_WORKING_DIRECTORY ${BLK_RUNTIME_DIRECTORY}
 )

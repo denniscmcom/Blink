@@ -6,11 +6,15 @@
 #include "Engine/Resource/Texture.hpp"
 
 #include "Engine/Core/Pool.hpp"
+#include "Engine/Core/Serial.hpp"
+#include "Engine/Platform/File.hpp"
 #include "Engine/Platform/Log.hpp"
+#include "Engine/Resource/Resource.hpp"
 #include "Engine/Resource/Resource_Storage.hpp"
 
 #include "stb_image.h"
 
+#include <format>
 #include <math.h>
 #include <string>
 
@@ -22,36 +26,69 @@ blk::Resource_Storage<blk::Texture> texture_storage = {};
 blk::Pool_Handle<blk::Texture>
 blk::load_texture(const char* stem)
 {
-	std::string path = "./Assets/Textures/";
-	path += stem;
-	path += ".png";
+	const uint64_t hash = get_resource_hash(stem, Resource_Type::TEXTURE);
 
-	if (is_resource_loaded(texture_storage, path.c_str()))
+	return load_texture(hash);
+}
+
+blk::Pool_Handle<blk::Texture>
+blk::load_texture(uint64_t hash)
+{
+	const std::string path = std::format("Assets/{}.btexture", hash);
+
+	if (is_resource_loaded(texture_storage, hash))
 	{
-		return get_resource_handle(texture_storage, path.c_str());
+		return get_resource_handle(texture_storage, hash);
 	}
 
-	int width = 0;
-	int height = 0;
-	int channel_count = 0;
+	File* file = open_file(path.c_str(), File_Access_Mode::READ);
 
-	stbi_uc* pixels = stbi_load(path.c_str(), &width, &height, &channel_count, STBI_rgb_alpha);
-
-	if (!pixels)
+	if (!file)
 	{
-		BLK_FATAL("Failed to load texture\n");
+		BLK_FATAL("Failed to open asset: %s\n", path.c_str());
 	}
 
-	const auto* begin = reinterpret_cast<const Color_RGBA<uint8_t>*>(pixels);
+	const uint64_t file_size = get_file_size(file);
+	auto buffer = static_cast<char*>(malloc(file_size));
+	read_file(file, buffer, file_size);
+	close_file(file);
+
+	Serial src_serial(buffer, file_size);
+
+	if (src_serial.read<Magic>() != BLINK_MAGIC)
+	{
+		BLK_FATAL("Source buffer is not Blink format\n");
+	}
+
+	if (src_serial.read<Magic>() != TEXTURE_MAGIC)
+	{
+		BLK_FATAL("Source buffer is not a Blink texture\n");
+	}
+
+	if (src_serial.read<uint8_t>() != TEXTURE_VERSION)
+	{
+		BLK_FATAL("Expected Blink texture version %u\n", TEXTURE_VERSION);
+	}
 
 	Texture texture = {};
-	texture.pixels.assign(begin, begin + static_cast<size_t>(width) * static_cast<size_t>(height));
-	texture.width = static_cast<uint32_t>(width);
-	texture.height = static_cast<uint32_t>(height);
 
-	stbi_image_free(pixels);
+	texture.width = src_serial.read<uint32_t>();
+	texture.height = src_serial.read<uint32_t>();
+	texture.pixels.reserve(texture.width * texture.height);
 
-	return store_resource(texture_storage, texture, stem, path.c_str());
+	for (uint64_t i = 0; i < texture.width * texture.height; i++)
+	{
+		Color_RGBA<uint8_t> pixel = {};
+
+		pixel.r = src_serial.read<uint8_t>();
+		pixel.g = src_serial.read<uint8_t>();
+		pixel.b = src_serial.read<uint8_t>();
+		pixel.a = src_serial.read<uint8_t>();
+
+		texture.pixels.push_back(pixel);
+	}
+
+	return store_resource(texture_storage, texture, hash, "");
 }
 
 void
