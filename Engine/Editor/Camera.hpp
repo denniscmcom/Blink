@@ -5,13 +5,20 @@
 
 #pragma once
 
+#include "Engine/Core/Pool.hpp"
+
 namespace blk
 {
-struct Editor_Context;
+struct World;
+struct Camera;
 struct Input_State;
 
-void create_editor_camera(Editor_Context& context);
-void destroy_editor_camera(Editor_Context& context);
-void update_editor_camera(const Editor_Context& context, double delta_time, const Input_State& input_state);
-void activate_editor_camera(Editor_Context& context);
+Pool_Handle<Camera> create_editor_camera(World& world);
+void destroy_editor_camera(World& world, Pool_Handle<Camera>& handle);
+void update_editor_camera(
+	const World& world,
+	const Pool_Handle<Camera>& handle,
+	const Input_State& input_state,
+	double delta_time
+);
 }  // namespace blk

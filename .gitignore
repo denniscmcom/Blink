@@ -5,6 +5,7 @@
 .vs/
 Assets/
 Build/
+Engine/Editor/Resources
 External/
 Game/
 TODO.md

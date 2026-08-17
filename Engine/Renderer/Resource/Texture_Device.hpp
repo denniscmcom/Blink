@@ -10,6 +10,8 @@
 
 #include <vulkan/vulkan.h>
 
+#include <optional>
+
 namespace blk
 {
 struct Context;
@@ -18,11 +20,12 @@ struct Texture;
 
 struct Texture_Device
 {
-	Pool_Handle<Texture> handle;
-	Image image;
+	Pool_Handle<Texture> handle = {};
+	Image image = {};
 };
 
-Texture_Device transfer_texture(
+/// Transfers texture to GPU device.
+std::optional<Texture_Device> transfer_texture(
 	const Context& context,
 	Arena& arena,
 	const Pool_Handle<Texture>& handle,

@@ -45,7 +45,9 @@ blk::load_texture(uint64_t hash)
 
 	if (!file)
 	{
-		BLK_FATAL("Failed to open asset: %s\n", path.c_str());
+		BLK_ERROR("Failed to open asset: %s\n", path.c_str());
+
+		return {};
 	}
 
 	const uint64_t file_size = get_file_size(file);
@@ -57,17 +59,23 @@ blk::load_texture(uint64_t hash)
 
 	if (src_serial.read<Magic>() != BLINK_MAGIC)
 	{
-		BLK_FATAL("Source buffer is not Blink format\n");
+		BLK_ERROR("Source buffer is not Blink format\n");
+
+		return {};
 	}
 
 	if (src_serial.read<Magic>() != TEXTURE_MAGIC)
 	{
-		BLK_FATAL("Source buffer is not a Blink texture\n");
+		BLK_ERROR("Source buffer is not a Blink texture\n");
+
+		return {};
 	}
 
 	if (src_serial.read<uint8_t>() != TEXTURE_VERSION)
 	{
-		BLK_FATAL("Expected Blink texture version %u\n", TEXTURE_VERSION);
+		BLK_ERROR("Expected Blink texture version %u\n", TEXTURE_VERSION);
+
+		return {};
 	}
 
 	Texture texture = {};

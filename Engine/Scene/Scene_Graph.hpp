@@ -24,7 +24,8 @@ struct Scene_Graph
 };
 
 Pool_Handle<Node> create_node(Scene_Graph& scene_graph, const char* name, Pool_Handle<Node> parent);
-void destroy_node(Scene_Graph& scene_graph, Pool_Handle<Node> handle, std::vector<Pool_Handle<Node>>& removed_handles);
 std::string make_unique_node_name(const Scene_Graph& scene_graph, const char* base_name);
+void destroy_node(Scene_Graph& scene_graph, Pool_Handle<Node> handle, std::vector<Pool_Handle<Node>>& removed_handles);
 void rename_node(Scene_Graph& scene_graph, Pool_Handle<Node> handle, const char* name);
+Node* get_node(const Scene_Graph& scene_graph, Pool_Handle<Node> handle);
 }  // namespace blk

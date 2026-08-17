@@ -52,4 +52,12 @@ void despawn_node(World& world, Pool_Handle<Node> handle);
 Pool_Handle<Actor> find_actor(const World& world, const char* name);
 Pool_Handle<Camera> find_camera(const World& world, const char* name);
 Pool_Handle<Prop> find_prop(const World& world, const char* name);
+
+Actor* get_actor(const World& world, Pool_Handle<Actor> handle);
+Camera* get_camera(const World& world, Pool_Handle<Camera> handle);
+Prop* get_prop(const World& world, Pool_Handle<Prop> handle);
+
+Node* get_entity_node(const World& world, Pool_Handle<Actor> handle);
+Node* get_entity_node(const World& world, Pool_Handle<Camera> handle);
+Node* get_entity_node(const World& world, Pool_Handle<Prop> handle);
 }  // namespace blk

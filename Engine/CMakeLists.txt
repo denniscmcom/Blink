@@ -18,5 +18,11 @@ target_link_libraries(BlkEngine
 		PRIVATE
 			BlkStb
 			BlkImGui
+			BlkIconFontCppHeaders
 			Vulkan::Vulkan
+)
+
+target_compile_definitions(BlkEngine
+	PRIVATE
+		BLK_ENGINE_VERSION="2026.08.08.1-Dev"
 )

@@ -17,8 +17,14 @@ blk::Descriptor_Layouts
 blk::create_descriptor_layouts(const Context& context)
 {
 	constexpr std::array<VkDescriptorPoolSize, 2> descriptor_pool_sizes = {{
-		{.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = MAX_FRAMES_IN_FLIGHT * 2 + MAX_MATERIAL_COUNT},
-		{.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = MAX_MATERIAL_COUNT * 2},
+		{
+			.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			.descriptorCount = MAX_FRAMES_IN_FLIGHT * 2 + MAX_MATERIAL_COUNT,
+		},
+		{
+			.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			.descriptorCount = MAX_MATERIAL_COUNT * 3,
+		},
 	}};
 
 	VkDescriptorPoolCreateInfo descriptor_pool_create_info = {};
@@ -36,10 +42,12 @@ blk::create_descriptor_layouts(const Context& context)
 	}
 
 	constexpr std::array<VkDescriptorSetLayoutBinding, 1> camera_bindings = {{
-		{.binding = 0,
-		 .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-		 .descriptorCount = 1,
-		 .stageFlags = VK_SHADER_STAGE_VERTEX_BIT},
+		{
+			.binding = 0,
+			.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			.descriptorCount = 1,
+			.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+		},
 	}};
 
 	VkDescriptorSetLayoutCreateInfo camera_layout_create_info = {};
@@ -74,19 +82,31 @@ blk::create_descriptor_layouts(const Context& context)
 		BLK_FATAL("Failed to create descriptor set layout\n");
 	}
 
-	constexpr std::array<VkDescriptorSetLayoutBinding, 3> material_bindings = {{
-		{.binding = 0,
-		 .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-		 .descriptorCount = 1,
-		 .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT},
-		{.binding = 1,
-		 .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-		 .descriptorCount = 1,
-		 .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT},
-		{.binding = 2,
-		 .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-		 .descriptorCount = 1,
-		 .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT},
+	constexpr std::array<VkDescriptorSetLayoutBinding, 4> material_bindings = {{
+		{
+			.binding = 0,
+			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			.descriptorCount = 1,
+			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+		},
+		{
+			.binding = 1,
+			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			.descriptorCount = 1,
+			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+		},
+		{
+			.binding = 2,
+			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			.descriptorCount = 1,
+			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+		},
+		{
+			.binding = 3,
+			.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			.descriptorCount = 1,
+			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+		},
 	}};
 
 	VkDescriptorSetLayoutCreateInfo material_layout_create_info = {};

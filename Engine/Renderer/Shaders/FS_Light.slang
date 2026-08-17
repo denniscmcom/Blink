@@ -5,16 +5,12 @@
 
 #include "Shared.slang"
 
-[[vk::binding(0, 1)]]
-ConstantBuffer<Light_UBO> light_ubo;
-
-[[vk::push_constant]]
-ConstantBuffer<Light_Constants> light_constants;
-
 [shader("fragment")]
 float4
-fs_main(VS_PNT_Output input)
+fs_main(VS_Main_Output input)
 	: SV_Target
 {
-	return float4(light_ubo.light_colors[light_constants.light_index], 1.0);
+	return float4(1.0, 1.0, 1.0, 1.0);
 }
+
+

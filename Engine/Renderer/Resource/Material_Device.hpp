@@ -18,19 +18,20 @@ struct Arena;
 struct Descriptor_Layouts;
 struct Material;
 
-// Layout must match Shaders/Shared.slang (std140).
 struct Material_UBO
 {
-	float shininess;
+	// TODO: This is temporary until I add PBR factors.
+	int dummy = 0;
 };
 
 struct Material_Device
 {
-	Pool_Handle<Material> handle;
-	Texture_Device diffuse_map;
-	Texture_Device specular_map;
-	Buffer uniform_buffer;
-	VkDescriptorSet descriptor_set;
+	Pool_Handle<Material> handle = {};
+	Texture_Device albedo = {};
+	Texture_Device normal = {};
+	Texture_Device orm = {};
+	Buffer uniform_buffer = {};
+	VkDescriptorSet descriptor_set = VK_NULL_HANDLE;
 };
 
 Material_Device transfer_material(

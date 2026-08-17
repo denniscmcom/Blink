@@ -18,7 +18,7 @@ enum class File_Access_Mode
 };
 
 File* open_file(const char* path, File_Access_Mode mode);
-void close_file(File* file);
+void close_file(const File* file);
 uint64_t get_file_size(File* file);
 void read_file(File* file, char* buffer, uint64_t size);
 void write_file(File* file, char* buffer, uint64_t size);

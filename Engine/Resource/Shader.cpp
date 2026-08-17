@@ -38,7 +38,9 @@ blk::load_shader(const char* stem)
 
 	if (!file)
 	{
-		BLK_FATAL("Failed to load shader");
+		BLK_ERROR("Failed to load shader");
+
+		return {};
 	}
 
 	const uint64_t file_size = get_file_size(file);
@@ -50,17 +52,23 @@ blk::load_shader(const char* stem)
 
 	if (src_serial.read<Magic>() != BLINK_MAGIC)
 	{
-		BLK_FATAL("Source buffer is not Blink format\n");
+		BLK_ERROR("Source buffer is not Blink format\n");
+
+		return {};
 	}
 
 	if (src_serial.read<Magic>() != SHADER_MAGIC)
 	{
-		BLK_FATAL("Source buffer is not a Blink shader\n");
+		BLK_ERROR("Source buffer is not a Blink shader\n");
+
+		return {};
 	}
 
 	if (src_serial.read<uint8_t>() != SHADER_VERSION)
 	{
-		BLK_FATAL("Expected Blink shader version %u\n", SHADER_VERSION);
+		BLK_ERROR("Expected Blink shader version %u\n", SHADER_VERSION);
+
+		return {};
 	}
 
 	Shader shader = {};

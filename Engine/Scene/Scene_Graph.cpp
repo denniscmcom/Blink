@@ -183,3 +183,9 @@ blk::rename_node(Scene_Graph& scene_graph, Pool_Handle<Node> handle, const char*
 
 	scene_graph.name_id_to_handle.insert({node->name_id, handle});
 }
+
+blk::Node*
+blk::get_node(const Scene_Graph& scene_graph, Pool_Handle<Node> handle)
+{
+	return scene_graph.nodes.get(handle);
+}

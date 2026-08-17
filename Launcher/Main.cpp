@@ -3,8 +3,8 @@
 // Licensed under the Blink Engine Source Access License, see LICENSE.txt
 // ============================================================================
 
+#include "../Engine/Editor/World/Console.hpp"
 #include "Engine/Core/Time.hpp"
-#include "Engine/Editor/Console.hpp"
 #include "Engine/Editor/Context.hpp"
 #include "Engine/Editor/Editor.hpp"
 #include "Engine/Input/Input.hpp"
@@ -29,22 +29,21 @@ BLK_ENTRY()
 	blk::create_log_sink(blk::log_editor);
 
 	blk::create_application(hInstance);
-	blk::create_window();
+	blk::create_window(BLK_PROJECT_NAME);
 
-	blk::Rect<int> client_size = blk::get_window_client_size();
-	blk::create_renderer(client_size.x, client_size.y);
+	const blk::Rect<unsigned> client_size = blk::get_window_client_size();
+	blk::create_renderer(client_size);
 
 	blk::Game_Context game_context = {};
 	blk::create_game(game_context);
 
-	blk::Editor_Context editor_context = {};
-	editor_context.world = &game_context.world;
+	blk::Input_State input_state = {};
+
+	blk::Editor_Context editor_context(&input_state, &game_context.world);
 	blk::create_editor(editor_context);
 
 	blk::start_global_timer();
 	double prev_frame_secs = blk::get_global_timer_seconds();
-
-	blk::Input_State input_state = {};
 
 	while (blk::is_application_running())
 	{
@@ -53,10 +52,9 @@ BLK_ENTRY()
 		prev_frame_secs = frame_secs;
 
 		blk::update_input_state(input_state);
+		blk::update_editor(editor_context, delta_time);
 
-		blk::update_editor(editor_context, delta_time, input_state);
-
-		if (!editor_context.is_game_simulation_paused)
+		if (!editor_context.world_context.is_game_simulation_paused)
 		{
 			blk::update_game(game_context, delta_time, input_state);
 		}

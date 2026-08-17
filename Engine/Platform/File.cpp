@@ -48,7 +48,7 @@ blk::open_file(const char* path, File_Access_Mode mode)
 }
 
 void
-blk::close_file(File* file)
+blk::close_file(const File* file)
 {
 	if (!BLK_VERIFY(file))
 	{

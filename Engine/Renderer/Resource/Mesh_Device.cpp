@@ -24,7 +24,7 @@ blk::transfer_mesh(const Context& context, Arena& arena, const Pool_Handle<Mesh>
 	const uint32_t available_vertex_buffer_size = arena.vertex_buffer.host.size - arena.vertex_buffer_byte_offset;
 	const uint32_t available_index_buffer_size = arena.index_buffer.host.size - arena.index_buffer_byte_offset;
 
-	if (available_vertex_buffer_size < sizeof(Vertex_PNT) * mesh->vertices.size())
+	if (available_vertex_buffer_size < sizeof(Vertex) * mesh->vertices.size())
 	{
 		BLK_FATAL("Vertex buffer is too small\n");
 	}
@@ -42,7 +42,7 @@ blk::transfer_mesh(const Context& context, Arena& arena, const Pool_Handle<Mesh>
 	update_buffer(
 		arena.vertex_buffer.host,
 		mesh->vertices.data(),
-		sizeof(Vertex_PNT) * mesh->vertices.size(),
+		sizeof(Vertex) * mesh->vertices.size(),
 		arena.vertex_buffer_byte_offset
 	);
 
@@ -67,11 +67,11 @@ blk::transfer_mesh(const Context& context, Arena& arena, const Pool_Handle<Mesh>
 	Mesh_Device mesh_device = {};
 	mesh_device.handle = mesh_handle;
 	mesh_device.vertex_count = mesh->vertices.size();
-	mesh_device.vertex_buffer_offset = arena.vertex_buffer_byte_offset / sizeof(Vertex_PNT);
+	mesh_device.vertex_buffer_offset = arena.vertex_buffer_byte_offset / sizeof(Vertex);
 	mesh_device.index_count = mesh->indices.size();
 	mesh_device.index_buffer_offset = arena.index_buffer_byte_offset / sizeof(Index);
 
-	arena.vertex_buffer_byte_offset += sizeof(Vertex_PNT) * mesh->vertices.size();
+	arena.vertex_buffer_byte_offset += sizeof(Vertex) * mesh->vertices.size();
 	arena.index_buffer_byte_offset += sizeof(Index) * mesh->indices.size();
 
 	arena.meshes.insert({mesh_handle, mesh_device});

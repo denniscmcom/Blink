@@ -11,21 +11,27 @@
 #include "Engine/Renderer/Resource/Arena.hpp"
 #include "Engine/Resource/Texture.hpp"
 
-blk::Texture_Device
+#include <optional>
+
+std::optional<blk::Texture_Device>
 blk::transfer_texture(const Context& context, Arena& arena, const Pool_Handle<Texture>& handle, const VkFormat format)
 {
 	const Texture* texture = get_texture(handle);
 
 	if (!texture)
 	{
-		BLK_FATAL("Failed to get texture\n");
+		BLK_ERROR("Failed to get host texture\n");
+
+		return std::nullopt;
 	}
 
 	const VkDeviceSize texture_size = sizeof(Color_RGBA<uint8_t>) * texture->pixels.size();
 
 	if (arena.texture_buffer.size < texture_size)
 	{
-		BLK_FATAL("Texture staging buffer is too small\n");
+		BLK_ERROR("Texture staging buffer is too small\n");
+
+		return std::nullopt;
 	}
 
 	if (!arena.texture_buffer.map)

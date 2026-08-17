@@ -1,25 +1,22 @@
 # The Blink Game Engine
 
-Game engine written in C++ with a Vulkan-based renderer. Currently in active
-development.
+Game engine written in C++ for Windows with a Vulkan Physically Based Renderer
+(PBR) renderer. Currently in active development.
 
-![Blink Editor](https://public.denniscm.com/repositories/blink/editor.jpg)
+![Blink Editor](https://public.denniscm.com/repositories/blink/editor_1.png)
 
 ## Features
  
-- Renderer: Vulkan renderer with Blinn-Phong lighting and separate pipelines for
-  meshes and lights
-- Scene Graph: Hierarchical scene graph with parent/child node relationships
-- Entity System: Actor, Camera, and Prop entities managed through a pool
-  allocator with generational IDs
-- Resource System: Caching for meshes, materials, textures, and shaders with
-  FNV-1a hash-based deduplication
-- Platform Layer: Win32 windowing and input system with raw mouse input and
-  keyboard edge detection
-- Editor: Integrated editor with outliner, console, stats panel, and editor
-  camera (built with ImGui)
-- Math Library: Custom vector and matrix types
-- Asset Pipeline: Resource loading with OBJ mesh parsing and material support
+- PBR material pipeline (albedo, normal map, occlusion, roughness, metallic).
+- Support for point lights.
+- Hierarchical scene graph with parent-child node relationships.
+- Asset caching system for meshes, materials, textures, and shaders.
+- Platform layer for Windows using the Win32 API.
+- Integrated editor with two modes (world, and material) built with ImGui.
+- Custom math library.
+- Asset compilation to custom binary formats.
+- Data-oriented approach.
+- Focused in code readability, maintenance, and performance.
 
 ## Building
  

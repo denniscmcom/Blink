@@ -11,19 +11,18 @@
 #include <vulkan/vulkan_win32.h>
 
 #include <array>
+#include <stdint.h>
+#include <string.h>
 #include <vector>
 
+namespace
+{
 VKAPI_ATTR VkBool32 VKAPI_CALL vulkan_debug_callback(
 	VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
 	VkDebugUtilsMessageTypeFlagsEXT message_type,
 	const VkDebugUtilsMessengerCallbackDataEXT* callback_data,
 	void* user_data
 );
-
-namespace
-{
-const char* vulkan_get_severity_tag(VkDebugUtilsMessageSeverityFlagBitsEXT tag);
-const char* vulkan_get_message_type_tag(VkDebugUtilsMessageTypeFlagsEXT tag);
 }  // namespace
 
 blk::Context
@@ -33,13 +32,16 @@ blk::create_context(HWND window)
 	// Create instance.
 	// ============================================================================
 
-	BLK_DEBUG("Creating instance...\n");
+	BLK_DEBUG("Creating Vulkan instance\n");
 
 	VkApplicationInfo application_info = {};
 	application_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-	application_info.pApplicationName = "Blink Game";
+	// FIXME: Use `BLK_PROJECT_NAME` here.
+	application_info.pApplicationName = "BlinkApplication";
+	// FIXME: Use `BLK_PROJECT_VERSION` here.
 	application_info.applicationVersion = VK_MAKE_VERSION(0, 0, 1);
 	application_info.pEngineName = "Blink";
+	// FIXME: Use `BLK_ENGINE_VERSION` here.
 	application_info.engineVersion = VK_MAKE_VERSION(0, 0, 1);
 	application_info.apiVersion = VK_API_VERSION_1_3;
 
@@ -55,11 +57,11 @@ blk::create_context(HWND window)
 	instance_create_info.enabledExtensionCount = extensions.size();
 	instance_create_info.ppEnabledExtensionNames = extensions.data();
 
-	VkInstance instance;
+	VkInstance instance = VK_NULL_HANDLE;
 
 	if (vkCreateInstance(&instance_create_info, nullptr, &instance) != VK_SUCCESS)
 	{
-		BLK_FATAL("Failed to create instance\n");
+		BLK_FATAL("Failed to create Vulkan instance\n");
 	}
 
 	auto vkCreateDebugUtilsMessengerEXT = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
@@ -71,7 +73,7 @@ blk::create_context(HWND window)
 		BLK_FATAL("Failed to load vkCreateDebugUtilsMessengerEXT\n");
 	}
 
-	VkDebugUtilsMessengerEXT messenger;
+	VkDebugUtilsMessengerEXT messenger = VK_NULL_HANDLE;
 
 	VkDebugUtilsMessengerCreateInfoEXT messenger_create_info = {};
 	messenger_create_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
@@ -85,14 +87,14 @@ blk::create_context(HWND window)
 
 	if (vkCreateDebugUtilsMessengerEXT(instance, &messenger_create_info, nullptr, &messenger) != VK_SUCCESS)
 	{
-		BLK_FATAL("Failed to create debug messenger\n");
+		BLK_FATAL("Failed to create Vulkan debug messenger\n");
 	}
 
 	// ============================================================================
 	// Create surface.
 	// ============================================================================
 
-	BLK_DEBUG("Creating surface...\n");
+	BLK_DEBUG("Creating Vulkan surface\n");
 
 	// FIXME: This is leaking outside of Platform/
 	VkWin32SurfaceCreateInfoKHR create_info = {};
@@ -100,7 +102,7 @@ blk::create_context(HWND window)
 	create_info.hinstance = GetModuleHandleW(nullptr);
 	create_info.hwnd = window;
 
-	VkSurfaceKHR surface;
+	VkSurfaceKHR surface = VK_NULL_HANDLE;
 
 	if (vkCreateWin32SurfaceKHR(instance, &create_info, nullptr, &surface) != VK_SUCCESS)
 	{
@@ -111,7 +113,7 @@ blk::create_context(HWND window)
 	// Create device.
 	// ============================================================================
 
-	BLK_DEBUG("Selecting physical device...\n");
+	BLK_DEBUG("Selecting physical device\n");
 
 	uint32_t physical_device_count = 0;
 
@@ -128,21 +130,22 @@ blk::create_context(HWND window)
 		BLK_FATAL("Failed to enumerate physical devices\n");
 	}
 
-	BLK_DEBUG("Selecting best physical device...\n");
+	BLK_DEBUG("Selecting best physical device\n");
+
 	bool found_physical_device = false;
-	VkPhysicalDevice selected_physical_device;
+	VkPhysicalDevice selected_physical_device = VK_NULL_HANDLE;
 	uint32_t graphics_queue_family_index = ~0;
 
 	for (const auto& physical_device : physical_devices)
 	{
 		graphics_queue_family_index = ~0u;
 
-		BLK_DEBUG("Getting physical device properties...\n");
+		BLK_DEBUG("Getting physical device properties\n");
 		VkPhysicalDeviceProperties2 physical_device_properties = {};
 		physical_device_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
 		vkGetPhysicalDeviceProperties2(physical_device, &physical_device_properties);
 
-		BLK_DEBUG("Getting physical device features...\n");
+		BLK_DEBUG("Getting physical device features\n");
 		VkPhysicalDeviceExtendedDynamicStateFeaturesEXT physical_device_extended_dynamic_state_features = {};
 		physical_device_extended_dynamic_state_features.sType =
 			VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT;
@@ -210,7 +213,7 @@ blk::create_context(HWND window)
 			continue;
 		}
 
-		BLK_DEBUG("Getting queue family properties...\n");
+		BLK_DEBUG("Getting queue family properties\n");
 		uint32_t queque_family_properties_count = 0;
 		vkGetPhysicalDeviceQueueFamilyProperties2(physical_device, &queque_family_properties_count, nullptr);
 
@@ -228,7 +231,7 @@ blk::create_context(HWND window)
 			queue_families_properties.data()
 		);
 
-		BLK_DEBUG("Checking surface support for physical device...\n");
+		BLK_DEBUG("Checking surface support for physical device\n");
 
 		for (uint32_t queue_family_properties_index = 0;
 			 queue_family_properties_index < queue_families_properties.size();
@@ -246,7 +249,8 @@ blk::create_context(HWND window)
 				BLK_FATAL("Failed to get physical device surface support\n");
 			}
 
-			VkQueueFamilyProperties2 queue_family_properties = queue_families_properties[queue_family_properties_index];
+			const VkQueueFamilyProperties2 queue_family_properties =
+				queue_families_properties.at(queue_family_properties_index);
 			const auto supports_graphics =
 				static_cast<bool>(queue_family_properties.queueFamilyProperties.queueFlags & VK_QUEUE_GRAPHICS_BIT);
 
@@ -263,7 +267,7 @@ blk::create_context(HWND window)
 			continue;
 		}
 
-		BLK_DEBUG("Getting physical device extension properties...\n");
+		BLK_DEBUG("Getting physical device extension properties\n");
 		uint32_t physical_device_extension_properties_count = 0;
 
 		if (vkEnumerateDeviceExtensionProperties(
@@ -291,11 +295,12 @@ blk::create_context(HWND window)
 			BLK_FATAL("Failed to get physical device extension properties\n");
 		}
 
-		BLK_DEBUG("Checking physical device extensions supports...\n");
-		constexpr std::array<const char*, 1> required_physical_device_extensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+		BLK_DEBUG("Checking physical device extensions supports\n");
 		bool supports_extension = false;
 
-		for (const auto& required_extension : required_physical_device_extensions)
+		for (constexpr std::array<const char*, 1> required_physical_device_extensions =
+				 {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+			 const auto& required_extension : required_physical_device_extensions)
 		{
 			supports_extension = false;
 
@@ -320,7 +325,7 @@ blk::create_context(HWND window)
 			continue;
 		}
 
-		BLK_DEBUG("Selected device: %s\n", physical_device_properties.properties.deviceName);
+		BLK_INFO("Selected device: %s\n", physical_device_properties.properties.deviceName);
 		selected_physical_device = physical_device;
 		found_physical_device = true;
 	}
@@ -330,7 +335,7 @@ blk::create_context(HWND window)
 		BLK_FATAL("Failed to found physical device\n");
 	}
 
-	BLK_DEBUG("Creating logical device...\n");
+	BLK_DEBUG("Creating logical device\n");
 
 	VkPhysicalDeviceExtendedDynamicStateFeaturesEXT device_required_extended_dynamic_state_features = {};
 	device_required_extended_dynamic_state_features.sType =
@@ -370,15 +375,16 @@ blk::create_context(HWND window)
 	device_create_info.enabledExtensionCount = device_extensions.size();
 	device_create_info.ppEnabledExtensionNames = device_extensions.data();
 
-	VkDevice logical_device;
+	VkDevice logical_device = VK_NULL_HANDLE;
 
 	if (vkCreateDevice(selected_physical_device, &device_create_info, nullptr, &logical_device) != VK_SUCCESS)
 	{
 		BLK_FATAL("Failed to create logical device\n");
 	}
 
-	BLK_DEBUG("Getting graphics queue handle...\n");
-	VkQueue graphics_queue;
+	BLK_DEBUG("Getting graphics queue handle\n");
+
+	VkQueue graphics_queue = VK_NULL_HANDLE;
 	vkGetDeviceQueue(logical_device, graphics_queue_family_index, 0, &graphics_queue);
 
 	// ============================================================================
@@ -390,20 +396,20 @@ blk::create_context(HWND window)
 	command_pool_info.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
 	command_pool_info.queueFamilyIndex = graphics_queue_family_index;
 
-	VkCommandPool transient_command_pool;
+	VkCommandPool transient_command_pool = VK_NULL_HANDLE;
 
 	if (vkCreateCommandPool(logical_device, &command_pool_info, nullptr, &transient_command_pool) != VK_SUCCESS)
 	{
-		BLK_FATAL("Failed to create command pool\n");
+		BLK_FATAL("Failed to create transient command pool\n");
 	}
 
 	command_pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
-	VkCommandPool frame_command_pool;
+	VkCommandPool frame_command_pool = VK_NULL_HANDLE;
 
 	if (vkCreateCommandPool(logical_device, &command_pool_info, nullptr, &frame_command_pool) != VK_SUCCESS)
 	{
-		BLK_FATAL("Failed to create command pool\n");
+		BLK_FATAL("Failed to create frame command pool\n");
 	}
 
 	// ============================================================================
@@ -426,7 +432,7 @@ blk::create_context(HWND window)
 	sampler_create_info.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
 	sampler_create_info.compareOp = VK_COMPARE_OP_ALWAYS;
 
-	VkSampler sampler;
+	VkSampler sampler = VK_NULL_HANDLE;
 
 	if (vkCreateSampler(logical_device, &sampler_create_info, nullptr, &sampler) != VK_SUCCESS)
 	{
@@ -447,67 +453,57 @@ blk::create_context(HWND window)
 	};
 }
 
+namespace
+{
 VKAPI_ATTR VkBool32 VKAPI_CALL
 vulkan_debug_callback(
 	VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
 	VkDebugUtilsMessageTypeFlagsEXT message_type,
 	const VkDebugUtilsMessengerCallbackDataEXT* callback_data,
-	void* user_data
+	void* /*user_data*/
 )
 {
-	(void)user_data;
+	constexpr size_t max_message_type_size = 256;
+	char message_type_buffer[max_message_type_size] = "Vulkan | ";
 
-	blk::log_msg(
-		"VULKAN",
-		nullptr,
-		0,
-		"[ %s ] [ %s ] %s\n",
-		vulkan_get_severity_tag(message_severity),
-		vulkan_get_message_type_tag(message_type),
-		callback_data->pMessage
-	);
+	if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT)
+	{
+		strcat(message_type_buffer, "General | ");
+	}
 
-	return VK_FALSE;
-}
+	if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT)
+	{
+		strcat(message_type_buffer, "Validation | ");
+	}
 
-namespace
-{
-const char*
+	if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT)
+	{
+		strcat(message_type_buffer, "Performance | ");
+	}
 
-vulkan_get_severity_tag(VkDebugUtilsMessageSeverityFlagBitsEXT tag)
-{
-	switch (tag)
+	if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_DEVICE_ADDRESS_BINDING_BIT_EXT)
+	{
+		strcat(message_type_buffer, "AddrBind | ");
+	}
+
+	switch (message_severity)
 	{
 	case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT:
-		return "VERBOSE";
+		BLK_TRACE("%s%s\n", message_type_buffer, callback_data->pMessage);
+		break;
 	case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT:
-		return "INFO";
+		BLK_DEBUG("%s%s\n", message_type_buffer, callback_data->pMessage);
+		break;
 	case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
-		return "WARNING";
+		BLK_WARNING("%s%s\n", message_type_buffer, callback_data->pMessage);
+		break;
 	case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
-		return "ERROR";
+		BLK_ERROR("%s%s\n", message_type_buffer, callback_data->pMessage);
+		break;
 	default:
-		return "UNKNOWN";
+		break;
 	}
-}
 
-const char*
-vulkan_get_message_type_tag(VkDebugUtilsMessageTypeFlagsEXT tag)
-{
-	switch (tag)
-	{
-	case VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT:
-		return "GENERAL";
-	case VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT:
-		return "VALIDATION";
-	case VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT:
-		return "PERFORMANCE";
-	case VK_DEBUG_UTILS_MESSAGE_TYPE_DEVICE_ADDRESS_BINDING_BIT_EXT:
-		return "ADDRESS_BINDING";
-	default:
-		// TODO: This is not correct. Multiple message type flags could be set, so this switch will return `UNKNOWN`
-		//   incorrectly.
-		return "UNKNOWN";
-	}
+	return VK_FALSE;
 }
 }  // namespace

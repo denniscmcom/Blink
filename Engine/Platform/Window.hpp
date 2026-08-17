@@ -10,7 +10,7 @@ namespace blk
 template <typename Type>
 struct Rect;
 
-void create_window();
+void create_window(const char* title);
 void destroy_window();
-Rect<int> get_window_client_size();
+Rect<unsigned> get_window_client_size();
 }  // namespace blk

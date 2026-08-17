@@ -15,18 +15,13 @@
 
 namespace blk
 {
-struct Vertex_PNT
+struct Vertex
 {
 	Vector3 position;
 	Vector3 normal;
+	Vector3 tangent;
+	Vector3 bitangent;
 	Vector2 texture_coord;
-};
-
-struct Vertex_PNC
-{
-	Vector3 position;
-	Vector3 normal;
-	Color_RGB<float> color;
 };
 
 using Index = uint32_t;
@@ -34,7 +29,7 @@ using Index = uint32_t;
 struct Mesh
 {
 	Resource_Metadata metadata;
-	std::vector<Vertex_PNT> vertices;
+	std::vector<Vertex> vertices;
 	std::vector<Index> indices;
 };
 

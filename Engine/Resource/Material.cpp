@@ -35,7 +35,9 @@ blk::load_material(const char* stem)
 
 	if (!file)
 	{
-		BLK_FATAL("Failed to open asset: %s\n", path.c_str());
+		BLK_ERROR("Failed to open asset: %s\n", path.c_str());
+
+		return {};
 	}
 
 	const uint64_t file_size = get_file_size(file);
@@ -47,23 +49,29 @@ blk::load_material(const char* stem)
 
 	if (serial.read<Magic>() != BLINK_MAGIC)
 	{
-		BLK_FATAL("Source buffer is not Blink format\n");
+		BLK_ERROR("Source buffer is not Blink format\n");
+
+		return {};
 	}
 
 	if (serial.read<Magic>() != MATERIAL_MAGIC)
 	{
-		BLK_FATAL("Source buffer is not a Blink material\n");
+		BLK_ERROR("Source buffer is not a Blink material\n");
+
+		return {};
 	}
 
 	if (serial.read<uint8_t>() != MATERIAL_VERSION)
 	{
-		BLK_FATAL("Expected Blink mesh version %u\n", MATERIAL_VERSION);
+		BLK_ERROR("Expected Blink mesh version %u\n", MATERIAL_VERSION);
+
+		return {};
 	}
 
 	Material material = {};
-	material.diffuse_map = load_texture(serial.read<uint64_t>());
-	material.specular_map = load_texture(serial.read<uint64_t>());
-	material.shininess = serial.read<float>();
+	material.albedo = load_texture(serial.read<uint64_t>());
+	material.normal = load_texture(serial.read<uint64_t>());
+	material.orm = load_texture(serial.read<uint64_t>());
 
 	return store_resource(material_storage, material, hash, stem);
 }
@@ -71,6 +79,7 @@ blk::load_material(const char* stem)
 void
 blk::unload_material(Pool_Handle<Material> handle)
 {
+	BLK_NOT_IMPLEMENTED();
 }
 
 blk::Material*

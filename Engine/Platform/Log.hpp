@@ -7,6 +7,8 @@
 
 #include "Engine/Platform/Debug.hpp"
 
+#include <stdint.h>
+
 #ifndef BLK_SOURCE_PATH_PREFIX_LENGTH
 #define BLK_SOURCE_PATH_PREFIX_LENGTH 0
 #endif
@@ -34,7 +36,7 @@
 	do                                                                                                                 \
 	{                                                                                                                  \
 		BLK_LOG("ERROR", __VA_ARGS__);                                                                                 \
-		BLK_DEBUG_BREAK();                                                                                             \
+		/* TODO (WIP): Sometimes it is too much noise. BLK_DEBUG_BREAK(); */                                           \
 	} while (0)
 #else
 #define BLK_ERROR(...) BLK_LOG("ERROR", __VA_ARGS__);
@@ -56,6 +58,9 @@
 namespace blk
 {
 using Log_Sink = void (*)(const char* msg);
+
+constexpr size_t MAX_MSG_SIZE = 1024;
+constexpr uint32_t MAX_SINK_COUNT = 5;
 
 void create_log_sink(Log_Sink sink);
 void log_msg(const char* tag, const char* filename, int line, const char* fmt, ...);

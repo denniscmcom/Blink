@@ -25,6 +25,7 @@ struct Camera_UBO
 {
 	Matrix4 view;
 	Matrix4 projection;
+	Vector3 view_position;
 };
 
 constexpr uint32_t MAX_LIGHT_COUNT = 16;
@@ -35,8 +36,6 @@ constexpr uint32_t MAX_LIGHT_COUNT = 16;
 struct Light_UBO
 {
 	uint32_t light_count;
-	float ambient_strength;
-	Vector3 view_position;
 	Vector3 light_positions[MAX_LIGHT_COUNT];
 	Vector3 light_colors[MAX_LIGHT_COUNT];
 };

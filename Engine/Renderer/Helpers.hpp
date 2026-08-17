@@ -13,8 +13,7 @@
 namespace blk
 {
 struct Context;
-struct Vertex_PNT;
-struct Vertex_PNC;
+struct Vertex;
 
 uint32_t find_memory_type_index(
 	const Context& context,
@@ -48,9 +47,7 @@ std::vector<VkVertexInputBindingDescription> get_vertex_input_descriptions();
 template <typename Type>
 std::vector<VkVertexInputAttributeDescription> get_vertex_input_attribute_descriptions();
 template <>
-std::vector<VkVertexInputAttributeDescription> get_vertex_input_attribute_descriptions<Vertex_PNT>();
-template <>
-std::vector<VkVertexInputAttributeDescription> get_vertex_input_attribute_descriptions<Vertex_PNC>();
+std::vector<VkVertexInputAttributeDescription> get_vertex_input_attribute_descriptions<Vertex>();
 
 VkCommandBuffer create_command_buffer(const Context& context, VkCommandPool pool);
 VkSemaphore create_semaphore(const Context& context);

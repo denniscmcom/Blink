@@ -5,113 +5,97 @@
 
 #include "Engine/Editor/Menu.hpp"
 
-#include "Engine/Editor/Console.hpp"
 #include "Engine/Editor/Context.hpp"
-#include "Engine/Editor/Material_Creator.hpp"
-#include "Engine/Editor/Outliner.hpp"
-#include "Engine/Editor/Stats.hpp"
+#include "Engine/Editor/Material/Settings.hpp"
+#include "Engine/Editor/Toolbar.hpp"
 #include "Engine/Platform/Assert.hpp"
 #include "Engine/Scene/Scene_Graph.hpp"
 #include "Engine/World/World.hpp"
+#include "World/Console.hpp"
+#include "World/Outliner.hpp"
+#include "World/Stats.hpp"
+#include "imgui_internal.h"
 
 #include <imgui.h>
 
 void
 blk::draw_menu(Editor_Context& context)
 {
-	BLK_CHECK(context.world);
+	BLK_CHECK(context.world_context._game_world);
+	BLK_CHECK(context._input_state);
 
 	if (ImGui::BeginMainMenuBar())
 	{
 		if (ImGui::BeginMenu("File"))
 		{
-			if (ImGui::MenuItem("Create project"))
+			if (ImGui::MenuItem("Create project", "Ctrl+N"))
 			{
+				BLK_NOT_IMPLEMENTED();
 			}
 
-			if (ImGui::MenuItem("Load project"))
+			if (ImGui::MenuItem("Load project", "Ctrl+O"))
 			{
-			}
-
-			ImGui::Separator();
-
-			if (ImGui::MenuItem("Create world"))
-			{
-			}
-
-			if (ImGui::MenuItem("Save world"))
-			{
-			}
-
-			if (ImGui::MenuItem("Load world"))
-			{
-			}
-
-			ImGui::Separator();
-
-			if (ImGui::MenuItem("Create material"))
-			{
-				context.show_material_creator = true;
+				BLK_NOT_IMPLEMENTED();
 			}
 
 			ImGui::EndMenu();
 		}
 
-		if (ImGui::BeginMenu("World"))
+		if (ImGui::BeginMenu("Edit"))
 		{
-			if (ImGui::MenuItem("Spawn actor"))
+			if (ImGui::MenuItem("Undo", "Ctrl+Z"))
 			{
-				std::string actor_name = make_unique_node_name(context.world->scene_graph, "Actor");
-				spawn_actor(*context.world, actor_name.c_str(), context.selected_node_handle);
+				BLK_NOT_IMPLEMENTED();
 			}
 
-			if (ImGui::MenuItem("Spawn camera"))
+			if (ImGui::MenuItem("Redo", "Ctrl+R"))
 			{
-				std::string camera_name = make_unique_node_name(context.world->scene_graph, "Camera");
-				spawn_actor(*context.world, camera_name.c_str(), context.selected_node_handle);
-			}
-
-			if (ImGui::MenuItem("Spawn prop"))
-			{
-				std::string prop_name = make_unique_node_name(context.world->scene_graph, "Prop");
-				spawn_actor(*context.world, prop_name.c_str(), context.selected_node_handle);
-			}
-
-			ImGui::Separator();
-
-			if (ImGui::MenuItem("Despawn selected node"))
-			{
-				despawn_node(*context.world, context.selected_node_handle);
-				context.selected_node_handle = {};
+				BLK_NOT_IMPLEMENTED();
 			}
 
 			ImGui::EndMenu();
 		}
 
-		if (ImGui::BeginMenu("Window"))
+		if (ImGui::BeginMenu("View"))
 		{
-			const bool show_all = context.show_outliner && context.show_stats;
-			const bool hide_all = !context.show_outliner && !context.show_stats;
+			const bool show_all = context.world_context.show_outliner && context.world_context.show_stats;
+			const bool hide_all = !context.world_context.show_outliner && !context.world_context.show_stats;
 
-			if (ImGui::MenuItem("Show all", nullptr, show_all))
+			if (ImGui::MenuItem("Show all", "Ctrl+Shift+H", show_all))
 			{
-				context.show_outliner = true;
-				context.show_stats = true;
-				context.show_console = true;
+				// TODO (WIP).
+				BLK_NOT_IMPLEMENTED();
 			}
 
-			if (ImGui::MenuItem("Hide all", nullptr, hide_all))
+			if (ImGui::MenuItem("Hide all", "Ctrl+H", hide_all))
 			{
-				context.show_outliner = false;
-				context.show_stats = false;
-				context.show_console = false;
+				// TODO (WIP).
+				BLK_NOT_IMPLEMENTED();
 			}
 
 			ImGui::Separator();
 
-			ImGui::MenuItem("Show outliner", nullptr, &context.show_outliner);
-			ImGui::MenuItem("Show stats", nullptr, &context.show_stats);
-			ImGui::MenuItem("Show console", nullptr, &context.show_console);
+			switch (context.mode)
+			{
+			case Editor_Mode::WORLD:
+				ImGui::MenuItem("Show outliner", nullptr, &context.world_context.show_outliner);
+				ImGui::MenuItem("Show stats", nullptr, &context.world_context.show_stats);
+				ImGui::MenuItem("Show console", nullptr, &context.world_context.show_console);
+				break;
+			case Editor_Mode::MATERIAL:
+				ImGui::MenuItem("Show material settings", nullptr, &context.material_context.show_material_settings);
+				break;
+			}
+
+			ImGui::EndMenu();
+		}
+
+		if (ImGui::BeginMenu("Help"))
+		{
+			if (ImGui::MenuItem("About", nullptr))
+			{
+				BLK_NOT_IMPLEMENTED();
+			}
 
 			ImGui::EndMenu();
 		}
@@ -119,23 +103,36 @@ blk::draw_menu(Editor_Context& context)
 
 	ImGui::EndMainMenuBar();
 
-	if (context.show_outliner)
+	if (context.show_toolbar)
 	{
-		draw_outliner(context);
+		draw_toolbar(context);
 	}
 
-	if (context.show_stats)
+	switch (context.mode)
 	{
-		draw_stats(context);
-	}
+	case Editor_Mode::WORLD: {
+		if (context.world_context.show_outliner)
+		{
+			draw_outliner(context);
+		}
 
-	if (context.show_console)
-	{
-		draw_console(context);
-	}
+		if (context.world_context.show_stats)
+		{
+			draw_stats(context);
+		}
 
-	if (context.show_material_creator)
-	{
-		draw_material_creator(context);
+		if (context.world_context.show_console)
+		{
+			draw_console(context);
+		}
+	}
+	break;
+	case Editor_Mode::MATERIAL: {
+		if (context.material_context.show_material_settings)
+		{
+			draw_material_settings(context);
+		}
+	}
+	break;
 	}
 }

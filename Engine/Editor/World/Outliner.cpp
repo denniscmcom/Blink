@@ -3,13 +3,12 @@
 // Licensed under the Blink Engine Source Access License, see LICENSE.txt
 // ============================================================================
 
-#include "Engine/Editor/Outliner.hpp"
+#include "Engine/Editor/World/Outliner.hpp"
 
 #include "Engine/Core/Math/Unit.hpp"
 #include "Engine/Core/Math/Vector.hpp"
 #include "Engine/Core/Pool.hpp"
 #include "Engine/Editor/Context.hpp"
-#include "Engine/Editor/Helpers.hpp"
 #include "Engine/Platform/Application.hpp"
 #include "Engine/Platform/Assert.hpp"
 #include "Engine/Resource/Material.hpp"
@@ -31,7 +30,7 @@ void draw_node(blk::Editor_Context& context, blk::Pool_Handle<blk::Node> handle)
 void
 blk::draw_outliner(Editor_Context& context)
 {
-	BLK_CHECK(context.world);
+	BLK_CHECK(context.world_context._game_world);
 
 	const ImGuiViewport* viewport = ImGui::GetMainViewport();
 
@@ -39,39 +38,42 @@ blk::draw_outliner(Editor_Context& context)
 	// Scene graph.
 	// ============================================================================
 
-	const float available_height = viewport->WorkSize.y - context.status_bar_size.y;
+	const float available_height =
+		viewport->WorkSize.y - context.viewport_context.status_bar_size.y - context.toolbar_size.y;
 
-	context.scene_graph_position = to_rect2(viewport->WorkPos);
-	context.scene_graph_size = Rect{.x = context.left_column_width, .y = available_height * 0.6f};
-	context.scene_graph_min_size = Rect{.x = LEFT_COLUMN_MIN_WIDTH, .y = context.scene_graph_size.y};
-	context.scene_graph_max_size = Rect{.x = LEFT_COLUMN_MAX_WIDTH, .y = context.scene_graph_size.y};
+	context.world_context.scene_graph_position.x = viewport->WorkPos.x;
+	context.world_context.scene_graph_position.y = viewport->WorkPos.y + context.toolbar_size.y;
+	context.world_context.scene_graph_size = ImVec2(context.left_column_width, available_height * 0.6f);
+	context.world_context.scene_graph_min_size = ImVec2(LEFT_COLUMN_MIN_WIDTH, context.world_context.scene_graph_size.y);
+	context.world_context.scene_graph_max_size = ImVec2(LEFT_COLUMN_MAX_WIDTH, context.world_context.scene_graph_size.y);
 
-	ImGui::SetNextWindowPos(to_imvec2(context.scene_graph_position), ImGuiCond_Always);
-	ImGui::SetNextWindowSize(to_imvec2(context.scene_graph_size), ImGuiCond_Always);
+	ImGui::SetNextWindowPos(context.world_context.scene_graph_position, ImGuiCond_Always);
+	ImGui::SetNextWindowSize(context.world_context.scene_graph_size, ImGuiCond_Always);
 	ImGui::SetNextWindowSizeConstraints(
-		to_imvec2(context.scene_graph_min_size),
-		to_imvec2(context.scene_graph_max_size)
+		context.world_context.scene_graph_min_size,
+		context.world_context.scene_graph_max_size
 	);
 
 	ImGui::Begin("Scene graph", nullptr, ImGuiWindowFlags_NoMove);
 	context.left_column_width = ImGui::GetWindowWidth();
-	draw_node(context, context.world->scene_graph.root);
+	draw_node(context, context.world_context._game_world->scene_graph.root);
 	ImGui::End();
 
 	// ============================================================================
 	// Settings.
 	// ============================================================================
 
-	context.settings_size = Rect{.x = context.right_column_width, .y = available_height};
-	context.settings_min_size = Rect{.x = RIGHT_COLUMN_MIN_WIDTH, .y = context.settings_size.y};
-	context.settings_max_size = Rect{.x = RIGHT_COLUMN_MAX_WIDTH, .y = context.settings_size.y};
+	context.world_context.settings_size = ImVec2(context.right_column_width, available_height);
+	context.world_context.settings_min_size = ImVec2(RIGHT_COLUMN_MIN_WIDTH, context.world_context.settings_size.y);
+	context.world_context.settings_max_size = ImVec2(RIGHT_COLUMN_MAX_WIDTH, context.world_context.settings_size.y);
 
-	context.settings_position.x = viewport->WorkPos.x + viewport->WorkSize.x - context.settings_size.x;
-	context.settings_position.y = viewport->WorkPos.y;
+	context.world_context.settings_position.x =
+		viewport->WorkPos.x + viewport->WorkSize.x - context.world_context.settings_size.x;
+	context.world_context.settings_position.y = viewport->WorkPos.y + context.toolbar_size.y;
 
-	ImGui::SetNextWindowPos(to_imvec2(context.settings_position), ImGuiCond_Always);
-	ImGui::SetNextWindowSize(to_imvec2(context.settings_size), ImGuiCond_Always);
-	ImGui::SetNextWindowSizeConstraints(to_imvec2(context.settings_min_size), to_imvec2(context.settings_max_size));
+	ImGui::SetNextWindowPos(context.world_context.settings_position, ImGuiCond_Always);
+	ImGui::SetNextWindowSize(context.world_context.settings_size, ImGuiCond_Always);
+	ImGui::SetNextWindowSizeConstraints(context.world_context.settings_min_size, context.world_context.settings_max_size);
 
 	ImGui::Begin("Settings", nullptr, ImGuiWindowFlags_NoMove);
 	context.right_column_width = ImGui::GetWindowWidth();
@@ -80,7 +82,8 @@ blk::draw_outliner(Editor_Context& context)
 	{
 		if (ImGui::BeginTabItem("Node settings"))
 		{
-			if (Node* node = context.world->scene_graph.nodes.get(context.selected_node_handle))
+			if (Node* node =
+					context.world_context._game_world->scene_graph.nodes.get(context.world_context.selected_node_handle))
 			{
 				// ============================================================================
 				// Name.
@@ -89,8 +92,12 @@ blk::draw_outliner(Editor_Context& context)
 				if (ImGui::InputText("Name", &node->name, ImGuiInputTextFlags_EnterReturnsTrue))
 				{
 					const std::string unique_node_name =
-						make_unique_node_name(context.world->scene_graph, node->name.c_str());
-					rename_node(context.world->scene_graph, context.selected_node_handle, unique_node_name.c_str());
+						make_unique_node_name(context.world_context._game_world->scene_graph, node->name.c_str());
+					rename_node(
+						context.world_context._game_world->scene_graph,
+						context.world_context.selected_node_handle,
+						unique_node_name.c_str()
+					);
 				}
 
 				// ============================================================================
@@ -194,9 +201,9 @@ namespace
 void
 draw_node(blk::Editor_Context& context, const blk::Pool_Handle<blk::Node> handle)
 {
-	BLK_CHECK(context.world);
+	BLK_CHECK(context.world_context._game_world);
 
-	const blk::Node* node = context.world->scene_graph.nodes.get(handle);
+	const blk::Node* node = context.world_context._game_world->scene_graph.nodes.get(handle);
 
 	if (!node)
 	{
@@ -206,7 +213,7 @@ draw_node(blk::Editor_Context& context, const blk::Pool_Handle<blk::Node> handle
 	ImGuiTreeNodeFlags flags =
 		ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_DefaultOpen;
 
-	if (handle == context.selected_node_handle)
+	if (handle == context.world_context.selected_node_handle)
 	{
 		flags |= ImGuiTreeNodeFlags_Selected;
 	}
@@ -224,14 +231,14 @@ draw_node(blk::Editor_Context& context, const blk::Pool_Handle<blk::Node> handle
 
 	if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
 	{
-		context.selected_node_handle = handle;
+		context.world_context.selected_node_handle = handle;
 	}
 
 	if (is_open)
 	{
 		blk::Pool_Handle<blk::Node> child_handle = node->first_child_handle;
 
-		while (const blk::Node* child = context.world->scene_graph.nodes.get(child_handle))
+		while (const blk::Node* child = context.world_context._game_world->scene_graph.nodes.get(child_handle))
 		{
 			draw_node(context, child_handle);
 			child_handle = child->next_sibling_handle;

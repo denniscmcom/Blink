@@ -15,5 +15,5 @@ struct Editor_Context;
 
 void create_editor(Editor_Context& context);
 void destroy_editor();
-void update_editor(Editor_Context& context, double delta_time, const Input_State& input_state);
+void update_editor(Editor_Context& context, double delta_time);
 }  // namespace blk

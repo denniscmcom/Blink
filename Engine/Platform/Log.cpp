@@ -14,10 +14,7 @@
 
 namespace
 {
-constexpr size_t MAX_MSG_SIZE = 1024;
-constexpr uint32_t MAX_SINK_COUNT = 5;
-
-blk::Log_Sink sinks[MAX_SINK_COUNT];
+blk::Log_Sink sinks[blk::MAX_SINK_COUNT];
 uint32_t sink_count = 0;
 }  // namespace
 

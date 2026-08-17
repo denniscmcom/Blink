@@ -22,6 +22,7 @@ struct Resource_Storage
 	std::unordered_map<uint64_t, Pool_Handle<Type>> hash_to_handle;
 };
 
+// TODO: Check if `metadata` is in use.
 struct Resource_Metadata
 {
 	uint64_t hash;

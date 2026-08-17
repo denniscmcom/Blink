@@ -31,3 +31,8 @@ objc-*,
 WarningsAsErrors: '*'
 HeaderFilterRegex: '.*'
 ExcludeHeaderFilterRegex: '.*/(External|claude)/.*'
+
+CheckOptions:
+    # Vulkan and Windows SDK umbrella headers do not re-export their symbols with
+    # IWYU pragmas, so every symbol they provide is reported as not directly included.
+    misc-include-cleaner.IgnoreHeaders: '[/\\]vulkan[/\\].*;.*[Ww]indows [Kk]its.*'

@@ -9,5 +9,5 @@ namespace blk
 {
 struct Editor_Context;
 
-void draw_material_creator(Editor_Context& context);
+void draw_material_settings(Editor_Context& context);
 }  // namespace blk

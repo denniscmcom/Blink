@@ -23,6 +23,9 @@ void despawn_entity(blk::World& world, blk::Pool_Handle<Type> handle);
 
 template <typename Type>
 blk::Pool_Handle<Type> find_entity(const blk::World& world, const char* name);
+
+template <typename Type>
+blk::Node* get_entity_node(const blk::World& world, blk::Pool_Handle<Type> handle);
 }  // namespace
 
 blk::Pool_Handle<blk::Actor>
@@ -109,6 +112,42 @@ blk::Pool_Handle<blk::Prop>
 blk::find_prop(const World& world, const char* name)
 {
 	return find_entity<Prop>(world, name);
+}
+
+blk::Actor*
+blk::get_actor(const World& world, Pool_Handle<Actor> handle)
+{
+	return world.actors.get(handle);
+}
+
+blk::Camera*
+blk::get_camera(const World& world, Pool_Handle<Camera> handle)
+{
+	return world.cameras.get(handle);
+}
+
+blk::Prop*
+blk::get_prop(const World& world, Pool_Handle<Prop> handle)
+{
+	return world.props.get(handle);
+}
+
+blk::Node*
+blk::get_entity_node(const World& world, Pool_Handle<Actor> handle)
+{
+	return ::get_entity_node(world, handle);
+}
+
+blk::Node*
+blk::get_entity_node(const World& world, Pool_Handle<Camera> handle)
+{
+	return ::get_entity_node(world, handle);
+}
+
+blk::Node*
+blk::get_entity_node(const World& world, Pool_Handle<Prop> handle)
+{
+	return ::get_entity_node(world, handle);
 }
 
 namespace
@@ -232,5 +271,43 @@ find_entity(const blk::World& world, const char* name)
 	}
 
 	return {.id = entity_instance.id, .version = entity_instance.version};
+}
+
+template <typename Type>
+blk::Node*
+get_entity_node(const blk::World& world, blk::Pool_Handle<Type> handle)
+{
+	Type* entity = nullptr;
+
+	if constexpr (std::is_same_v<Type, blk::Camera>)
+	{
+		entity = world.cameras.get(handle);
+	}
+	else if constexpr (std::is_same_v<Type, blk::Actor>)
+	{
+		entity = world.actors.get(handle);
+	}
+	else if constexpr (std::is_same_v<Type, blk::Prop>)
+	{
+		entity = world.props.get(handle);
+	}
+	else
+	{
+		static_assert(sizeof(Type) == 0, "Entity type not supported");
+	}
+
+	if (!entity)
+	{
+		return nullptr;
+	}
+
+	blk::Node* node = world.scene_graph.nodes.get(entity->node_handle);
+
+	if (!node)
+	{
+		return nullptr;
+	}
+
+	return node;
 }
 }  // namespace

@@ -37,7 +37,9 @@ blk::load_mesh(const char* stem)
 
 	if (!file)
 	{
-		BLK_FATAL("Failed to open asset: %s\n", path.c_str());
+		BLK_ERROR("Failed to open asset: %s\n", path.c_str());
+
+		return {};
 	}
 
 	const uint64_t file_size = get_file_size(file);
@@ -49,17 +51,23 @@ blk::load_mesh(const char* stem)
 
 	if (src_serial.read<Magic>() != BLINK_MAGIC)
 	{
-		BLK_FATAL("Source buffer is not Blink format\n");
+		BLK_ERROR("Source buffer is not Blink format\n");
+
+		return {};
 	}
 
 	if (src_serial.read<Magic>() != MESH_MAGIC)
 	{
-		BLK_FATAL("Source buffer is not a Blink mesh\n");
+		BLK_ERROR("Source buffer is not a Blink mesh\n");
+
+		return {};
 	}
 
 	if (src_serial.read<uint8_t>() != MESH_VERSION)
 	{
-		BLK_FATAL("Expected Blink mesh version %u\n", MESH_VERSION);
+		BLK_ERROR("Expected Blink mesh version %u\n", MESH_VERSION);
+
+		return {};
 	}
 
 	Mesh mesh = {};
@@ -71,7 +79,7 @@ blk::load_mesh(const char* stem)
 
 	for (uint32_t i = 0; i < vertex_count; i++)
 	{
-		Vertex_PNT vertex = {};
+		Vertex vertex = {};
 
 		vertex.position.x = src_serial.read<float>();
 		vertex.position.y = src_serial.read<float>();
@@ -80,6 +88,14 @@ blk::load_mesh(const char* stem)
 		vertex.normal.x = src_serial.read<float>();
 		vertex.normal.y = src_serial.read<float>();
 		vertex.normal.z = src_serial.read<float>();
+
+		vertex.tangent.x = src_serial.read<float>();
+		vertex.tangent.y = src_serial.read<float>();
+		vertex.tangent.z = src_serial.read<float>();
+
+		vertex.bitangent.x = src_serial.read<float>();
+		vertex.bitangent.y = src_serial.read<float>();
+		vertex.bitangent.z = src_serial.read<float>();
 
 		vertex.texture_coord.x = src_serial.read<float>();
 		vertex.texture_coord.y = src_serial.read<float>();
@@ -118,7 +134,7 @@ blk::compute_uv_sphere(const float radius, const uint32_t segment_count, const u
 		{
 			const float theta = 2.0f * static_cast<float>(PI) * static_cast<float>(j) / segment_count;
 
-			Vertex_PNT vertex = {};
+			Vertex vertex = {};
 			vertex.position.x = ring_radius * cosf(theta);
 			vertex.position.y = ring_height;
 			vertex.position.z = ring_radius * sinf(theta);

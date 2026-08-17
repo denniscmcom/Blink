@@ -36,17 +36,25 @@
 
 namespace
 {
+/// Renderer data.
 struct Renderer
 {
-	blk::Swapchain swapchain;
-	blk::Pipeline pnt_mesh_pipeline;
-	blk::Pipeline pnt_light_pipeline;
-	blk::Descriptor_Layouts descriptor_layouts;
+	/// Swapchain.
+	blk::Swapchain swapchain = {};
+	/// Pipeline to render meshes.
+	blk::Pipeline mesh_pipeline = {};
+	/// Pipeline to render light gizmos.
+	blk::Pipeline light_pipeline = {};
+	/// Descriptor layouts.
+	blk::Descriptor_Layouts descriptor_layouts = {};
 
-	blk::Image depth_image;
+	/// Image for depth testing.
+	blk::Image depth_image = {};
 
-	std::array<blk::Frame, blk::MAX_FRAMES_IN_FLIGHT> frames;
-	uint64_t frame_index;
+	/// Frame data.
+	std::array<blk::Frame, blk::MAX_FRAMES_IN_FLIGHT> frames = {};
+	/// Current frame index. It goes from 0 to `MAX_FRAMES_IN_FLIGHT - 1`.
+	uint64_t frame_index = 0;
 };
 
 blk::Context context = {};
@@ -54,10 +62,11 @@ blk::Arena arena = {};
 Renderer renderer = {};
 }  // namespace
 
+// TODO: `rect` is currently not used. Swapchain creation is using surface capabilities to get it's size.
 void
-blk::create_renderer(unsigned width, unsigned height)
+blk::create_renderer(const Rect<unsigned>& /*rect*/)
 {
-	Window* window = get_window();
+	const Window* window = get_window();
 	BLK_CHECK(window);
 
 	context = create_context(window->hwnd);
@@ -82,31 +91,31 @@ blk::create_renderer(unsigned width, unsigned height)
 		renderer.descriptor_layouts.material_layout,
 	};
 
-	const VkShaderModule fs_light = create_shader_module(context, "FS_Light");
-	const VkShaderModule fs_mesh = create_shader_module(context, "FS_Mesh");
-	const VkShaderModule vs_pnt = create_shader_module(context, "VS_PNT");
+	VkShaderModule fs_light = create_shader_module(context, "FS_Light");
+	VkShaderModule fs_mesh = create_shader_module(context, "FS_Mesh");
+	VkShaderModule vs_main = create_shader_module(context, "VS_Main");
 
 	const VkPipelineShaderStageCreateInfo fs_light_stage_info =
 		get_pipeline_shader_stage_create_info(fs_light, VK_SHADER_STAGE_FRAGMENT_BIT, "fs_main");
 	const VkPipelineShaderStageCreateInfo fs_mesh_stage_info =
 		get_pipeline_shader_stage_create_info(fs_mesh, VK_SHADER_STAGE_FRAGMENT_BIT, "fs_main");
-	const VkPipelineShaderStageCreateInfo vs_pnt_stage_info =
-		get_pipeline_shader_stage_create_info(vs_pnt, VK_SHADER_STAGE_VERTEX_BIT, "vs_main");
+	const VkPipelineShaderStageCreateInfo vs_main_stage_info =
+		get_pipeline_shader_stage_create_info(vs_main, VK_SHADER_STAGE_VERTEX_BIT, "vs_main");
 
 	const std::array mesh_pipeline_shader_stages = {
-		vs_pnt_stage_info,
+		vs_main_stage_info,
 		fs_mesh_stage_info,
 	};
 
 	const std::array light_pipeline_shader_stages = {
-		vs_pnt_stage_info,
+		vs_main_stage_info,
 		fs_light_stage_info,
 	};
 
-	const std::vector<VkVertexInputBindingDescription> vertex_pnt_input_descriptions =
-		get_vertex_input_descriptions<Vertex_PNT>();
-	const std::vector<VkVertexInputAttributeDescription> vertex_pnt_attribute_descriptions =
-		get_vertex_input_attribute_descriptions<Vertex_PNT>();
+	const std::vector<VkVertexInputBindingDescription> vertex_input_descriptions =
+		get_vertex_input_descriptions<Vertex>();
+	const std::vector<VkVertexInputAttributeDescription> vertex_attribute_descriptions =
+		get_vertex_input_attribute_descriptions<Vertex>();
 
 	VkPushConstantRange mesh_push_contant_range = {};
 	mesh_push_contant_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
@@ -123,31 +132,31 @@ blk::create_renderer(unsigned width, unsigned height)
 		light_push_constant_range,
 	};
 
-	renderer.pnt_mesh_pipeline = create_pipeline(
+	renderer.mesh_pipeline = create_pipeline(
 		context,
 		renderer.swapchain.surface_format,
 		renderer.depth_image.format,
 		pipeline_layouts,
 		mesh_pipeline_shader_stages,
-		vertex_pnt_input_descriptions,
-		vertex_pnt_attribute_descriptions,
+		vertex_input_descriptions,
+		vertex_attribute_descriptions,
 		pipeline_push_constant_ranges
 	);
 
-	renderer.pnt_light_pipeline = create_pipeline(
+	renderer.light_pipeline = create_pipeline(
 		context,
 		renderer.swapchain.surface_format,
 		renderer.depth_image.format,
 		pipeline_layouts,
 		light_pipeline_shader_stages,
-		vertex_pnt_input_descriptions,
-		vertex_pnt_attribute_descriptions,
+		vertex_input_descriptions,
+		vertex_attribute_descriptions,
 		pipeline_push_constant_ranges
 	);
 
 	for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
 	{
-		renderer.frames[i] = create_frame(
+		renderer.frames.at(i) = create_frame(
 			context,
 			renderer.descriptor_layouts.pool,
 			renderer.descriptor_layouts.camera_layout,
@@ -156,7 +165,7 @@ blk::create_renderer(unsigned width, unsigned height)
 	}
 
 	arena.vertex_buffer =
-		create_host_device_buffer(context, sizeof(Vertex_PNT) * MAX_VERTEX_COUNT, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+		create_host_device_buffer(context, sizeof(Vertex) * MAX_VERTEX_COUNT, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 	arena.index_buffer =
 		create_host_device_buffer(context, sizeof(Index) * MAX_INDEX_COUNT, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
 
@@ -176,7 +185,7 @@ blk::destroy_renderer()
 void
 blk::update_frame(const Scene_Graph& scene_graph, const Camera_View& camera_view)
 {
-	Frame& frame = renderer.frames[renderer.frame_index];
+	Frame& frame = renderer.frames.at(renderer.frame_index);
 	frame.draw_commands.clear();
 
 	std::vector<Vector3> light_positions = {};
@@ -200,7 +209,7 @@ blk::update_frame(const Scene_Graph& scene_graph, const Camera_View& camera_view
 		if (node.mesh_instance)
 		{
 			const Mesh_Instance mesh_instance = node.mesh_instance.value();
-			draw_command.pipeline = &renderer.pnt_mesh_pipeline;
+			draw_command.pipeline = &renderer.mesh_pipeline;
 
 			// FIXME: These if-else checking for resources are duplicated. We could do better.
 			if (const std::optional<Mesh_Device> mesh_device = find_mesh_device(arena, mesh_instance.mesh_handle))
@@ -229,7 +238,7 @@ blk::update_frame(const Scene_Graph& scene_graph, const Camera_View& camera_view
 			const Point_Light point_light = node.point_light.value();
 			const Pool_Handle<Mesh> light_uv_sphere_handle = compute_uv_sphere(1.0f, 18, 32);
 
-			draw_command.pipeline = &renderer.pnt_light_pipeline;
+			draw_command.pipeline = &renderer.light_pipeline;
 			draw_command.light_constants.light_index = light_count;
 
 			// FIXME: These if-else checking for resources are duplicated. We could do better.
@@ -263,10 +272,9 @@ blk::update_frame(const Scene_Graph& scene_graph, const Camera_View& camera_view
 	Camera_UBO camera_ubo = {};
 	camera_ubo.view = camera_view.view;
 	camera_ubo.projection = camera_view.projection;
+	camera_ubo.view_position = camera_view.view_position;
 
 	Light_UBO light_ubo = {};
-	light_ubo.view_position = camera_view.view_position;
-	light_ubo.ambient_strength = 0.1f;
 	light_ubo.light_count = light_count;
 
 	for (uint32_t i = 0; i < light_count; i++)
@@ -404,12 +412,15 @@ blk::render_frame()
 	static_assert(sizeof(Index) == sizeof(uint32_t), "Index buffer is bound as VK_INDEX_TYPE_UINT32");
 	vkCmdBindIndexBuffer(frame.command_buffer, arena.index_buffer.device.buffer, 0, VK_INDEX_TYPE_UINT32);
 
-	std::array frame_descriptor_sets = {frame.camera_descriptor_set, frame.light_descriptor_set};
+	std::array frame_descriptor_sets = {
+		frame.camera_descriptor_set,
+		frame.light_descriptor_set,
+	};
 
 	vkCmdBindDescriptorSets(
 		frame.command_buffer,
 		VK_PIPELINE_BIND_POINT_GRAPHICS,
-		renderer.pnt_mesh_pipeline.layout,
+		renderer.mesh_pipeline.layout,
 		0,
 		frame_descriptor_sets.size(),
 		frame_descriptor_sets.data(),
@@ -424,7 +435,7 @@ blk::render_frame()
 
 		vkCmdPushConstants(
 			frame.command_buffer,
-			renderer.pnt_mesh_pipeline.layout,
+			renderer.mesh_pipeline.layout,
 			VK_SHADER_STAGE_VERTEX_BIT,
 			0,
 			sizeof(Mesh_Constants),
@@ -436,7 +447,7 @@ blk::render_frame()
 			vkCmdBindDescriptorSets(
 				frame.command_buffer,
 				VK_PIPELINE_BIND_POINT_GRAPHICS,
-				renderer.pnt_mesh_pipeline.layout,
+				renderer.mesh_pipeline.layout,
 				2,
 				1,
 				&draw_command.material_device->descriptor_set,
@@ -448,7 +459,7 @@ blk::render_frame()
 		{
 			vkCmdPushConstants(
 				frame.command_buffer,
-				renderer.pnt_mesh_pipeline.layout,
+				renderer.mesh_pipeline.layout,
 				VK_SHADER_STAGE_FRAGMENT_BIT,
 				sizeof(Mesh_Constants),
 				sizeof(Light_Constants),

@@ -58,6 +58,5 @@ endfunction()
 blk_add_shaders(BlkShaders
 	FS_Light.slang|fs_main
 	FS_Mesh.slang|fs_main
-	VS_PNC.slang|vs_main
-	VS_PNT.slang|vs_main
+	VS_Main.slang|vs_main
 )

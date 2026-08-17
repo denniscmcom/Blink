@@ -24,21 +24,21 @@ blk::Window* window = nullptr;
 }  // namespace
 
 void
-blk::create_window()
+blk::create_window(const char* title)
 {
 	BLK_CHECK(window == nullptr);
 
 	Application* application = get_application();
 	BLK_CHECK(application);
 
-	WNDCLASSEXW window_class = {};
+	WNDCLASSEXA window_class = {};
 	window_class.cbSize = sizeof(window_class);
 	window_class.style = CS_HREDRAW | CS_VREDRAW;
 	window_class.lpfnWndProc = MainWndProc;
 	window_class.hInstance = application->hinstance;
-	window_class.lpszClassName = L"BlinkLauncherWindowClass";
+	window_class.lpszClassName = "BlinkWindowClass";
 
-	if (!RegisterClassExW(&window_class))
+	if (!RegisterClassExA(&window_class))
 	{
 		BLK_FATAL("Failed to register window class\n");
 	}
@@ -49,9 +49,9 @@ blk::create_window()
 		BLK_FATAL("Failed to set DPI awareness\n");
 	}
 
-	HWND hwnd = CreateWindowW(
+	HWND hwnd = CreateWindowA(
 		window_class.lpszClassName,
-		L"LAUNCHER | VULKAN | DEVELOPMENT",
+		title,
 		WS_OVERLAPPEDWINDOW,
 		CW_USEDEFAULT,
 		CW_USEDEFAULT,
@@ -96,7 +96,7 @@ blk::destroy_window()
 	}
 }
 
-blk::Rect<int>
+blk::Rect<unsigned>
 blk::get_window_client_size()
 {
 	BLK_CHECK(window);
@@ -108,8 +108,8 @@ blk::get_window_client_size()
 		BLK_FATAL("Failed to get client rect\n");
 	}
 
-	const auto width = static_cast<int>(rect.right - rect.left);
-	const auto height = static_cast<int>(rect.bottom - rect.top);
+	const auto width = static_cast<unsigned>(rect.right - rect.left);
+	const auto height = static_cast<unsigned>(rect.bottom - rect.top);
 
 	return Rect{.x = width, .y = height};
 }
@@ -203,7 +203,7 @@ MainWndProc(HWND hwnd, const UINT message, const WPARAM w_param, const LPARAM l_
 	}
 
 		// WM_INPUT requires DefWindowProc for cleanup.
-		return DefWindowProcW(hwnd, message, w_param, l_param);
+		return DefWindowProcA(hwnd, message, w_param, l_param);
 	case WM_KEYDOWN:
 		event.type = blk::Event_Type::KEY_DOWN;
 		// Fallthrough.
@@ -256,7 +256,7 @@ MainWndProc(HWND hwnd, const UINT message, const WPARAM w_param, const LPARAM l_
 		}
 		break;
 	default:
-		return DefWindowProcW(hwnd, message, w_param, l_param);
+		return DefWindowProcA(hwnd, message, w_param, l_param);
 	}
 
 	return 0;

@@ -3,10 +3,9 @@
 // Licensed under the Blink Engine Source Access License, see LICENSE.txt
 // ============================================================================
 
-#include "Engine/Editor/Stats.hpp"
+#include "Engine/Editor/World/Stats.hpp"
 
 #include "Engine/Editor/Context.hpp"
-#include "Engine/Editor/Helpers.hpp"
 #include "Engine/Platform/Application.hpp"
 #include "Engine/Platform/Assert.hpp"
 #include "Engine/Resource/Mesh.hpp"
@@ -52,20 +51,24 @@ blk::draw_stats(Editor_Context& context)
 {
 	const ImGuiViewport* viewport = ImGui::GetMainViewport();
 
-	const float available_height = viewport->WorkSize.y - context.status_bar_size.y;
+	const float available_height =
+		viewport->WorkSize.y - context.viewport_context.status_bar_size.y - context.toolbar_size.y;
 
-	context.stats_size.x = context.left_column_width;
-	context.stats_size.y = available_height - context.scene_graph_size.y;
+	context.world_context.stats_size.x = context.left_column_width;
+	context.world_context.stats_size.y = available_height - context.world_context.scene_graph_size.y;
 
-	context.stats_min_size = Rect{context.scene_graph_min_size.x, context.stats_size.y};
-	context.stats_max_size = Rect{context.scene_graph_max_size.x, context.stats_size.y};
+	context.world_context.stats_min_size =
+		ImVec2(context.world_context.scene_graph_min_size.x, context.world_context.stats_size.y);
+	context.world_context.stats_max_size =
+		ImVec2(context.world_context.scene_graph_max_size.x, context.world_context.stats_size.y);
 
-	context.stats_position.x = viewport->WorkPos.x;
-	context.stats_position.y = viewport->WorkPos.y + context.scene_graph_size.y;
+	context.world_context.stats_position.x = viewport->WorkPos.x;
+	context.world_context.stats_position.y =
+		viewport->WorkPos.y + context.world_context.scene_graph_size.y + context.toolbar_size.y;
 
-	ImGui::SetNextWindowPos(to_imvec2(context.stats_position), ImGuiCond_Always);
-	ImGui::SetNextWindowSize(to_imvec2(context.stats_size), ImGuiCond_Always);
-	ImGui::SetNextWindowSizeConstraints(to_imvec2(context.stats_min_size), to_imvec2(context.stats_max_size));
+	ImGui::SetNextWindowPos(context.world_context.stats_position, ImGuiCond_Always);
+	ImGui::SetNextWindowSize(context.world_context.stats_size, ImGuiCond_Always);
+	ImGui::SetNextWindowSizeConstraints(context.world_context.stats_min_size, context.world_context.stats_max_size);
 
 	ImGui::Begin("Stats", nullptr, ImGuiWindowFlags_NoMove);
 	context.left_column_width = ImGui::GetWindowWidth();
@@ -139,9 +142,9 @@ blk::compute_stats(const Editor_Context& context, const double delta_time)
 
 	world_sample = {};
 
-	world_sample.node_count = context.world->scene_graph.nodes.count();
+	world_sample.node_count = context.world_context._game_world->scene_graph.nodes.count();
 
-	for (const auto& node : context.world->scene_graph.nodes)
+	for (const auto& node : context.world_context._game_world->scene_graph.nodes)
 	{
 		if (node.mesh_instance)
 		{

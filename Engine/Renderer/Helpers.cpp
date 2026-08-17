@@ -140,25 +140,14 @@ blk::get_pipeline_shader_stage_create_info(VkShaderModule module, VkShaderStageF
 
 template <>
 std::vector<VkVertexInputAttributeDescription>
-blk::get_vertex_input_attribute_descriptions<blk::Vertex_PNT>()
+blk::get_vertex_input_attribute_descriptions<blk::Vertex>()
 {
 	std::vector<VkVertexInputAttributeDescription> descriptions = {
-		{.location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(Vertex_PNT, position)},
-		{.location = 1, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(Vertex_PNT, normal)},
-		{.location = 2, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(Vertex_PNT, texture_coord)},
-	};
-
-	return descriptions;
-}
-
-template <>
-std::vector<VkVertexInputAttributeDescription>
-blk::get_vertex_input_attribute_descriptions<blk::Vertex_PNC>()
-{
-	std::vector<VkVertexInputAttributeDescription> descriptions = {
-		{.location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(Vertex_PNC, position)},
-		{.location = 1, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(Vertex_PNC, normal)},
-		{.location = 2, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(Vertex_PNC, color)},
+		{.location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(Vertex, position)},
+		{.location = 1, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(Vertex, normal)},
+		{.location = 2, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(Vertex, tangent)},
+		{.location = 3, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(Vertex, bitangent)},
+		{.location = 4, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(Vertex, texture_coord)},
 	};
 
 	return descriptions;

@@ -19,38 +19,48 @@ namespace
 {
 constexpr float MOUSE_SENSITIVITY = 0.0015f;
 constexpr float MOVE_SPEED = 5.0f;
-constexpr float PITCH_LIMIT = 1.55f;  // ~89 degrees, keeps forward away from world up.
+constexpr float PITCH_LIMIT = 1.55f;
 }  // namespace
 
-void
-blk::create_editor_camera(Editor_Context& context)
+blk::Pool_Handle<blk::Camera>
+blk::create_editor_camera(World& world)
 {
-	BLK_CHECK(context.world);
-	context.editor_camera_handle = spawn_camera(*context.world, "Editor camera", context.world->scene_graph.root);
+	return spawn_camera(world, "Editor camera", world.scene_graph.root);
 }
 
 void
-blk::destroy_editor_camera(Editor_Context& context)
+blk::destroy_editor_camera(World& world, Pool_Handle<Camera>& handle)
 {
-	despawn_camera(*context.world, context.editor_camera_handle);
-	context.editor_camera_handle = {};
+	despawn_camera(world, handle);
+	handle = {};
 }
 
 void
-blk::update_editor_camera(const Editor_Context& context, const double delta_time, const Input_State& input_state)
+blk::update_editor_camera(
+	const World& world,
+	const Pool_Handle<Camera>& handle,
+	const Input_State& input_state,
+	double delta_time
+)
 {
-	BLK_CHECK(context.world);
+	const Camera* camera = world.cameras.get(handle);
 
-	const Camera* camera = context.world->cameras.get(context.editor_camera_handle);
-	BLK_CHECK(camera);
+	if (!camera)
+	{
+		BLK_ERROR("Failed to find editor camera\n");
+		return;
+	}
 
-	Node* node = context.world->scene_graph.nodes.get(camera->node_handle);
-	BLK_CHECK(node);
+	Node* node = world.scene_graph.nodes.get(camera->node_handle);
 
-	// Mouse look: rotation.y is yaw, rotation.x is pitch (Euler radians, same convention
-	// as make_view_matrix).
-	node->transform.rotation.y += -input_state.mouse_delta_x * MOUSE_SENSITIVITY;
-	node->transform.rotation.x += -input_state.mouse_delta_y * MOUSE_SENSITIVITY;
+	if (!node)
+	{
+		BLK_ERROR("Failed to find editor camera node\n");
+		return;
+	}
+
+	node->transform.rotation.y += -static_cast<float>(input_state.mouse_delta_x) * MOUSE_SENSITIVITY;
+	node->transform.rotation.x += -static_cast<float>(input_state.mouse_delta_y) * MOUSE_SENSITIVITY;
 
 	if (node->transform.rotation.x > PITCH_LIMIT)
 	{
@@ -61,8 +71,6 @@ blk::update_editor_camera(const Editor_Context& context, const double delta_time
 		node->transform.rotation.x = -PITCH_LIMIT;
 	}
 
-	// Movement basis derived exactly like make_view_matrix: forward is +Z rotated by the
-	// node rotation, right is cross(world_up, forward) (left-handed look-at convention).
 	const Matrix4 rotation_matrix = make_rotation_matrix(node->transform.rotation);
 	const Vector4 forward4 = rotation_matrix * Vector4{.x = 0.0f, .y = 0.0f, .z = 1.0f, .w = 0.0f};
 
@@ -105,19 +113,6 @@ blk::update_editor_camera(const Editor_Context& context, const double delta_time
 	if (compute_vector_magnitude_squared(velocity) > 0.0f)
 	{
 		velocity = compute_unit_vector(velocity);
-		node->transform.position += (MOVE_SPEED * static_cast<float>(delta_time)) * velocity;
-	}
-}
-
-void
-blk::activate_editor_camera(Editor_Context& context)
-{
-	BLK_CHECK(context.world);
-
-	if (context.world->active_camera_handle != context.editor_camera_handle)
-	{
-		context.game_camera_handle = context.world->active_camera_handle;
-		context.world->active_camera_handle = context.editor_camera_handle;
-		context.is_editor_camera_active = true;
+		node->transform.position += MOVE_SPEED * static_cast<float>(delta_time) * velocity;
 	}
 }

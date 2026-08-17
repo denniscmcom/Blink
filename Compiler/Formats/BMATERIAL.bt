@@ -17,9 +17,9 @@ LittleEndian();
 
 typedef struct
 {
-	uint64 diffuse_map;
-	uint64 specular_map;
-	float shininess;
+	uint64 albedo;
+	uint64 normal;
+	uint64 orm;
 } Material;
 
 Header header;

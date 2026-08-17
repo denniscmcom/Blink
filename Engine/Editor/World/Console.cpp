@@ -3,10 +3,9 @@
 // Licensed under the Blink Engine Source Access License, see LICENSE.txt
 // ============================================================================
 
-#include "Engine/Editor/Console.hpp"
+#include "Engine/Editor/World/Console.hpp"
 
 #include "Engine/Editor/Context.hpp"
-#include "Engine/Editor/Helpers.hpp"
 
 #include <imgui.h>
 
@@ -20,7 +19,7 @@ constexpr int MAX_LINE_COUNT = 1024;
 
 struct Console_Log
 {
-	char lines[MAX_LINE_COUNT][MAX_LINE_LENGTH];
+	char lines[MAX_LINE_COUNT][MAX_LINE_LENGTH] = {};
 	int line_count = 0;
 	int next_line = 0;
 	bool auto_scroll = true;
@@ -67,14 +66,15 @@ blk::draw_console(Editor_Context& context)
 {
 	const ImGuiViewport* viewport = ImGui::GetMainViewport();
 
-	context.console_size.x = viewport->WorkSize.x - context.scene_graph_size.x - context.settings_size.x;
-	context.console_size.y = 650.0f;
+	context.world_context.console_size.x =
+		viewport->WorkSize.x - context.world_context.scene_graph_size.x - context.world_context.settings_size.x;
+	context.world_context.console_size.y = 650.0f;
 
-	context.console_position.x = viewport->WorkPos.x + context.stats_size.x;
-	context.console_position.y = viewport->WorkSize.y - context.console_size.y;
+	context.world_context.console_position.x = viewport->WorkPos.x + context.world_context.stats_size.x;
+	context.world_context.console_position.y = viewport->WorkSize.y - context.world_context.console_size.y;
 
-	ImGui::SetNextWindowPos(to_imvec2(context.console_position), ImGuiCond_Always);
-	ImGui::SetNextWindowSize(to_imvec2(context.console_size), ImGuiCond_Always);
+	ImGui::SetNextWindowPos(context.world_context.console_position, ImGuiCond_Always);
+	ImGui::SetNextWindowSize(context.world_context.console_size, ImGuiCond_Always);
 
 	ImGui::Begin("Console", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
 
@@ -103,7 +103,7 @@ blk::draw_console(Editor_Context& context)
 		{
 			const int index = (oldest + row) % MAX_LINE_COUNT;
 			const char* line = console_log.lines[index];
-			ImVec4 line_color = get_line_color(line);
+			const ImVec4 line_color = get_line_color(line);
 
 			ImGui::PushStyleColor(ImGuiCol_Text, line_color);
 			ImGui::TextUnformatted(line);

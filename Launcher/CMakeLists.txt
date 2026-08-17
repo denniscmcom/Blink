@@ -17,8 +17,8 @@ target_link_libraries(BlkLauncher
 
 add_dependencies(BlkLauncher BlkAssets BlkShaders)
 
-# TODO: What's this?
 set_target_properties(BlkLauncher PROPERTIES
 	RUNTIME_OUTPUT_DIRECTORY ${BLK_RUNTIME_DIRECTORY}
-	VS_DEBUGGER_WORKING_DIRECTORY ${BLK_RUNTIME_DIRECTORY}
 )
+
+

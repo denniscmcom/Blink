@@ -16,9 +16,9 @@ struct Texture;
 struct Material
 {
 	Resource_Metadata metadata;
-	Pool_Handle<Texture> diffuse_map;
-	Pool_Handle<Texture> specular_map;
-	float shininess;
+	Pool_Handle<Texture> albedo;
+	Pool_Handle<Texture> normal;
+	Pool_Handle<Texture> orm;
 };
 
 constexpr Magic MATERIAL_MAGIC = {'M', 'A', 'T', 'R'};
