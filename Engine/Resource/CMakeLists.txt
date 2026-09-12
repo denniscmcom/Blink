@@ -7,18 +7,12 @@ target_sources(BlkEngine
 			Material.hpp
 			Mesh.hpp
 			Shader.hpp
-		Resource.hpp
+			Storage.hpp
 			Texture.hpp
-	PRIVATE
-		FILE_SET privateHeaders
-		TYPE HEADERS
-		BASE_DIRS ${CMAKE_SOURCE_DIR}
-		FILES
-			Resource_Storage.hpp
 	PRIVATE
 		Material.cpp
 		Mesh.cpp
 		Shader.cpp
-		Resource.cpp
+		Storage.cpp
 		Texture.cpp
 )

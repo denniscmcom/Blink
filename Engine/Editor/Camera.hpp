@@ -13,10 +13,11 @@ struct World;
 struct Camera;
 struct Input_State;
 
-Pool_Handle<Camera> create_editor_camera(World& world);
-void destroy_editor_camera(World& world, Pool_Handle<Camera>& handle);
+/// Update the editor camera.
+///
+/// Passes and processes the `input_state` to the camera `handle` when in free fly mode.
 void update_editor_camera(
-	const World& world,
+	World& world,
 	const Pool_Handle<Camera>& handle,
 	const Input_State& input_state,
 	double delta_time

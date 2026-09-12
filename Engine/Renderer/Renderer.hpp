@@ -12,23 +12,25 @@
 namespace blk
 {
 struct Scene_Graph;
+enum class Result;
 
 /// View data to update the frame to render.
 struct Camera_View
 {
 	/// View point.
-	Vector3 view_position = {};
+	Vector3 view_position;
 	/// View matrix.
-	Matrix4 view = {};
+	Matrix4 view;
 	/// Projection matrix.
-	Matrix4 projection = {};
+	Matrix4 projection;
 };
 
-/// Creates renderer given a resolution.
-void create_renderer(const Rect<unsigned>& rect);
-/// Destroys renderer.
+/// Creates the renderer.
+/// @param rect The renderer resolution.
+Result create_renderer(const Rect<unsigned>& rect);
+/// Destroys the renderer.
 void destroy_renderer();
-/// Updates the frame to render.
+/// Updates the frame to render next.
 void update_frame(const Scene_Graph& scene_graph, const Camera_View& camera_view);
 /// Renders the frame.
 void render_frame();

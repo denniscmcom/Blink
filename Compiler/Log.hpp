@@ -7,5 +7,6 @@
 
 namespace blk
 {
+/// Logs a message to stdout.
 void log_console(const char* msg);
 }  // namespace blk

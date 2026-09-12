@@ -3,38 +3,51 @@
 // Licensed under the Blink Engine Source Access License, see LICENSE.txt
 // ============================================================================
 
+/// Host-side vectors up to 4 dimensions.
+
 #pragma once
 
 namespace blk
 {
 struct Matrix4;
+enum class Result;
 
-// TODO: Ensure alignment and size compatability with renderer in all shared structures.
+// TODO: Ensure alignment and size compatibility with renderer in all shared structures. I think it is best to have
+//		 different structures for Vulkan std140 and std430.
 
-struct alignas(8) Vector2
+struct Vector2
 {
 	float x;
 	float y;
+
+	/// @warning Crashes at runtime if `index` is out of bounds.
+	float& operator[](int index);
+	/// @warning Crashes at runtime if `index` is out of bounds.
+	float operator[](int index) const;
 };
 
-struct alignas(16) Vector3
+struct Vector3
 {
 	float x;
 	float y;
 	float z;
 
+	/// @warning Crashes at runtime if `index` is out of bounds.
 	float& operator[](int index);
+	/// @warning Crashes at runtime if `index` is out of bounds.
 	float operator[](int index) const;
 };
 
-struct alignas(16) Vector4
+struct Vector4
 {
 	float x;
 	float y;
 	float z;
 	float w;
 
+	/// @warning Crashes at runtime if `index` is out of bounds.
 	float& operator[](int index);
+	/// @warning Crashes at runtime if `index` is out of bounds.
 	float operator[](int index) const;
 };
 
@@ -57,7 +70,16 @@ Vector4 operator*(const Matrix4& matrix, const Vector4& vector);
 
 Vector3 compute_cross_product(const Vector3& lhs, const Vector3& rhs);
 Vector3 compute_unit_vector(const Vector3& vector);
+
 float compute_dot_product(const Vector3& lhs, const Vector3& rhs);
+/// Computes the vector magnitude squared.
 float compute_vector_magnitude_squared(const Vector3& vector);
 float compute_vector_magnitude(const Vector3& vector);
+
+/// Accesses `vector` element at `index` and writes it to `value`.
+Result at(const Vector2& vector, int index, float& value);
+/// Accesses `vector` element at `index` and writes it to `value`.
+Result at(const Vector3& vector, int index, float& value);
+/// Accesses `vector` element at `index` and writes it to `value`.
+Result at(const Vector4& vector, int index, float& value);
 }  // namespace blk

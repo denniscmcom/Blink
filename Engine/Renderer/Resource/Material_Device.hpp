@@ -17,27 +17,43 @@ struct Context;
 struct Arena;
 struct Descriptor_Layouts;
 struct Material;
+enum class Result;
 
+/// Material uniform buffer object.
 struct Material_UBO
 {
-	// TODO: This is temporary until I add PBR factors.
-	int dummy = 0;
+	// TODO (Feature): This is temporary until I add PBR factors.
+	int dummy;
 };
 
+/// A device material.
 struct Material_Device
 {
-	Pool_Handle<Material> handle = {};
-	Texture_Device albedo = {};
-	Texture_Device normal = {};
-	Texture_Device orm = {};
-	Buffer uniform_buffer = {};
+	/// Host material handle.
+	Pool_Handle<Material> host_handle;
+	/// Device albedo texture.
+	Texture_Device albedo;
+	/// Device normal texture.
+	Texture_Device normal;
+	/// Device ORM texture.
+	Texture_Device orm;
+	/// Material uniform buffer.
+	Buffer uniform_buffer;
+	/// Material descriptor set.
 	VkDescriptorSet descriptor_set = VK_NULL_HANDLE;
 };
 
-Material_Device transfer_material(
+/// Transfer a host `Material` into device.
+///
+/// It checks for duplicated materials before transferring. If a material already exists in device, it reuses it.
+Result transfer_material(
 	const Context& context,
-	Arena& arena,
 	const Descriptor_Layouts& descriptor_layouts,
-	Pool_Handle<Material> handle
+	Arena& arena,
+	Pool_Handle<Material> host_handle,
+	Material_Device& material
 );
+/// Unloads a `material` from device.
+// TODO (Bug): not implemented.
+void unload_material_from_device(const Context& context, Arena& arena, Material_Device& material);
 }  // namespace blk

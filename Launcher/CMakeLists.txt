@@ -20,5 +20,3 @@ add_dependencies(BlkLauncher BlkAssets BlkShaders)
 set_target_properties(BlkLauncher PROPERTIES
 	RUNTIME_OUTPUT_DIRECTORY ${BLK_RUNTIME_DIRECTORY}
 )
-
-

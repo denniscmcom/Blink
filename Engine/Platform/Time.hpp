@@ -5,23 +5,18 @@
 
 #pragma once
 
-#include <array>
-#include <stdint.h>
-
 namespace blk
 {
-using Magic = std::array<char, 4>;
+struct Allocator;
+enum class Result;
 
-constexpr Magic BLINK_MAGIC = {'B', 'L', 'N', 'K'};
-constexpr size_t MAX_RESOURCE_LOGICAL_PATH_SIZE = 256;
+/// Opaque handle to a timer.
+struct Timer;
 
-enum class Resource_Type
-{
-	MATERIAL,
-	MESH,
-	SHADER,
-	TEXTURE,
-};
-
-uint64_t get_resource_hash(const char* stem, Resource_Type resource_type);
+/// Creates timer.
+Result create_timer(Allocator* allocator, Timer*& timer);
+/// Destroys timer.
+void destroy_timer(Timer* timer);
+/// Writes the elapsed seconds since `timer` was created to `elapsed`.
+Result get_elapsed_seconds(const Timer* timer, double& elapsed);
 }  // namespace blk

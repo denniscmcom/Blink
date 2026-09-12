@@ -7,8 +7,58 @@
 
 #include "Engine/Core/Math/Unit.hpp"
 #include "Engine/Core/Math/Vector.hpp"
+#include "Engine/Platform/Assert.hpp"
+#include "Engine/Platform/Result.hpp"
 
 #include <math.h>
+
+blk::Vector2&
+blk::Matrix2::operator[](int index)
+{
+	BLK_ENSURE(index >= 0 && index < 2);
+
+	return columns[index];
+}
+
+blk::Vector2
+blk::Matrix2::operator[](int index) const
+{
+	BLK_ENSURE(index >= 0 && index < 2);
+
+	return columns[index];
+}
+
+blk::Vector3&
+blk::Matrix3::operator[](int index)
+{
+	BLK_ENSURE(index >= 0 && index < 3);
+
+	return columns[index];
+}
+
+blk::Vector3
+blk::Matrix3::operator[](int index) const
+{
+	BLK_ENSURE(index >= 0 && index < 3);
+
+	return columns[index];
+}
+
+blk::Vector4&
+blk::Matrix4::operator[](int index)
+{
+	BLK_ENSURE(index >= 0 && index < 4);
+
+	return columns[index];
+}
+
+blk::Vector4
+blk::Matrix4::operator[](int index) const
+{
+	BLK_ENSURE(index >= 0 && index < 4);
+
+	return columns[index];
+}
 
 blk::Matrix4
 blk::operator*(const Matrix4& lhs, const Matrix4& rhs)
@@ -23,7 +73,7 @@ blk::operator*(const Matrix4& lhs, const Matrix4& rhs)
 }
 
 blk::Matrix4
-blk::make_identity_matrix()
+blk::init_identity_matrix()
 {
 	Matrix4 matrix{};
 	matrix.columns[0].x = 1.0f;
@@ -35,9 +85,9 @@ blk::make_identity_matrix()
 }
 
 blk::Matrix4
-blk::make_translation_matrix(const Vector3& translation)
+blk::init_translation_matrix(const Vector3& translation)
 {
-	Matrix4 matrix = make_identity_matrix();
+	Matrix4 matrix = init_identity_matrix();
 	matrix.columns[3].x = translation.x;
 	matrix.columns[3].y = translation.y;
 	matrix.columns[3].z = translation.z;
@@ -46,7 +96,7 @@ blk::make_translation_matrix(const Vector3& translation)
 }
 
 blk::Matrix4
-blk::make_scale_matrix(const Vector3& scale)
+blk::init_scale_matrix(const Vector3& scale)
 {
 	Matrix4 matrix{};
 	matrix.columns[0].x = scale.x;
@@ -58,7 +108,7 @@ blk::make_scale_matrix(const Vector3& scale)
 }
 
 blk::Matrix4
-blk::make_rotation_matrix_x(const Radians angle)
+blk::init_rotation_matrix_x(const Radians angle)
 {
 	const float cos = cosf(angle.value);
 	const float sin = sinf(angle.value);
@@ -66,8 +116,8 @@ blk::make_rotation_matrix_x(const Radians angle)
 	Matrix4 matrix{};
 	matrix.columns[0].x = 1.0f;
 	matrix.columns[1].y = cos;
-	matrix.columns[1].z = -sin;
-	matrix.columns[2].y = sin;
+	matrix.columns[1].z = sin;
+	matrix.columns[2].y = -sin;
 	matrix.columns[2].z = cos;
 	matrix.columns[3].w = 1.0f;
 
@@ -75,16 +125,16 @@ blk::make_rotation_matrix_x(const Radians angle)
 }
 
 blk::Matrix4
-blk::make_rotation_matrix_y(const Radians angle)
+blk::init_rotation_matrix_y(const Radians angle)
 {
 	const float cos = cosf(angle.value);
 	const float sin = sinf(angle.value);
 
 	Matrix4 matrix{};
 	matrix.columns[0].x = cos;
-	matrix.columns[0].z = sin;
+	matrix.columns[0].z = -sin;
 	matrix.columns[1].y = 1.0f;
-	matrix.columns[2].x = -sin;
+	matrix.columns[2].x = sin;
 	matrix.columns[2].z = cos;
 	matrix.columns[3].w = 1.0f;
 
@@ -92,15 +142,15 @@ blk::make_rotation_matrix_y(const Radians angle)
 }
 
 blk::Matrix4
-blk::make_rotation_matrix_z(const Radians angle)
+blk::init_rotation_matrix_z(const Radians angle)
 {
 	const float cos = cosf(angle.value);
 	const float sin = sinf(angle.value);
 
 	Matrix4 matrix{};
 	matrix.columns[0].x = cos;
-	matrix.columns[0].y = -sin;
-	matrix.columns[1].x = sin;
+	matrix.columns[0].y = sin;
+	matrix.columns[1].x = -sin;
 	matrix.columns[1].y = cos;
 	matrix.columns[2].z = 1.0f;
 	matrix.columns[3].w = 1.0f;
@@ -109,17 +159,17 @@ blk::make_rotation_matrix_z(const Radians angle)
 }
 
 blk::Matrix4
-blk::make_rotation_matrix(const Vector3& rotation)
+blk::init_rotation_matrix(const Vector3& rotation)
 {
-	const Matrix4 rotation_x = make_rotation_matrix_x(Radians{rotation.x});
-	const Matrix4 rotation_y = make_rotation_matrix_y(Radians{rotation.y});
-	const Matrix4 rotation_z = make_rotation_matrix_z(Radians{rotation.z});
+	const Matrix4 rotation_x = init_rotation_matrix_x(Radians{rotation.x});
+	const Matrix4 rotation_y = init_rotation_matrix_y(Radians{rotation.y});
+	const Matrix4 rotation_z = init_rotation_matrix_z(Radians{rotation.z});
 
 	return rotation_y * rotation_x * rotation_z;
 }
 
 blk::Matrix4
-blk::make_look_at_matrix(const Vector3& eye, const Vector3& target, const Vector3& up)
+blk::init_look_at_matrix(const Vector3& eye, const Vector3& target, const Vector3& up)
 {
 	const Vector3 forward = compute_unit_vector(target - eye);
 	const Vector3 right = compute_unit_vector(compute_cross_product(up, forward));
@@ -149,9 +199,9 @@ blk::make_look_at_matrix(const Vector3& eye, const Vector3& target, const Vector
 }
 
 blk::Matrix4
-blk::make_perspective_matrix(const Radians fov, const float aspect_ratio, const float near, const float far)
+blk::init_perspective_matrix(const Radians fov, const float aspect_ratio, const float near_plane, const float far_plane)
 {
-	Matrix4 matrix = make_identity_matrix();
+	Matrix4 matrix = init_identity_matrix();
 
 	const float tan_half_fov = tanf(fov.value * 0.5f);
 	matrix.columns[0].x = 1.0f / (tan_half_fov * aspect_ratio);
@@ -159,11 +209,11 @@ blk::make_perspective_matrix(const Radians fov, const float aspect_ratio, const 
 	matrix.columns[2].w = 1.0f;
 	matrix.columns[3].w = 0.0f;
 
-	matrix.columns[2].z = far / (far - near);
-	matrix.columns[3].z = -(far * near) / (far - near);
+	matrix.columns[2].z = far_plane / (far_plane - near_plane);
+	matrix.columns[3].z = -(far_plane * near_plane) / (far_plane - near_plane);
 
-	// TODO: Not sure about this flip here.
-	matrix.columns[1].y = -1.0f / tan_half_fov;
+	// This is Y-up, matching the engine. Whichever graphics API renders it is responsible for its own clip space.
+	matrix.columns[1].y = 1.0f / tan_half_fov;
 
 	return matrix;
 }
@@ -228,8 +278,63 @@ blk::compute_determinant(const Matrix4& matrix)
 		   d * compute_determinant(D);
 }
 
-std::optional<blk::Matrix4>
-blk::inverse(const Matrix4& matrix)
+blk::Result
+blk::at(const Matrix2& matrix, int index, Vector2& vector)
+{
+	if (index < 0 || index > 1)
+	{
+		return Result::OUT_OF_BOUNDS;
+	}
+
+	vector = matrix[index];
+
+	return Result::SUCCESS;
+}
+
+blk::Result
+blk::at(const Matrix3& matrix, int index, Vector3& vector)
+{
+	if (index < 0 || index > 2)
+	{
+		return Result::OUT_OF_BOUNDS;
+	}
+
+	vector = matrix[index];
+
+	return Result::SUCCESS;
+}
+
+blk::Result
+blk::at(const Matrix4& matrix, int index, Vector4& vector)
+{
+	if (index < 0 || index > 3)
+	{
+		return Result::OUT_OF_BOUNDS;
+	}
+
+	vector = matrix[index];
+
+	return Result::SUCCESS;
+}
+
+blk::Matrix4
+blk::transpose(const Matrix4& matrix)
+{
+	Matrix4 result = {};
+
+	for (int column = 0; column < 4; column++)
+	{
+		for (int row = 0; row < 4; row++)
+		{
+			result.columns[column][row] = matrix.columns[row][column];
+		}
+	}
+
+	return result;
+}
+
+blk::Result
+blk::inverse(const Matrix4& matrix, Matrix4& inverse_matrix)
 {
 	float cofactors[4][4];
 
@@ -273,37 +378,20 @@ blk::inverse(const Matrix4& matrix)
 
 	if (constexpr float epsilon = 1e-6f; fabsf(determinant) < epsilon)
 	{
-		return std::nullopt;
+		return Result::INVALID_ARGUMENTS;
 	}
 
 	const float inverse_determinant = 1.0f / determinant;
-	Matrix4 result = {};
 
 	for (int column = 0; column < 4; column++)
 	{
-		result.columns[column] = inverse_determinant * Vector4{
-														   .x = cofactors[column][0],
-														   .y = cofactors[column][1],
-														   .z = cofactors[column][2],
-														   .w = cofactors[column][3]
-													   };
+		inverse_matrix.columns[column] = inverse_determinant * Vector4{
+																   .x = cofactors[column][0],
+																   .y = cofactors[column][1],
+																   .z = cofactors[column][2],
+																   .w = cofactors[column][3]
+															   };
 	}
 
-	return result;
-}
-
-blk::Matrix4
-blk::transpose(const Matrix4& matrix)
-{
-	Matrix4 result = {};
-
-	for (int column = 0; column < 4; column++)
-	{
-		for (int row = 0; row < 4; row++)
-		{
-			result.columns[column][row] = matrix.columns[row][column];
-		}
-	}
-
-	return result;
+	return Result::SUCCESS;
 }

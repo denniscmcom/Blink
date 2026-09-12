@@ -9,8 +9,13 @@
 
 namespace blk
 {
+/// Controller key.
 enum class Key : uint8_t
 {
+	/// Sentinel value to represent no key.
+	/// @warning It should be always at the beginning of the enumeration. Add new keys after this value.
+	NONE,
+
 	KEYBOARD_ESC,
 	KEYBOARD_F1,
 	KEYBOARD_F2,
@@ -22,8 +27,13 @@ enum class Key : uint8_t
 	KEYBOARD_S,
 	KEYBOARD_D,
 	MOUSE_RIGHT,
+
+	/// Sentinel value to represent the end of the enumeration.
+	/// @warning It should be always at the end. Add new keys before this value.
+	END,
 };
 
+/// Type of the input event.
 enum class Event_Type : uint8_t
 {
 	NONE,
@@ -32,15 +42,21 @@ enum class Event_Type : uint8_t
 	MOUSE_MOVE,
 };
 
+/// Input event.
+///
+/// Specific fields are populated depending on `Event_Type`.
 struct Event
 {
-	Event_Type type = Event_Type::NONE;
+	Event_Type type;
 	Key key;
-	uint32_t mouse_delta_x;
-	uint32_t mouse_delta_y;
+	int32_t mouse_delta_x;
+	int32_t mouse_delta_y;
 };
 
+/// Writes an `event` to the event buffer.
 void write_event(const Event& event);
+/// Gets the next event from the buffer without advancing the read index.
 Event peek_event();
+/// Gets the next event from the buffer and advances the read index.
 Event poll_event();
 }  // namespace blk

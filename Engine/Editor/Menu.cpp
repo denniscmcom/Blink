@@ -5,27 +5,32 @@
 
 #include "Engine/Editor/Menu.hpp"
 
+#include "Engine/Editor/Console.hpp"
 #include "Engine/Editor/Context.hpp"
 #include "Engine/Editor/Material/Settings.hpp"
 #include "Engine/Editor/Toolbar.hpp"
+#include "Engine/Editor/World/Outliner.hpp"
+#include "Engine/Editor/World/Stats.hpp"
 #include "Engine/Platform/Assert.hpp"
-#include "Engine/Scene/Scene_Graph.hpp"
 #include "Engine/World/World.hpp"
-#include "World/Console.hpp"
-#include "World/Outliner.hpp"
-#include "World/Stats.hpp"
-#include "imgui_internal.h"
 
 #include <imgui.h>
 
 void
 blk::draw_menu(Editor_Context& context)
 {
-	BLK_CHECK(context.world_context._game_world);
-	BLK_CHECK(context._input_state);
+	if (!BLK_VERIFY(context.world_context.game_world) || !BLK_VERIFY(context.input_state))
+	{
+		return;
+	}
+
+	// First we draw the options and store the action.
 
 	if (ImGui::BeginMainMenuBar())
 	{
+		// File category.
+		// Anything related to create, or open files that affect the entire engine context should be here.
+
 		if (ImGui::BeginMenu("File"))
 		{
 			if (ImGui::MenuItem("Create project", "Ctrl+N"))
@@ -40,6 +45,9 @@ blk::draw_menu(Editor_Context& context)
 
 			ImGui::EndMenu();
 		}
+
+		// Edit category.
+		// Anything related to editting the general engine context.
 
 		if (ImGui::BeginMenu("Edit"))
 		{
@@ -56,20 +64,23 @@ blk::draw_menu(Editor_Context& context)
 			ImGui::EndMenu();
 		}
 
+		// View category.
+		// Anything related to showing, or hiding widgets.
+
 		if (ImGui::BeginMenu("View"))
 		{
-			const bool show_all = context.world_context.show_outliner && context.world_context.show_stats;
-			const bool hide_all = !context.world_context.show_outliner && !context.world_context.show_stats;
+			const bool show_all = context.world_context.show_outliner && context.world_context.show_stats &&
+								  context.world_context.show_console;
+			const bool hide_all = !context.world_context.show_outliner && !context.world_context.show_stats &&
+								  !context.world_context.show_console;
 
 			if (ImGui::MenuItem("Show all", "Ctrl+Shift+H", show_all))
 			{
-				// TODO (WIP).
 				BLK_NOT_IMPLEMENTED();
 			}
 
 			if (ImGui::MenuItem("Hide all", "Ctrl+H", hide_all))
 			{
-				// TODO (WIP).
 				BLK_NOT_IMPLEMENTED();
 			}
 
@@ -90,6 +101,9 @@ blk::draw_menu(Editor_Context& context)
 			ImGui::EndMenu();
 		}
 
+		// Help category.
+		// Anything related to helping the user use the engine.
+
 		if (ImGui::BeginMenu("Help"))
 		{
 			if (ImGui::MenuItem("About", nullptr))
@@ -99,9 +113,11 @@ blk::draw_menu(Editor_Context& context)
 
 			ImGui::EndMenu();
 		}
+
+		ImGui::EndMainMenuBar();
 	}
 
-	ImGui::EndMainMenuBar();
+	// Then we draw widgets based on the user's intentions stored previously.
 
 	if (context.show_toolbar)
 	{

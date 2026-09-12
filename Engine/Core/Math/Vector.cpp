@@ -6,7 +6,9 @@
 #include "Engine/Core/Math/Vector.hpp"
 
 #include "Engine/Core/Math/Matrix.hpp"
+#include "Engine/Platform/Assert.hpp"
 #include "Engine/Platform/Log.hpp"
+#include "Engine/Platform/Result.hpp"
 
 #include <math.h>
 
@@ -69,8 +71,44 @@ blk::operator+=(Vector3& lhs, const Vector3& rhs)
 }
 
 float&
+blk::Vector2::operator[](int index)
+{
+	BLK_ENSURE(index >= 0 && index < 2);
+
+	switch (index)
+	{
+	case 0:
+		return x;
+	case 1:
+		return y;
+	default:
+		// Unreachable.
+		return x;
+	}
+}
+
+float
+blk::Vector2::operator[](int index) const
+{
+	BLK_ENSURE(index >= 0 && index < 2);
+
+	switch (index)
+	{
+	case 0:
+		return x;
+	case 1:
+		return y;
+	default:
+		// Unreachable.
+		return x;
+	}
+}
+
+float&
 blk::Vector3::operator[](const int index)
 {
+	BLK_ENSURE(index >= 0 && index < 3);
+
 	switch (index)
 	{
 	case 0:
@@ -80,13 +118,16 @@ blk::Vector3::operator[](const int index)
 	case 2:
 		return z;
 	default:
-		BLK_FATAL("Index out of bounds\n");
+		// Unreachable.
+		return x;
 	}
 }
 
 float
 blk::Vector3::operator[](const int index) const
 {
+	BLK_ENSURE(index >= 0 && index < 3);
+
 	switch (index)
 	{
 	case 0:
@@ -96,7 +137,8 @@ blk::Vector3::operator[](const int index) const
 	case 2:
 		return z;
 	default:
-		BLK_FATAL("Index out of bounds\n");
+		// Unreachable.
+		return x;
 	}
 }
 
@@ -127,6 +169,8 @@ blk::operator-(const Vector4& vector)
 float&
 blk::Vector4::operator[](const int index)
 {
+	BLK_ENSURE(index >= 0 && index < 4);
+
 	switch (index)
 	{
 	case 0:
@@ -138,13 +182,16 @@ blk::Vector4::operator[](const int index)
 	case 3:
 		return w;
 	default:
-		BLK_FATAL("Index out of bounds\n");
+		// Unreachable.
+		return x;
 	}
 }
 
 float
 blk::Vector4::operator[](const int index) const
 {
+	BLK_ENSURE(index >= 0 && index < 4);
+
 	switch (index)
 	{
 	case 0:
@@ -156,7 +203,8 @@ blk::Vector4::operator[](const int index) const
 	case 3:
 		return w;
 	default:
-		BLK_FATAL("Index out of bounds\n");
+		// Unreachable.
+		return x;
 	}
 }
 
@@ -182,6 +230,16 @@ blk::compute_unit_vector(const Vector3& vector)
 {
 	const float magnitude = compute_vector_magnitude(vector);
 
+	if (constexpr float epsilon = 1e-6f; magnitude < epsilon)
+	{
+		// TODO (Consistency): `compute_unit_vector` has no way to report the failure to the caller, unlike `inverse`
+		// which returns `Result::INVALID_ARGUMENTS` for a singular matrix. Decide whether it should return `Result`
+		// and write the unit vector to an out parameter.
+
+		// A zero-length vector has no direction. We return a zero vector to avoid propagating NaNs to the caller.
+		return {};
+	}
+
 	return Vector3{.x = vector.x / magnitude, .y = vector.y / magnitude, .z = vector.z / magnitude};
 }
 
@@ -201,4 +259,43 @@ float
 blk::compute_vector_magnitude(const Vector3& vector)
 {
 	return sqrtf(compute_vector_magnitude_squared(vector));
+}
+
+blk::Result
+blk::at(const Vector2& vector, int index, float& value)
+{
+	if (index < 0 || index > 1)
+	{
+		return Result::OUT_OF_BOUNDS;
+	}
+
+	value = vector[index];
+
+	return Result::SUCCESS;
+}
+
+blk::Result
+blk::at(const Vector3& vector, int index, float& value)
+{
+	if (index < 0 || index > 2)
+	{
+		return Result::OUT_OF_BOUNDS;
+	}
+
+	value = vector[index];
+
+	return Result::SUCCESS;
+}
+
+blk::Result
+blk::at(const Vector4& vector, int index, float& value)
+{
+	if (index < 0 || index > 3)
+	{
+		return Result::OUT_OF_BOUNDS;
+	}
+
+	value = vector[index];
+
+	return Result::SUCCESS;
 }

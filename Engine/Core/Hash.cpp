@@ -5,7 +5,7 @@
 
 #include "Engine/Core/Hash.hpp"
 
-#include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 
 namespace
@@ -21,8 +21,9 @@ blk::hash_fnv1a(const char* buffer, const size_t size)
 
 	for (size_t i = 0; i < size; i++)
 	{
-		// FIXME: Should I cast `buffer[i]` to unsigned char first because MSVC?
-		hash ^= static_cast<uint64_t>(buffer[i]);
+		// Without casting to `unsigned char` first, `0xFF` could extend to `0xFFFFFFFFFFFFFFFF` instead of
+		// `0x00000000000000FF`, corrupting the hash.
+		hash ^= static_cast<uint64_t>(static_cast<unsigned char>(buffer[i]));
 		hash *= FNV_PRIME;
 	}
 
@@ -33,4 +34,13 @@ uint64_t
 blk::hash_fnv1a(const char* string)
 {
 	return hash_fnv1a(string, strlen(string));
+}
+
+uint64_t
+blk::hash_fnv1a(uint64_t value)
+{
+	// TODO (Bug): The resulting hash will be endianness-dependent.
+	// The same integer will produce different hashes on little-endian vs big-endian machines. This is bad for
+	// cross-platform determinism (e.g. serialized asset IDs).
+	return hash_fnv1a(reinterpret_cast<const char*>(&value), sizeof(value));
 }

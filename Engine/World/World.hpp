@@ -5,59 +5,133 @@
 
 #pragma once
 
+#include "Engine/Core/Hash.hpp"
 #include "Engine/Core/Pool.hpp"
-#include "Engine/Scene/Scene_Graph.hpp"
+#include "Engine/Scene/Graph.hpp"
 #include "Engine/World/Actor.hpp"
 #include "Engine/World/Camera.hpp"
 #include "Engine/World/Prop.hpp"
 
 namespace blk
 {
+struct Mesh;
 struct Node;
+struct Allocator;
+enum class Result;
 
+/// The type of a `Entity` in `World`.
 enum class Entity_Type : uint8_t
 {
-	Actor,
-	Camera,
-	Prop,
+	/// @see `Actor`.
+	ACTOR,
+	/// @see `Camera`.
+	CAMERA,
+	/// @see `Prop`.
+	PROP,
 };
 
-struct Entity_Instance
+/// A generic entity used to associate any `Entity` with its `Node`.
+struct Entity
 {
-	Entity_Type type;
-	uint32_t id = UINT32_MAX;
-	uint32_t version = UINT32_MAX;
+	Entity_Type type = Entity_Type::ACTOR;
+	/// The id of the entity in the pool to compose `Pool_Handle`.
+	/// `SIZE_MAX` is the sentinel value that represents an invalid id.
+	/// @warning `SIZE_MAX` should match `Pool_Handle::id`.
+	size_t id = SIZE_MAX;
+	/// The version of the entity slot in the pool to compose `Pool_Handle`.
+	/// `SIZE_MAX` is the sentinel value that represents an invalid version.
+	/// @warning `SIZE_MAX` should match `Pool_Handle::version`.
+	size_t version = SIZE_MAX;
 };
 
+/// A `World` – commonly named level or scene in other engines.
+/// @note Only one `World` could be loaded at a time.
 struct World
 {
+	/// Pool of `Actor` entities.
 	Pool<Actor> actors;
+	/// Pool of `Camera` entities.
 	Pool<Camera> cameras;
+	/// Pool of `Prop` entities.
 	Pool<Prop> props;
+	/// The handle of the active camera.
+	/// @warning The camera should exist in `cameras` and only one camera can be activated at a time.
 	Pool_Handle<Camera> active_camera_handle;
+	/// The hierarchical representation of `World`.
 	Scene_Graph scene_graph;
-
-	std::unordered_map<Pool_Handle<Node>, Entity_Instance, Pool_Handle_Hash<Node>> node_handle_to_entity_instance;
+	/// Associates a node handle of each `Node` in `scene_graph` with its `Entity` in one of the pool of entities
+	/// (`actors`, `cameras`).
+	Hash_Map<Pool_Handle<Node>, Entity> node_handle_to_entity;
+	Allocator* allocator;
 };
 
+/// Creates an empty `World`.
+Result create_world(Allocator* allocator, World& world);
+/// Destroys `world`.
+void destroy_world(World& world);
+
+/// Spawns an actor in `world` and returns its handle.
+/// @param name A null-terminated string. It is copied, and it does not have to be unique — this function makes it so.
+/// @param parent A valid handle to its parent node.
+/// @warning It can return a `POOL_HANDLE_NONE` if it fails creating the `Actor`.
 Pool_Handle<Actor> spawn_actor(World& world, const char* name, Pool_Handle<Node> parent);
+/// Spawns a camera in `World` and returns its handle.
+/// @param name A null-terminated string. It is copied, and it does not have to be unique — this function makes it so.
+/// @param parent A valid handle to its parent node.
+/// @warning It can return a `POOL_HANDLE_NONE` if it fails creating the `Camera`.
 Pool_Handle<Camera> spawn_camera(World& world, const char* name, Pool_Handle<Node> parent);
+/// Spawns a prop in `world` and returns its handle.
+/// @param name A null-terminated string. It is copied, and it does not have to be unique — this function makes it so.
+/// @param parent A valid handle to its parent node.
+/// @warning It can return a `POOL_HANDLE_NONE` if it fails creating the `Prop`.
 Pool_Handle<Prop> spawn_prop(World& world, const char* name, Pool_Handle<Node> parent);
 
-void despawn_actor(World& world, Pool_Handle<Actor> handle);
-void despawn_camera(World& world, Pool_Handle<Camera> handle);
-void despawn_prop(World& world, Pool_Handle<Prop> handle);
-void despawn_node(World& world, Pool_Handle<Node> handle);
+/// Despawns an `Actor` from `world`.
+void despawn(World& world, Pool_Handle<Actor> handle);
+/// Despawns a `Camera` from `world`.
+void despawn(World& world, Pool_Handle<Camera> handle);
+/// Despawns a `Prop` from `world`.
+void despawn(World& world, Pool_Handle<Prop> handle);
+/// Despawns an entity by its `Node` handle from `world`.
+void despawn(World& world, Pool_Handle<Node> handle);
 
-Pool_Handle<Actor> find_actor(const World& world, const char* name);
-Pool_Handle<Camera> find_camera(const World& world, const char* name);
-Pool_Handle<Prop> find_prop(const World& world, const char* name);
+/// Finds an `Actor` in `world` by its `name`.
+/// It returns `POOL_HANDLE_NONE` if `Actor` does not exist.
+/// @param name A null-terminated string.
+Pool_Handle<Actor> find_actor(World& world, const char* name);
+/// Finds a `Camera` in `world` by its `name`.
+/// It returns `POOL_HANDLE_NONE` if `Camera` does not exist.
+/// @param name A null-terminated string.
+Pool_Handle<Camera> find_camera(World& world, const char* name);
+/// Finds an `Prop` in `world` by its `name`.
+/// It returns `POOL_HANDLE_NONE` if `Prop` does not exist.
+/// @param name A null-terminated string.
+Pool_Handle<Prop> find_prop(World& world, const char* name);
 
-Actor* get_actor(const World& world, Pool_Handle<Actor> handle);
-Camera* get_camera(const World& world, Pool_Handle<Camera> handle);
-Prop* get_prop(const World& world, Pool_Handle<Prop> handle);
+// TODO (Consistency): These overload are confusing, rename them to get_actor, get_camera, ...
 
-Node* get_entity_node(const World& world, Pool_Handle<Actor> handle);
-Node* get_entity_node(const World& world, Pool_Handle<Camera> handle);
-Node* get_entity_node(const World& world, Pool_Handle<Prop> handle);
+/// Returns a pointer to the `Actor` associated with `handle`.
+/// It returns `nullptr` if `Actor` does not exist in `world.actors`.
+Actor* get(World& world, Pool_Handle<Actor> handle);
+/// Returns a pointer to the `Camera` associated with `handle`.
+/// It returns `nullptr` if `Camera` does not exist in `world.cameras`.
+Camera* get(World& world, Pool_Handle<Camera> handle);
+/// Returns a pointer to the `Prop` associated with `handle`.
+/// It returns `nullptr` if `Prop` does not exist in `world.props`.
+Prop* get(World& world, Pool_Handle<Prop> handle);
+
+/// Returns a pointer to the `Actor`'s `Node`.
+/// It returns `nullptr` if `Actor` does not exist in `world.actors`.
+Node* get_node(World& world, Pool_Handle<Actor> handle);
+/// Returns a pointer to the `Camera`'s `Node`.
+/// It returns `nullptr` if `Camera` does not exist in `world.cameras`.
+Node* get_node(World& world, Pool_Handle<Camera> handle);
+/// Returns a pointer to the `Prop`'s `Node`.
+/// It returns `nullptr` if `Prop` does not exist in `world.props`.
+Node* get_node(World& world, Pool_Handle<Prop> handle);
+
+/// Attaches a `mesh` to a `Prop` after the last slot.
+Result attach_mesh(World& world, Pool_Handle<Prop> handle, Pool_Handle<Mesh> mesh);
+/// Attached a `mesh` to a `Prop` at `index`.
+Result attach_mesh(World& world, Pool_Handle<Prop> handle, Pool_Handle<Mesh> mesh, size_t index);
 }  // namespace blk

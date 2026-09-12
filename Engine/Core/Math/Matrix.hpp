@@ -3,46 +3,81 @@
 // Licensed under the Blink Engine Source Access License, see LICENSE.txt
 // ============================================================================
 
+/// Host-side squared matrices up to 4x4.
+
 #pragma once
 
 #include "Engine/Core/Math/Vector.hpp"
 
-#include <optional>
-
 namespace blk
 {
 struct Radians;
+enum class Result;
 
+// TODO: Ensure alignment and size compatibility with renderer in all shared structures. I think it is best to have
+//		 different structures for Vulkan std140 and std430.
+
+/// Column-major 2x2 matrix.
 struct Matrix2
 {
 	Vector2 columns[2];
+
+	/// @warning Crashes at runtime if `index` is out of bounds.
+	Vector2& operator[](int index);
+	/// @warning Crashes at runtime if `index` is out of bounds.
+	Vector2 operator[](int index) const;
 };
 
+/// Column-major 3x3 matrix.
 struct Matrix3
 {
 	Vector3 columns[3];
+
+	/// @warning Crashes at runtime if `index` is out of bounds.
+	Vector3& operator[](int index);
+	/// @warning Crashes at runtime if `index` is out of bounds.
+	Vector3 operator[](int index) const;
 };
 
-struct alignas(16) Matrix4
+/// Column-major 4x4 matrix.
+struct Matrix4
 {
 	Vector4 columns[4];
+
+	/// @warning Crashes at runtime if `index` is out of bounds.
+	Vector4& operator[](int index);
+	/// @warning Crashes at runtime if `index` is out of bounds.
+	Vector4 operator[](int index) const;
 };
 
 Matrix4 operator*(const Matrix4& lhs, const Matrix4& rhs);
 
-Matrix4 make_identity_matrix();
-Matrix4 make_translation_matrix(const Vector3& translation);
-Matrix4 make_scale_matrix(const Vector3& scale);
-Matrix4 make_rotation_matrix_x(Radians angle);
-Matrix4 make_rotation_matrix_y(Radians angle);
-Matrix4 make_rotation_matrix_z(Radians angle);
-Matrix4 make_rotation_matrix(const Vector3& rotation);
-Matrix4 make_look_at_matrix(const Vector3& eye, const Vector3& target, const Vector3& up);
-Matrix4 make_perspective_matrix(Radians fov, float aspect_ratio, float near, float far);
-std::optional<Matrix4> inverse(const Matrix4& matrix);
+Matrix4 init_identity_matrix();
+Matrix4 init_translation_matrix(const Vector3& translation);
+Matrix4 init_scale_matrix(const Vector3& scale);
+/// Initializes a rotation matrix around the X axis. A positive `angle` rotates `+Y` towards `+Z`.
+Matrix4 init_rotation_matrix_x(Radians angle);
+/// Initializes a rotation matrix around the Y axis. A positive `angle` rotates `+Z` towards `+X`.
+Matrix4 init_rotation_matrix_y(Radians angle);
+/// Initializes a rotation matrix around the Z axis. A positive `angle` rotates `+X` towards `+Y`.
+Matrix4 init_rotation_matrix_z(Radians angle);
+/// Initializes a rotation matrix from the Euler angles in `rotation`, applied in yaw–pitch–roll order.
+Matrix4 init_rotation_matrix(const Vector3& rotation);
+Matrix4 init_look_at_matrix(const Vector3& eye, const Vector3& target, const Vector3& up);
+Matrix4 init_perspective_matrix(Radians fov, float aspect_ratio, float near_plane, float far_plane);
+
+/// Computes the inverse of `matrix` and writes the result to `inverse_matrix`.
+Result inverse(const Matrix4& matrix, Matrix4& inverse_matrix);
 Matrix4 transpose(const Matrix4& matrix);
 
 float compute_determinant(const Matrix2& matrix);
 float compute_determinant(const Matrix3& matrix);
 float compute_determinant(const Matrix4& matrix);
+
+/// Accesses `matrix` column at `index` and writes it to `vector`.
+Result at(const Matrix2& matrix, int index, Vector2& vector);
+/// Accesses `matrix` column at `index` and writes it to `vector`.
+Result at(const Matrix3& matrix, int index, Vector3& vector);
+/// Accesses `matrix` column at `index` and writes it to `vector`.
+Result at(const Matrix4& matrix, int index, Vector4& vector);
 }  // namespace blk

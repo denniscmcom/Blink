@@ -8,6 +8,11 @@
 #ifdef _MSC_VER
 /// Triggers a debugger breakpoint.
 #define BLK_DEBUG_BREAK() __debugbreak()
+#else
+// TODO (Bug): Compilers other than MSVC never break into the debugger. Every assertion silently continues.
+
+/// No-op.
+#define BLK_DEBUG_BREAK() ((void)0)
 #endif
 
 namespace blk

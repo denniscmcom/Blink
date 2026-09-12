@@ -1,19 +1,19 @@
-add_subdirectory("Math")
-
 target_sources(BlkEngine
 	PUBLIC
 		FILE_SET publicHeaders
 		TYPE HEADERS
 		BASE_DIRS ${CMAKE_SOURCE_DIR}
 		FILES
+			Array.hpp
 			Hash.hpp
-			Iterator.hpp
 			Pool.hpp
 			Serial.hpp
-			Time.hpp
+			String.hpp
 	PRIVATE
 		Hash.cpp
 		Serial.cpp
-		Time.cpp
+		String.cpp
 )
+
+add_subdirectory(Math)
 

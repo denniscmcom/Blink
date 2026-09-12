@@ -5,9 +5,11 @@
 
 #include "Engine/Platform/Application.hpp"
 
+#include "Engine/Platform/Allocator.hpp"
 #include "Engine/Platform/Application_Internal.hpp"
 #include "Engine/Platform/Assert.hpp"
-#include "Engine/Platform/Log.hpp"
+#include "Engine/Platform/Result.hpp"
+#include "Engine/Platform/Types.hpp"
 
 #include <Windows.h>
 
@@ -16,28 +18,54 @@ namespace
 blk::Application* application = nullptr;
 }  // namespace
 
-void
-blk::create_application(HINSTANCE hinstance)
+blk::Result
+blk::create_application(Allocator* allocator, HINSTANCE hinstance)
 {
-	BLK_CHECK(application == nullptr);
-	application = new Application();
-	BLK_CHECK(application);
+	if (!BLK_VERIFY(!application) || !BLK_VERIFY(allocator))
+	{
+		return Result::INVALID_ARGUMENTS;
+	}
+
+	void* pointer = nullptr;
+
+	if (const Result result = allocate(*allocator, pointer, sizeof(Application), alignof(Application));
+		result != Result::SUCCESS)
+	{
+		return result;
+	}
+
+	application = static_cast<Application*>(pointer);
 	application->hinstance = hinstance;
+	application->allocator = allocator;
+
+	return Result::SUCCESS;
 }
 
 void
 blk::destroy_application()
 {
-	if (application)
+	if (!BLK_VERIFY(application))
 	{
-		delete application;
+		return;
 	}
+
+	if (!BLK_VERIFY(application->allocator))
+	{
+		// `Application` may be corrupted.
+		return;
+	}
+
+	free(*application->allocator, application);
+	application = nullptr;
 }
 
 bool
 blk::is_application_running()
 {
-	BLK_CHECK(application);
+	if (!BLK_VERIFY(application))
+	{
+		return false;
+	}
 
 	MSG message = {};
 
@@ -53,18 +81,17 @@ blk::is_application_running()
 void
 blk::show_cursor()
 {
-	BLK_CHECK(application);
+	if (!BLK_VERIFY(application))
+	{
+		return;
+	}
 
 	if (application->is_cursor_hidden)
 	{
+		// TODO (Bug): The display counter starts at -1 when no mouse is installed, so both `BLK_CHECK` assertions are
+		// off by one on those machines. Query `GetSystemMetrics(SM_MOUSEPRESENT)` at startup and skip cursor management
+		// when there is no mouse.
 		const int counter = ShowCursor(TRUE);
-
-		if (counter == -1)
-		{
-			BLK_WARNING("Mouse is not installed\n");
-			return;
-		}
-
 		BLK_CHECK(counter == 0);
 		application->is_cursor_hidden = false;
 	}
@@ -73,7 +100,10 @@ blk::show_cursor()
 void
 blk::hide_cursor()
 {
-	BLK_CHECK(application);
+	if (!BLK_VERIFY(application))
+	{
+		return;
+	}
 
 	if (!application->is_cursor_hidden)
 	{
@@ -83,23 +113,32 @@ blk::hide_cursor()
 	}
 }
 
-void
+blk::Result
 blk::set_cursor_position(const Rect<int>& position)
 {
-	BLK_VERIFY(SetCursorPos(position.x, position.y));
-}
-
-blk::Rect<int>
-blk::get_cursor_position()
-{
-	POINT point;
-
-	if (!BLK_VERIFY(GetCursorPos(&point)))
+	if (!SetCursorPos(position.x, position.y))
 	{
-		return {};
+		return Result::OS_ERROR;
 	}
 
-	return Rect{.x = static_cast<int>(point.x), .y = static_cast<int>(point.y)};
+	return Result::SUCCESS;
+}
+
+blk::Result
+blk::get_cursor_position(Rect<int>& position)
+{
+	position = {};
+	POINT point;
+
+	if (!GetCursorPos(&point))
+	{
+		return Result::OS_ERROR;
+	}
+
+	position.x = static_cast<int>(point.x);
+	position.y = static_cast<int>(point.y);
+
+	return Result::SUCCESS;
 }
 
 blk::Application*

@@ -5,7 +5,9 @@
 
 #include "Engine/Renderer/Resource/Material_Device.hpp"
 
+#include "Engine/Core/Array.hpp"
 #include "Engine/Platform/Log.hpp"
+#include "Engine/Platform/Result.hpp"
 #include "Engine/Renderer/Lifetime/Buffer.hpp"
 #include "Engine/Renderer/Lifetime/Context.hpp"
 #include "Engine/Renderer/Lifetime/Descriptor.hpp"
@@ -13,51 +15,109 @@
 #include "Engine/Renderer/Resource/Texture_Device.hpp"
 #include "Engine/Resource/Material.hpp"
 
-#include <array>
-#include <optional>
-
-namespace
-{
-blk::Texture_Device find_or_transfer_texture(
-	const blk::Context& context,
-	blk::Arena& arena,
-	blk::Pool_Handle<blk::Texture> handle,
-	VkFormat format
-);
-}  // namespace
-
-blk::Material_Device
+blk::Result
 blk::transfer_material(
 	const Context& context,
-	Arena& arena,
 	const Descriptor_Layouts& descriptor_layouts,
-	const Pool_Handle<Material> handle
+	Arena& arena,
+	Pool_Handle<Material> host_handle,
+	Material_Device& material
 )
 {
-	const Material* material = get_material(handle);
+	material = {};
 
-	if (!material)
+	// Check if `material` is already on device.
+	if (const Material_Device* material_ptr = get(arena.materials, host_handle))
 	{
-		BLK_FATAL("Failed to get material\n");
+		material = *material_ptr;
+
+		return Result::SUCCESS;
 	}
 
-	Material_Device material_device = {};
-	material_device.handle = handle;
-	material_device.albedo = find_or_transfer_texture(context, arena, material->albedo, VK_FORMAT_R8G8B8A8_SRGB);
-	material_device.normal = find_or_transfer_texture(context, arena, material->normal, VK_FORMAT_R8G8B8A8_UNORM);
-	material_device.orm = find_or_transfer_texture(context, arena, material->orm, VK_FORMAT_R8G8B8A8_UNORM);
+	// Get material data.
+	const Material* host_material = get_material(host_handle);
 
-	material_device.uniform_buffer = create_buffer(
-		context,
-		sizeof(Material_UBO),
-		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-	);
+	if (!host_material)
+	{
+		BLK_ERROR("Failed to get host material to transfer\n");
 
-	map_buffer(context, material_device.uniform_buffer);
+		return Result::INVALID_ARGUMENTS;
+	}
+
+	material.host_handle = host_handle;
+
+	// Transfer material textures.
+
+	if (const Result result =
+			transfer_texture(context, arena, host_material->albedo, VK_FORMAT_R8G8B8A8_SRGB, material.albedo);
+		result != Result::SUCCESS)
+	{
+		BLK_ERROR("Failed to transfer albedo texture to device\n");
+		unload_material_from_device(context, arena, material);
+
+		return Result::DEVICE_ERROR;
+	}
+
+	if (const Result result =
+			transfer_texture(context, arena, host_material->normal, VK_FORMAT_R8G8B8A8_UNORM, material.normal);
+		result != Result::SUCCESS)
+	{
+		BLK_ERROR("Failed to transfer normal texture to device\n");
+		unload_material_from_device(context, arena, material);
+
+		return Result::DEVICE_ERROR;
+	}
+
+	if (const Result result =
+			transfer_texture(context, arena, host_material->orm, VK_FORMAT_R8G8B8A8_UNORM, material.orm);
+		result != Result::SUCCESS)
+	{
+		BLK_ERROR("Failed to transfer ORM texture to device\n");
+		unload_material_from_device(context, arena, material);
+
+		return Result::DEVICE_ERROR;
+	}
+
+	// Create material UBO.
+	// TODO (Performance): We may want to suballocate from a single buffer like we do with the index and vertex buffer.
+
+	if (const Result result = create_buffer(
+			context,
+			sizeof(Material_UBO),
+			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			material.uniform_buffer
+		);
+		result != Result::SUCCESS)
+	{
+		BLK_ERROR("Failed to create material uniform buffer\n");
+		unload_material_from_device(context, arena, material);
+
+		return result;
+	}
+
+	if (const Result result = map_buffer(context, material.uniform_buffer); result != Result::SUCCESS)
+	{
+		BLK_ERROR("Failed to map material uniform buffer\n");
+		unload_material_from_device(context, arena, material);
+
+		return result;
+	}
+
+	// Update material UBO.
 
 	Material_UBO material_ubo = {};
-	update_buffer(material_device.uniform_buffer, &material_ubo, sizeof(Material_UBO), 0);
+
+	if (const Result result = update_buffer(material.uniform_buffer, &material_ubo, sizeof(Material_UBO), 0);
+		result != Result::SUCCESS)
+	{
+		BLK_ERROR("Failed to update material uniform buffer\n");
+		unload_material_from_device(context, arena, material);
+
+		return result;
+	}
+
+	// Allocate a descriptor set for the material.
 
 	VkDescriptorSetAllocateInfo descriptor_set_allocate_info = {};
 	descriptor_set_allocate_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -65,38 +125,40 @@ blk::transfer_material(
 	descriptor_set_allocate_info.descriptorSetCount = 1;
 	descriptor_set_allocate_info.pSetLayouts = &descriptor_layouts.material_layout;
 
-	if (vkAllocateDescriptorSets(
-			context.logical_device,
-			&descriptor_set_allocate_info,
-			&material_device.descriptor_set
-		) != VK_SUCCESS)
+	if (vkAllocateDescriptorSets(context.logical_device, &descriptor_set_allocate_info, &material.descriptor_set) !=
+		VK_SUCCESS)
 	{
-		BLK_FATAL("Failed to allocate material descriptor set\n");
+		BLK_ERROR("Failed to allocate material descriptor set\n");
+		unload_material_from_device(context, arena, material);
+
+		return Result::DEVICE_ERROR;
 	}
+
+	// Update the descriptor set.
 
 	VkDescriptorImageInfo albedo_image_info = {};
 	albedo_image_info.sampler = context.sampler;
-	albedo_image_info.imageView = material_device.albedo.image.view;
+	albedo_image_info.imageView = material.albedo.image.view;
 	albedo_image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 	VkDescriptorImageInfo normal_image_info = {};
 	normal_image_info.sampler = context.sampler;
-	normal_image_info.imageView = material_device.normal.image.view;
+	normal_image_info.imageView = material.normal.image.view;
 	normal_image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 	VkDescriptorImageInfo orm_image_info = {};
 	orm_image_info.sampler = context.sampler;
-	orm_image_info.imageView = material_device.orm.image.view;
+	orm_image_info.imageView = material.orm.image.view;
 	orm_image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 	VkDescriptorBufferInfo material_buffer_info = {};
-	material_buffer_info.buffer = material_device.uniform_buffer.buffer;
-	material_buffer_info.range = material_device.uniform_buffer.size;
+	material_buffer_info.buffer = material.uniform_buffer.buffer;
+	material_buffer_info.range = material.uniform_buffer.size;
 
-	const std::array<VkWriteDescriptorSet, 4> descriptor_writes = {{
+	const Array<VkWriteDescriptorSet, 4> descriptor_writes = {{
 		{
 			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-			.dstSet = material_device.descriptor_set,
+			.dstSet = material.descriptor_set,
 			.dstBinding = 0,
 			.dstArrayElement = 0,
 			.descriptorCount = 1,
@@ -105,7 +167,7 @@ blk::transfer_material(
 		},
 		{
 			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-			.dstSet = material_device.descriptor_set,
+			.dstSet = material.descriptor_set,
 			.dstBinding = 1,
 			.dstArrayElement = 0,
 			.descriptorCount = 1,
@@ -114,7 +176,7 @@ blk::transfer_material(
 		},
 		{
 			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-			.dstSet = material_device.descriptor_set,
+			.dstSet = material.descriptor_set,
 			.dstBinding = 2,
 			.dstArrayElement = 0,
 			.descriptorCount = 1,
@@ -123,7 +185,7 @@ blk::transfer_material(
 		},
 		{
 			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-			.dstSet = material_device.descriptor_set,
+			.dstSet = material.descriptor_set,
 			.dstBinding = 3,
 			.dstArrayElement = 0,
 			.descriptorCount = 1,
@@ -132,34 +194,15 @@ blk::transfer_material(
 		},
 	}};
 
-	vkUpdateDescriptorSets(context.logical_device, descriptor_writes.size(), descriptor_writes.data(), 0, nullptr);
-	arena.materials.insert({handle, material_device});
+	vkUpdateDescriptorSets(context.logical_device, descriptor_writes.capacity, descriptor_writes.buffer, 0, nullptr);
 
-	return material_device;
+	// Insert the host_handle-material pair into the hash map.
+	insert(arena.materials, host_handle, material);
+
+	return Result::SUCCESS;
 }
 
-namespace
+void
+blk::unload_material_from_device(const Context& context, Arena& arena, Material_Device& material)
 {
-blk::Texture_Device
-find_or_transfer_texture(
-	const blk::Context& context,
-	blk::Arena& arena,
-	blk::Pool_Handle<blk::Texture> handle,
-	VkFormat format
-)
-{
-	if (const std::optional<blk::Texture_Device> texture = find_texture_device(arena, handle))
-	{
-		return texture.value();
-	}
-
-	if (const std::optional<blk::Texture_Device> texture = transfer_texture(context, arena, handle, format))
-	{
-		return texture.value();
-	}
-
-	// FIXME: Create fallback textures at renderer creation. Use them when a mesh is missing a texture.
-	BLK_FATAL("Missing texture\n");
-	// return {};
 }
-}  // namespace

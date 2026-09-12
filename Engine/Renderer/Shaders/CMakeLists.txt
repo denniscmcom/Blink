@@ -33,13 +33,14 @@ function(blk_add_shaders TARGET)
 			VERBATIM
 		)
 
+		# A compiled shader is a resource like any other – `get_resource_logical_path` places it at `Assets/<hash>.bshader`
+		# – so it goes to the same directory as the rest, not to one of its own.
 		add_custom_command(
 			OUTPUT ${STAMP_FILE}
-			COMMAND ${CMAKE_COMMAND} -E make_directory ${BLK_RUNTIME_DIRECTORY}/Shaders
+			COMMAND ${CMAKE_COMMAND} -E make_directory ${BLK_RUNTIME_DIRECTORY}/Assets
 			COMMAND BlkCompiler
-				--input ${SOURCE_STEM}.spv
-				--input-dir ${CMAKE_CURRENT_BINARY_DIR}
-				--output-dir ${BLK_RUNTIME_DIRECTORY}/Shaders
+				--input ${OUTPUT_FILE}
+				--output-dir ${BLK_RUNTIME_DIRECTORY}
 			COMMAND ${CMAKE_COMMAND} -E touch ${STAMP_FILE}
 			DEPENDS BlkCompiler ${OUTPUT_FILE}
 			COMMENT "Compiling asset: ${SOURCE_STEM}.spv"

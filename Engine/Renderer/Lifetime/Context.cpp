@@ -6,6 +6,7 @@
 #define VK_USE_PLATFORM_WIN32_KHR
 #include "Engine/Renderer/Lifetime/Context.hpp"
 
+#include "Engine/Platform/Allocator.hpp"
 #include "Engine/Platform/Log.hpp"
 
 #include <vulkan/vulkan_win32.h>
@@ -26,8 +27,14 @@ VKAPI_ATTR VkBool32 VKAPI_CALL vulkan_debug_callback(
 }  // namespace
 
 blk::Context
-blk::create_context(HWND window)
+blk::create_context(Allocator* allocator, HWND window)
 {
+	// TODO (Feature): Use Vulkan profiles to select a device.
+	// This is old code that has not been improved because I'm removing it when I move to Vulkan profiles. Two things to
+	// fix in that rewrite: it uses `std::array` and `std::vector` where the engine has `Array` and `Dyn_Array`, and it
+	// reports every failure with `BLK_FATAL` because `create_context` returns a `Context` instead of a `Result`, so
+	// `create_renderer` has no way to detect a failure and clean up.
+
 	// ============================================================================
 	// Create instance.
 	// ============================================================================
@@ -134,11 +141,11 @@ blk::create_context(HWND window)
 
 	bool found_physical_device = false;
 	VkPhysicalDevice selected_physical_device = VK_NULL_HANDLE;
-	uint32_t graphics_queue_family_index = ~0;
+	uint32_t graphics_queue_family_index = UINT32_MAX;
 
 	for (const auto& physical_device : physical_devices)
 	{
-		graphics_queue_family_index = ~0u;
+		graphics_queue_family_index = UINT32_MAX;
 
 		BLK_DEBUG("Getting physical device properties\n");
 		VkPhysicalDeviceProperties2 physical_device_properties = {};
@@ -261,7 +268,7 @@ blk::create_context(HWND window)
 			}
 		}
 
-		if (graphics_queue_family_index == ~0)
+		if (graphics_queue_family_index == UINT32_MAX)
 		{
 			BLK_DEBUG("Failed to find suitable queue\n");
 			continue;
@@ -442,6 +449,7 @@ blk::create_context(HWND window)
 	return Context{
 		.api_version = application_info.apiVersion,
 		.instance = instance,
+		.debug_messenger = messenger,
 		.surface = surface,
 		.physical_device = selected_physical_device,
 		.logical_device = logical_device,
@@ -450,7 +458,32 @@ blk::create_context(HWND window)
 		.frame_command_pool = frame_command_pool,
 		.transient_command_pool = transient_command_pool,
 		.sampler = sampler,
+		.allocator = allocator
 	};
+}
+
+void
+blk::destroy_context(Context& context)
+{
+	// Device-level objects first, then the device, then the instance-level ones.
+
+	vkDestroySampler(context.logical_device, context.sampler, nullptr);
+	vkDestroyCommandPool(context.logical_device, context.frame_command_pool, nullptr);
+	vkDestroyCommandPool(context.logical_device, context.transient_command_pool, nullptr);
+	vkDestroyDevice(context.logical_device, nullptr);
+
+	// `vkDestroyDebugUtilsMessengerEXT` comes from an extension, so we have to load it before calling it.
+	if (const auto vkDestroyDebugUtilsMessengerEXT = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
+			vkGetInstanceProcAddr(context.instance, "vkDestroyDebugUtilsMessengerEXT")
+		))
+	{
+		vkDestroyDebugUtilsMessengerEXT(context.instance, context.debug_messenger, nullptr);
+	}
+
+	vkDestroySurfaceKHR(context.instance, context.surface, nullptr);
+	vkDestroyInstance(context.instance, nullptr);
+
+	context = {};
 }
 
 namespace

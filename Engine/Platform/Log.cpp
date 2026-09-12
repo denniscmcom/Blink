@@ -6,8 +6,8 @@
 #include "Engine/Platform/Log.hpp"
 
 #include "Engine/Platform/Assert.hpp"
+#include "Engine/Platform/Result.hpp"
 
-#include <array>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -18,13 +18,23 @@ blk::Log_Sink sinks[blk::MAX_SINK_COUNT];
 uint32_t sink_count = 0;
 }  // namespace
 
-void
+blk::Result
 blk::create_log_sink(Log_Sink sink)
 {
-	BLK_CHECK(sink_count < MAX_SINK_COUNT);
+	if (!BLK_VERIFY(sink))
+	{
+		return Result::INVALID_ARGUMENTS;
+	}
+
+	if (!BLK_VERIFY(sink_count < MAX_SINK_COUNT))
+	{
+		return Result::OUT_OF_BOUNDS;
+	}
 
 	sinks[sink_count] = sink;
 	sink_count += 1;
+
+	return Result::SUCCESS;
 }
 
 void

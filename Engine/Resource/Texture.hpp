@@ -5,49 +5,40 @@
 
 #pragma once
 
+#include "Engine/Core/Array.hpp"
+#include "Engine/Core/Math/Color.hpp"
 #include "Engine/Core/Pool.hpp"
-#include "Engine/Resource/Resource.hpp"
-#include "Engine/Resource/Resource_Storage.hpp"
-
-#include <vector>
+#include "Engine/Resource/Storage.hpp"
 
 namespace blk
 {
-template <typename Type>
-struct Color_RGB
-{
-	Type r;
-	Type g;
-	Type b;
-};
-
-template <typename Type>
-struct Color_RGBA
-{
-	Type r;
-	Type g;
-	Type b;
-	Type a;
-};
-
-static_assert(sizeof(Color_RGBA<uint8_t>) == 4);
-static_assert(sizeof(Color_RGBA<float>) == 16);
-
-Color_RGB<float> convert_srgb_to_linear(const Color_RGB<float>& color);
-
+/// A deserialized texture.
 struct Texture
 {
+	/// Texture's metadata.
 	Resource_Metadata metadata;
-	std::vector<Color_RGBA<uint8_t>> pixels;
+	/// Array of pixels. Capacity should be `width` * `height`.
+	Dyn_Array<Color_RGBA<uint8_t>> pixels;
+	/// Texture's width.
 	uint32_t width;
+	/// Texture's height.
 	uint32_t height;
 };
 
-constexpr Magic TEXTURE_MAGIC = {'T', 'E', 'X', 'T'};
+/// Blink's texture magic number. It is found after `BLINK_MAGIC` in `.btexture` binary files.
+constexpr char TEXTURE_MAGIC[4] = {'T', 'E', 'X', 'T'};
+/// The current implementation version of `.btexture` files.
 constexpr uint8_t TEXTURE_VERSION = 1;
 
-Pool_Handle<Texture> load_texture(const char* stem);
+/// Creates the storage for textures.
+Result create_texture_storage(Allocator* allocator);
+/// Destroys the storage for textures.
+void destroy_texture_storage();
+/// Loads a `.btexture` file with `hash` into memory.
+/// @note It is used by `load_material` to load each texture by hash.
 Pool_Handle<Texture> load_texture(uint64_t hash);
+/// Unloads a texture from memory.
 void unload_texture(Pool_Handle<Texture> handle);
+/// Gets a pointer to a texture's data.
 Texture* get_texture(Pool_Handle<Texture> handle);
 }  // namespace blk

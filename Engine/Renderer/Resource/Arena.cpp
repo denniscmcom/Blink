@@ -5,45 +5,97 @@
 
 #include "Engine/Renderer/Resource/Arena.hpp"
 
-#include "Engine/Core/Pool.hpp"
-#include "Engine/Renderer/Resource/Material_Device.hpp"
-#include "Engine/Renderer/Resource/Mesh_Device.hpp"
-#include "Engine/Renderer/Resource/Texture_Device.hpp"
-#include "Engine/Resource/Material.hpp"
+#include "Engine/Core/Math/Color.hpp"
+#include "Engine/Platform/Log.hpp"
+#include "Engine/Platform/Result.hpp"
+#include "Engine/Renderer/Lifetime/Context.hpp"
 #include "Engine/Resource/Mesh.hpp"
-#include "Engine/Resource/Texture.hpp"
 
-#include <optional>
-
-std::optional<blk::Mesh_Device>
-blk::find_mesh_device(const Arena& arena, const Pool_Handle<Mesh> handle)
+blk::Result
+blk::create_arena(const Context& context, Arena& arena)
 {
-	if (const auto search = arena.meshes.find(handle); search != arena.meshes.end())
+	arena = {};
+
+	// A failure leaves everything created so far without an owner, so we tear the whole `arena` down before returning.
+
+	if (const Result result = create_host_device_buffer(
+			context,
+			sizeof(Vertex_UV) * MAX_VERTEX_COUNT,
+			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+			arena.vertex_buffer
+		);
+		result != Result::SUCCESS)
 	{
-		return std::optional(search->second);
+		BLK_ERROR("Failed to create arena vertex buffer\n");
+		destroy_arena(context, arena);
+
+		return result;
 	}
 
-	return std::nullopt;
+	if (const Result result = create_host_device_buffer(
+			context,
+			sizeof(Index) * MAX_INDEX_COUNT,
+			VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+			arena.index_buffer
+		);
+		result != Result::SUCCESS)
+	{
+		BLK_ERROR("Failed to create arena index buffer\n");
+		destroy_arena(context, arena);
+
+		return result;
+	}
+
+	if (const Result result = create_buffer(
+			context,
+			sizeof(Color_RGBA<uint8_t>) * TEXTURE_WIDTH * TEXTURE_HEIGHT,
+			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			arena.texture_buffer
+		);
+		result != Result::SUCCESS)
+	{
+		BLK_ERROR("Failed to create arena texture staging buffer\n");
+		destroy_arena(context, arena);
+
+		return result;
+	}
+
+	// Create the host handle to device resource maps. These capacities are only a starting point, the maps grow on
+	// demand. Only `materials` has a hard limit, because `Descriptor_Layouts::pool` is sized for `MAX_MATERIAL_COUNT`
+	// descriptor sets.
+
+	if (const Result result = create_hash_map(arena.meshes, context.allocator, MAX_MATERIAL_COUNT, 0.75f);
+		result != Result::SUCCESS)
+	{
+		BLK_ERROR("Failed to create arena meshes hash map\n");
+		destroy_arena(context, arena);
+
+		return result;
+	}
+
+	if (const Result result = create_hash_map(arena.textures, context.allocator, MAX_MATERIAL_COUNT * 3, 0.75f);
+		result != Result::SUCCESS)
+	{
+		BLK_ERROR("Failed to create arena textures hash map\n");
+		destroy_arena(context, arena);
+
+		return result;
+	}
+
+	if (const Result result = create_hash_map(arena.materials, context.allocator, MAX_MATERIAL_COUNT, 0.75f);
+		result != Result::SUCCESS)
+	{
+		BLK_ERROR("Failed to create arena materials hash map\n");
+		destroy_arena(context, arena);
+
+		return result;
+	}
+
+	return Result::SUCCESS;
 }
 
-std::optional<blk::Texture_Device>
-blk::find_texture_device(const Arena& arena, const Pool_Handle<Texture> handle)
+void
+blk::destroy_arena(const Context& context, Arena& arena)
 {
-	if (const auto search = arena.textures.find(handle); search != arena.textures.end())
-	{
-		return std::optional(search->second);
-	}
-
-	return std::nullopt;
-}
-
-std::optional<blk::Material_Device>
-blk::find_material_device(const Arena& arena, const Pool_Handle<Material> handle)
-{
-	if (const auto search = arena.materials.find(handle); search != arena.materials.end())
-	{
-		return std::optional(search->second);
-	}
-
-	return std::nullopt;
 }

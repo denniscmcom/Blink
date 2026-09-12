@@ -8,19 +8,27 @@
 #include <vulkan/vulkan.h>
 
 #include <stdint.h>
-#include <vector>
 
 namespace blk
 {
 struct Context;
-struct Vertex;
+struct Vertex_UV;
+template <typename Type, size_t Capacity>
+struct Array;
+enum class Result;
 
-uint32_t find_memory_type_index(
+/// Finds which device memory type satisfies both what the resource needs and what the caller requested.
+/// @param memory_type_bits Memory type needed by the resource (buffer, image, etc.).
+/// @param memory_property_flags Any memory property needed by the caller.
+Result find_memory_type_index(
 	const Context& context,
 	uint32_t memory_type_bits,
-	VkMemoryPropertyFlags memory_property_flags
+	VkMemoryPropertyFlags memory_property_flags,
+	uint32_t& device_memory_index
 );
 
+/// Thin wrapper around a pipeline barrier.
+/// Transitions an image from one state into another.
 void transition_image_layout(
 	VkCommandBuffer command_buffer,
 	VkImage image,
@@ -33,43 +41,21 @@ void transition_image_layout(
 	VkImageAspectFlags image_aspect
 );
 
-void begin_one_time_commands(VkCommandBuffer command_buffer);
-void end_one_time_commands(const Context& context, VkCommandBuffer command_buffer);
+/// Thin wrapper around beginning a `VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT` command buffer.
+Result begin_one_time_commands(VkCommandBuffer command_buffer);
+/// Thin wrapper around ending a `VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT`, command buffer, submitting it and
+/// waiting for completion.
+Result end_one_time_commands(const Context& context, VkCommandBuffer command_buffer);
 
+/// Thin wrapper to create a `VkPipelineShaderStageCreateInfo`.
 VkPipelineShaderStageCreateInfo get_pipeline_shader_stage_create_info(
 	VkShaderModule module,
 	VkShaderStageFlagBits stage,
 	const char* entry_name
 );
 
-template <typename Type>
-std::vector<VkVertexInputBindingDescription> get_vertex_input_descriptions();
-template <typename Type>
-std::vector<VkVertexInputAttributeDescription> get_vertex_input_attribute_descriptions();
-template <>
-std::vector<VkVertexInputAttributeDescription> get_vertex_input_attribute_descriptions<Vertex>();
-
-VkCommandBuffer create_command_buffer(const Context& context, VkCommandPool pool);
-VkSemaphore create_semaphore(const Context& context);
-VkFence create_fence(const Context& context);
-
-template <typename Type>
-std::vector<VkVertexInputBindingDescription>
-get_vertex_input_descriptions()
-{
-	std::vector<VkVertexInputBindingDescription> descriptions = {
-		{.binding = 0, .stride = sizeof(Type), .inputRate = VK_VERTEX_INPUT_RATE_VERTEX}
-	};
-
-	return descriptions;
-}
-
-template <typename Type>
-std::vector<VkVertexInputAttributeDescription>
-get_vertex_input_attribute_descriptions()
-{
-	static_assert(sizeof(Type) == 0, "No vertex attribute description defined for this type");
-
-	return {};
-}
+/// Gets vertex input binding descriptions for `Vertex_UV`.
+Array<VkVertexInputBindingDescription, 1> get_vertex_uv_input_binding_descriptions();
+/// Gets vertex input attribute descriptions for `Vertex_UV`.
+Array<VkVertexInputAttributeDescription, 5> get_vertex_uv_input_attribute_descriptions();
 }  // namespace blk

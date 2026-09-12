@@ -12,16 +12,24 @@
 namespace blk
 {
 struct Context;
+enum class Result;
 
+/// A device image (usually a texture).
 struct Image
 {
+	/// Vulkan image.
 	VkImage image = VK_NULL_HANDLE;
+	/// Vulkan image view.
+	/// We cannot access a Vulkan image directly.
 	VkImageView view = VK_NULL_HANDLE;
+	/// Vulkan image memory.
 	VkDeviceMemory memory = VK_NULL_HANDLE;
+	/// Vulkan image format.
 	VkFormat format;
 };
 
-Image create_image(
+/// Creates an `image`.
+Result create_image(
 	const Context& context,
 	uint32_t width,
 	uint32_t height,
@@ -29,6 +37,10 @@ Image create_image(
 	VkImageTiling tiling,
 	VkImageUsageFlags usage,
 	VkMemoryPropertyFlags properties,
-	VkImageAspectFlags aspect
+	VkImageAspectFlags aspect,
+	Image& image
 );
+/// Destroys an `image`.
+// TODO (Bug): not implemented.
+void destroy_image(const Context& context, Image& image);
 }  // namespace blk

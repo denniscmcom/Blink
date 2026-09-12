@@ -7,9 +7,11 @@ target_sources(BlkEngine
 			Light.hpp
 			Mesh_Instance.hpp
 			Node.hpp
-			Scene_Graph.hpp
+			Graph.hpp
 			Transform.hpp
 	PRIVATE
-		Scene_Graph.cpp
+		Graph.cpp
+		Mesh_Instance.cpp
+		Node.cpp
 		Transform.cpp
 )

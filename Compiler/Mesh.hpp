@@ -7,7 +7,15 @@
 
 namespace blk
 {
-class Serial;
-
-void compile_mesh(Serial& input_serial, Serial& output_serial);
+struct Serial;
+struct Allocator;
 }  // namespace blk
+
+namespace blk::compiler
+{
+/// Compiles a `.fbx` file into `.bmesh`.
+///
+/// @param allocator Used for the intermediate vertex and index arrays this function builds while deduplicating.
+/// @param output_serial Its buffer should be pre-allocated by the caller and large enough to fit the result.
+void compile_mesh(Allocator* allocator, Serial& input_serial, Serial& output_serial);
+}  // namespace blk::compiler

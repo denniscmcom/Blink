@@ -9,7 +9,10 @@
 #include "Engine/Resource/Material.hpp"
 
 void
-blk::compile_material(Serial& input_serial, Serial& output_serial)
+blk::compiler::compile_material(const Serial& input_serial, Serial& output_serial)
 {
-	output_serial.write(input_serial.buffer(), input_serial.size());
+	BLK_IF_NOT_SUCCESS(write(output_serial, input_serial.buffer, input_serial.size))
+	{
+		BLK_FATAL("Failed to write material data\n");
+	}
 }

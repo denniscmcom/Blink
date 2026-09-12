@@ -3,6 +3,8 @@
 // Licensed under the Blink Engine Source Access License, see LICENSE.txt
 // ============================================================================
 
+/// Mathematical constants.
+
 #pragma once
 
 namespace blk

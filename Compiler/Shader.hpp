@@ -8,6 +8,12 @@
 namespace blk
 {
 struct Serial;
-
-void compile_shader(Serial& input_serial, Serial& output_serial);
 }  // namespace blk
+
+namespace blk::compiler
+{
+/// Compiles a `.spv` file into `.bshader`.
+///
+/// @param output_serial Its buffer should be pre-allocated by the caller and large enough to fit the result.
+void compile_shader(Serial& input_serial, Serial& output_serial);
+}  // namespace blk::compiler

@@ -28,7 +28,7 @@ blk::operator-(const Radians radians, const float value)
 blk::Radians
 blk::operator-(const float value, const Radians radians)
 {
-	return radians - value;
+	return Radians{value - radians.value};
 }
 
 blk::Radians
@@ -64,13 +64,13 @@ blk::operator-(const Degrees degrees, const float value)
 blk::Degrees
 blk::operator-(const float value, const Degrees degrees)
 {
-	return degrees - value;
+	return Degrees{value - degrees.value};
 }
 
 blk::Degrees
 blk::operator*(const float scalar, const Degrees degrees)
 {
-	return Degrees{scalar - degrees.value};
+	return Degrees{scalar * degrees.value};
 }
 
 blk::Degrees

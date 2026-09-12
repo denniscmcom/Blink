@@ -6,90 +6,92 @@
 #pragma once
 
 #include "Engine/Platform/Assert.hpp"
-#include "Engine/Platform/Log.hpp"
+#include "Engine/Platform/Result.hpp"
 
+#include <stddef.h>
 #include <string.h>
-#include <type_traits>
+
+namespace blk
+{
+/// Non-owning serializer/deserializer.
+struct Serial
+{
+	/// Data buffer.
+	char* buffer = nullptr;
+	/// Size in bytes of `buffer`.
+	size_t size = 0;
+	/// Next byte position to read from or write to.
+	size_t position = 0;
+};
+
+/// Initializes `Serial`.
+Serial init_serial(char* buffer, size_t size);
+/// Reads `sizeof(Type)` from `serial.buffer` and writes the result to `data`.
+/// @warning `Type` should be serializable.
+template <typename Type>
+Result read(Serial& serial, Type& data);
+/// Writes `data` to `serial.buffer`.
+///
+/// `data` is taken by reference so that an array keeps its type. Taking it by value would let `Type` decay to a
+/// pointer, and the write would store the pointer instead of what it points at – which is what `read` would then fail
+/// to match, since it takes a reference already.
+/// @warning `Type` should be serializable.
+template <typename Type>
+Result write(Serial& serial, const Type& data);
+/// Writes `size` bytes from `pointer` to `serial.buffer`.
+template <typename Type>
+Result write(Serial& serial, Type* pointer, size_t size);
+}  // namespace blk
 
 namespace blk
 {
 template <typename Type>
-concept Serializable = std::is_trivially_copyable_v<Type> && !std::is_pointer_v<Type>;
-
-class Serial
+Result
+read(Serial& serial, Type& data)
 {
-  public:
-	explicit Serial(size_t size);
-	Serial(const char* buffer, size_t size);
-
-	Serial(const Serial& other) = delete;
-	Serial(Serial&& other) noexcept = delete;
-	Serial& operator=(const Serial& other) = delete;
-	Serial& operator=(Serial&& other) noexcept = delete;
-
-	~Serial();
-
-	template <typename Type>
-		requires Serializable<Type>
-	Type read();
-
-	template <typename Type>
-		requires Serializable<Type>
-	void write(Type data);
-
-	template <typename Type>
-	void write(Type* pointer, size_t size);
-
-	char* buffer() const;
-	size_t size() const;
-	size_t position() const;
-
-  private:
-	/// Grows the buffer so it holds at least `size` bytes. Does nothing if it already fits.
-	void resize(size_t size);
-
-	char* buffer_ = nullptr;
-	size_t size_ = 0;
-	size_t position_ = 0;
-};
-
-template <typename Type>
-	requires Serializable<Type>
-Type
-Serial::read()
-{
-	if (position_ + sizeof(Type) > size_)
+	if (serial.position + sizeof(Type) > serial.size)
 	{
-		BLK_FATAL("Read out of bounds\n");
+		return Result::OUT_OF_BOUNDS;
 	}
 
-	Type data;
-	memcpy(&data, buffer_ + position_, sizeof(Type));
-	position_ += sizeof(Type);
+	memcpy(&data, serial.buffer + serial.position, sizeof(Type));
+	serial.position += sizeof(Type);
 
-	return data;
+	return Result::SUCCESS;
 }
 
 template <typename Type>
-	requires Serializable<Type>
-void
-Serial::write(Type data)
+Result
+write(Serial& serial, const Type& data)
 {
-	resize(position_ + sizeof(Type));
+	if (serial.position + sizeof(Type) > serial.size)
+	{
+		return Result::OUT_OF_BOUNDS;
+	}
 
-	memcpy(buffer_ + position_, &data, sizeof(Type));
-	position_ += sizeof(Type);
+	memcpy(serial.buffer + serial.position, &data, sizeof(Type));
+	serial.position += sizeof(Type);
+
+	return Result::SUCCESS;
 }
 
 template <typename Type>
-void
-Serial::write(Type* pointer, size_t size)
+Result
+write(Serial& serial, Type* pointer, size_t size)
 {
-	BLK_CHECK(pointer);
+	if (!BLK_VERIFY(pointer))
+	{
+		return Result::INVALID_ARGUMENTS;
+	}
 
-	resize(position_ + size);
+	if (serial.position + size > serial.size)
+	{
+		return Result::OUT_OF_BOUNDS;
+	}
 
-	memcpy(buffer_ + position_, pointer, size);
-	position_ += size;
+	memcpy(serial.buffer + serial.position, pointer, size);
+	serial.position += size;
+
+	return Result::SUCCESS;
 }
 }  // namespace blk

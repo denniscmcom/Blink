@@ -9,5 +9,7 @@ namespace blk
 {
 struct Editor_Context;
 
+/// Draws the material settings widget at the right side of the screen in `Editor_Mode::MATERIAL`.
+/// This widget allows material creation and updating an existing material.
 void draw_material_settings(Editor_Context& context);
 }  // namespace blk

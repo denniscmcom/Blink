@@ -9,5 +9,6 @@
 
 namespace blk
 {
+/// Gets information needed by `Editor/` regarding our Vulkan backend.
 ImGui_ImplVulkan_InitInfo get_renderer_imgui_init_info();
 }  // namespace blk

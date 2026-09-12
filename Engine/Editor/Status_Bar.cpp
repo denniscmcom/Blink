@@ -5,46 +5,53 @@
 
 #include "Engine/Editor/Status_Bar.hpp"
 
-#include "Engine/Editor/Camera.hpp"
 #include "Engine/Editor/Context.hpp"
-#include "Engine/Input/Input.hpp"
+#include "Engine/Editor/World/Stats.hpp"
 #include "Engine/Platform/Application.hpp"
 #include "Engine/Platform/Assert.hpp"
 #include "Engine/World/World.hpp"
-#include "World/Stats.hpp"
 
-#include <array>
 #include <imgui.h>
 
 namespace
 {
+/// Helper function to draw an horizontal separator.
 void draw_horizontal_separator();
 }  // namespace
 
 void
 blk::draw_status_bar(Editor_Context& context)
 {
-	BLK_CHECK(context.world_context._game_world);
-	BLK_CHECK(context._input_state);
+	if (!BLK_VERIFY(context.world_context.game_world) || !BLK_VERIFY(context.input_state))
+	{
+		return;
+	}
 
+	// Get the ImGui viewport.
 	const ImGuiViewport* viewport = ImGui::GetMainViewport();
 
-	context.viewport_context.status_bar_size = ImVec2(viewport->Size.x, ImGui::GetFrameHeight());
+	// Compute the status bar size and position.
+	// The status bar should fill the entire width of the viewport. It's height is just enough to fit text.
 
-	context.viewport_context.status_bar_position.x = viewport->Pos.x;
-	context.viewport_context.status_bar_position.y = viewport->Size.y - context.viewport_context.status_bar_size.y;
+	context.viewport_context.status_bar_size = ImVec2(viewport->WorkSize.x, ImGui::GetFrameHeight());
+
+	context.viewport_context.status_bar_position.x = viewport->WorkPos.x;
+	context.viewport_context.status_bar_position.y =
+		viewport->WorkPos.y + viewport->WorkSize.y - context.viewport_context.status_bar_size.y;
 
 	context.viewport_context.status_bar_padding.x = ImGui::GetStyle().WindowPadding.x;
 	context.viewport_context.status_bar_padding.y =
 		(context.viewport_context.status_bar_size.y - ImGui::GetTextLineHeight()) * 0.5f;
 
+	// Pass size and position information to ImGui.
+
 	ImGui::SetNextWindowPos(context.viewport_context.status_bar_position);
 	ImGui::SetNextWindowSize(context.viewport_context.status_bar_size);
+
+	// Set padding.
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, context.viewport_context.status_bar_padding);
 
-	static constexpr std::array<std::pair<const char*, const char*>, 2> world_mode_shortcuts = {
-		{{"F1", "Pause/resume"}, {"F2", "Editor/game camera"}}
-	};
+	// The status bar is not movable by the user, should not have any decorations and it is always visible.
 
 	ImGui::Begin(
 		"##StatusBar",
@@ -56,51 +63,41 @@ blk::draw_status_bar(Editor_Context& context)
 	ImGui::Text("Blink " BLK_ENGINE_VERSION);
 	draw_horizontal_separator();
 
+	// Depending on `Editor_Mode` we display context-based information.
+
 	switch (context.mode)
 	{
 	case Editor_Mode::WORLD: {
-		// Pause/resume game simulation.
-		if (is_key_press(*context._input_state, Key::KEYBOARD_F1))
-		{
-			context.world_context.is_game_simulation_paused = !context.world_context.is_game_simulation_paused;
-		}
+		// The F1 and F2 shortcuts these lines report on are handled by `update_editor`. This widget only reads state.
 
-		// Editor/game camera.
-		if (is_key_press(*context._input_state, Key::KEYBOARD_F2))
-		{
-			if (context.world_context.is_editor_camera_active)
-			{
-				context.world_context._game_world->active_camera_handle = context.world_context.game_camera_handle;
-				context.world_context.is_editor_camera_active = false;
-			}
-			else
-			{
-				activate_world_mode_editor_camera(context.world_context);
-			}
-		}
-
+		// Display whether the game is paused or running.
 		ImGui::Text("Game: %s", context.world_context.is_game_simulation_paused ? "Paused" : "Running");
+
 		draw_horizontal_separator();
+
+		// Display which camera is used; editor or in-game.
 		ImGui::Text(
 			"Camera: %s",
-			context.world_context.editor_camera_handle == context.world_context._game_world->active_camera_handle
+			context.world_context.editor_camera_handle == context.world_context.game_world->active_camera_handle
 				? "Editor"
 				: "Game"
 		);
 
 		draw_horizontal_separator();
 
-		for (const auto& [key, description] : world_mode_shortcuts)
-		{
-			ImGui::Text("%s - %s", key, description);
-			draw_horizontal_separator();
-		}
+		// Show most used shortcuts.
+
+		ImGui::Text("F1 - Pause/resume");
+		draw_horizontal_separator();
+		ImGui::Text("F2 - Editor/game camera");
 	}
 	break;
 	case Editor_Mode::MATERIAL: {
 	}
 	break;
 	}
+
+	// Display some performance data.
 
 	draw_horizontal_separator();
 	draw_fps();

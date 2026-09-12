@@ -6,75 +6,131 @@
 #include "Engine/Renderer/Resource/Mesh_Device.hpp"
 
 #include "Engine/Platform/Log.hpp"
+#include "Engine/Platform/Result.hpp"
 #include "Engine/Renderer/Lifetime/Buffer.hpp"
 #include "Engine/Renderer/Lifetime/Context.hpp"
 #include "Engine/Renderer/Resource/Arena.hpp"
 #include "Engine/Resource/Mesh.hpp"
 
-blk::Mesh_Device
-blk::transfer_mesh(const Context& context, Arena& arena, const Pool_Handle<Mesh>& mesh_handle)
+blk::Result
+blk::transfer_mesh(const Context& context, Arena& arena, const Pool_Handle<Mesh>& host_handle, Mesh_Device& mesh)
 {
-	const Mesh* mesh = get_mesh(mesh_handle);
+	mesh = {};
 
-	if (!mesh)
+	// Check if `mesh` already exist in device.
+	if (const Mesh_Device* mesh_ptr = get(arena.meshes, host_handle))
 	{
-		BLK_FATAL("Failed to get mesh\n");
+		mesh = *mesh_ptr;
+
+		return Result::SUCCESS;
 	}
 
-	const uint32_t available_vertex_buffer_size = arena.vertex_buffer.host.size - arena.vertex_buffer_byte_offset;
-	const uint32_t available_index_buffer_size = arena.index_buffer.host.size - arena.index_buffer_byte_offset;
+	// Get host mesh data.
 
-	if (available_vertex_buffer_size < sizeof(Vertex) * mesh->vertices.size())
+	const Mesh* mesh_host = get_mesh(host_handle);
+
+	if (!mesh_host)
 	{
-		BLK_FATAL("Vertex buffer is too small\n");
+		BLK_ERROR("Failed to get mesh host data to transfer\n");
+
+		return Result::INVALID_ARGUMENTS;
 	}
 
-	if (available_index_buffer_size < sizeof(Index) * mesh->indices.size())
+	// Verify if `mesh` fits in vertex and index buffer.
+
+	const VkDeviceSize available_vertex_buffer_size = arena.vertex_buffer.host.size - arena.vertex_buffer_offset;
+	const VkDeviceSize available_index_buffer_size = arena.index_buffer.host.size - arena.index_buffer_offset;
+
+	if (available_vertex_buffer_size < sizeof(Vertex_UV) * mesh_host->vertices.count)
 	{
-		BLK_FATAL("Index buffer is too small\n");
+		BLK_ERROR("Vertex buffer is too small\n");
+
+		return Result::OUT_OF_MEMORY;
 	}
+
+	if (available_index_buffer_size < sizeof(Index) * mesh_host->indices.count)
+	{
+		BLK_ERROR("Index buffer is too small\n");
+
+		return Result::OUT_OF_MEMORY;
+	}
+
+	mesh.host_handle = host_handle;
 
 	if (!arena.vertex_buffer.host.map)
 	{
+		// Map vertex buffer if it is not already.
 		map_buffer(context, arena.vertex_buffer.host);
 	}
 
-	update_buffer(
-		arena.vertex_buffer.host,
-		mesh->vertices.data(),
-		sizeof(Vertex) * mesh->vertices.size(),
-		arena.vertex_buffer_byte_offset
-	);
-
-	unmap_buffer(context, arena.vertex_buffer.host);
-	copy_buffer(context, arena.vertex_buffer.host, arena.vertex_buffer.device);
-
 	if (!arena.index_buffer.host.map)
 	{
+		// Map index buffer if it is not already.
 		map_buffer(context, arena.index_buffer.host);
 	}
 
-	update_buffer(
-		arena.index_buffer.host,
-		mesh->indices.data(),
-		sizeof(Index) * mesh->indices.size(),
-		arena.index_buffer_byte_offset
-	);
+	// Update vertex buffer
 
+	if (const Result result = update_buffer(
+			arena.vertex_buffer.host,
+			mesh_host->vertices.buffer,
+			sizeof(Vertex_UV) * mesh_host->vertices.count,
+			arena.vertex_buffer_offset
+		);
+		result != Result::SUCCESS)
+	{
+		BLK_ERROR("Failed to update vertex buffer\n");
+		unload_mesh_from_device(context, arena, mesh);
+
+		return result;
+	}
+
+	mesh.vertex_count = static_cast<uint32_t>(mesh_host->vertices.count);
+	mesh.first_vertex = arena.vertex_buffer_offset / sizeof(Vertex_UV);
+	arena.vertex_buffer_offset += static_cast<uint32_t>(sizeof(Vertex_UV) * mesh_host->vertices.count);
+
+	// Update index buffer.
+
+	if (const Result result = update_buffer(
+			arena.index_buffer.host,
+			mesh_host->indices.buffer,
+			sizeof(Index) * mesh_host->indices.count,
+			arena.index_buffer_offset
+		);
+		result != Result::SUCCESS)
+	{
+		BLK_ERROR("Failed to update index buffer\n");
+		unload_mesh_from_device(context, arena, mesh);
+
+		return result;
+	}
+
+	mesh.index_count = static_cast<uint32_t>(mesh_host->indices.count);
+	mesh.first_index = arena.index_buffer_offset / sizeof(Index);
+	arena.index_buffer_offset += static_cast<uint32_t>(sizeof(Index) * mesh_host->indices.count);
+
+	// We are done updating the buffers, so we unmap them.
+
+	unmap_buffer(context, arena.vertex_buffer.host);
 	unmap_buffer(context, arena.index_buffer.host);
+
+	// Copy data from host buffer to device buffer.
+
+	copy_buffer(context, arena.vertex_buffer.host, arena.vertex_buffer.device);
 	copy_buffer(context, arena.index_buffer.host, arena.index_buffer.device);
 
-	Mesh_Device mesh_device = {};
-	mesh_device.handle = mesh_handle;
-	mesh_device.vertex_count = mesh->vertices.size();
-	mesh_device.vertex_buffer_offset = arena.vertex_buffer_byte_offset / sizeof(Vertex);
-	mesh_device.index_count = mesh->indices.size();
-	mesh_device.index_buffer_offset = arena.index_buffer_byte_offset / sizeof(Index);
+	// Insert host_handle-mesh pair into hash map.
+	insert(arena.meshes, host_handle, mesh);
 
-	arena.vertex_buffer_byte_offset += sizeof(Vertex) * mesh->vertices.size();
-	arena.index_buffer_byte_offset += sizeof(Index) * mesh->indices.size();
+	return Result::SUCCESS;
+}
 
-	arena.meshes.insert({mesh_handle, mesh_device});
+void
+blk::unload_mesh_from_device(const Context& context, Arena& arena, Mesh_Device& mesh)
+{
+	// TODO (Bug): The vertex and index ranges cannot be reclaimed. `Arena` slices its buffers with a bump offset and
+	// has no free list, so the space this mesh occupies stays taken until the whole arena is destroyed.
+	remove(arena.meshes, mesh.host_handle);
 
-	return mesh_device;
+	mesh = {};
 }

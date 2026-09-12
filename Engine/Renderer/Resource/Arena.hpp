@@ -5,14 +5,12 @@
 
 #pragma once
 
+#include "Engine/Core/Hash.hpp"
 #include "Engine/Core/Pool.hpp"
 #include "Engine/Renderer/Lifetime/Buffer.hpp"
 #include "Engine/Renderer/Resource/Material_Device.hpp"
 #include "Engine/Renderer/Resource/Mesh_Device.hpp"
 #include "Engine/Renderer/Resource/Texture_Device.hpp"
-
-#include <optional>
-#include <unordered_map>
 
 namespace blk
 {
@@ -20,34 +18,57 @@ struct Material;
 struct Texture;
 struct Mesh;
 
+/// Maximum vertices supported in scene.
+///
+/// We use this value to preallocate a big enough vertex buffer.
 constexpr size_t MAX_VERTEX_COUNT = 10'000;
+/// Maximum indices supported in scene.
+///
+/// We use this value to preallocate a big enough index buffer.
 constexpr size_t MAX_INDEX_COUNT = 10'000;
-constexpr size_t MAX_TEXTURE_COUNT = 5;
-constexpr size_t MAX_TEXTURE_WIDTH = 1'024;
-constexpr size_t MAX_TEXTURE_HEIGHT = 1'024;
+/// Width of a supported texture.
+constexpr size_t TEXTURE_WIDTH = 1'024;
+/// Height of a supported texture.
+constexpr size_t TEXTURE_HEIGHT = 1'024;
+/// Maximum material supported in scene.
+///
+/// We use this value to calculate descriptor counts.
 constexpr size_t MAX_MATERIAL_COUNT = 5;
 
-// TODO: Right now it does not handle removing data from buffer nor reusing unused space.
-// FIXME: Right now I have a circular dependency (resolved by forward declared). Arena needs all the resources, and each
-//   resource needs Arena. I think is better to make Arena a class with private stuff to avoid corruption of state, and
-//   handle resource transfer to gpu with methods.
+/// Arena to manage the lifetime of device resources.
+///
+/// We try to avoid individual buffer allocations. Instead, we preallocate a big enough chunk when creating the
+/// renderer and slice it.
 struct Arena
 {
+	/// Host-device vertex buffer pair.
 	Host_Device_Buffer vertex_buffer;
+	/// Host-device index buffer pair.
 	Host_Device_Buffer index_buffer;
 
+	/// Staging buffer to create a texture.
+	///
+	/// We use this buffer to upload pixel data to, then we create a `Image`, and finally we copy the data from the
+	/// buffer to the image. We only need one buffer big enough to fit one texture, since the data is owned by the
+	/// image.
 	Buffer texture_buffer;
 
-	uint32_t vertex_buffer_byte_offset;
-	uint32_t index_buffer_byte_offset;
+	/// Byte offset in `vertex_buffer` for next write.
+	uint32_t vertex_buffer_offset;
+	/// Byte offset in `index_buffer` for next write.
+	uint32_t index_buffer_offset;
 
-	std::unordered_map<Pool_Handle<Mesh>, Mesh_Device, Pool_Handle_Hash<Mesh>> meshes;
-	std::unordered_map<Pool_Handle<Texture>, Texture_Device, Pool_Handle_Hash<Texture>> textures;
-	std::unordered_map<Pool_Handle<Material>, Material_Device, Pool_Handle_Hash<Material>> materials;
+	/// Associates a host mesh handle to a device mesh.
+	Hash_Map<Pool_Handle<Mesh>, Mesh_Device> meshes;
+	/// Associates a host texture handle to a device texture.
+	Hash_Map<Pool_Handle<Texture>, Texture_Device> textures;
+	/// Associates a host material handle to a device material.
+	Hash_Map<Pool_Handle<Material>, Material_Device> materials;
 };
 
-// FIXME: The code inside these functions is kind of duplicated.
-std::optional<Mesh_Device> find_mesh_device(const Arena& arena, Pool_Handle<Mesh> handle);
-std::optional<Texture_Device> find_texture_device(const Arena& arena, Pool_Handle<Texture> handle);
-std::optional<Material_Device> find_material_device(const Arena& arena, Pool_Handle<Material> handle);
+/// Creates `arena`.
+Result create_arena(const Context& context, Arena& arena);
+/// Destroys `arena`.
+// TODO (Bug): not implemented.
+void destroy_arena(const Context& context, Arena& arena);
 }  // namespace blk

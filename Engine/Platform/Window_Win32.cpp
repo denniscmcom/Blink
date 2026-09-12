@@ -5,77 +5,102 @@
 
 #include "Engine/Platform/Window.hpp"
 
+#include "Engine/Platform/Allocator.hpp"
 #include "Engine/Platform/Application.hpp"
 #include "Engine/Platform/Application_Internal.hpp"
 #include "Engine/Platform/Assert.hpp"
 #include "Engine/Platform/Event.hpp"
 #include "Engine/Platform/Log.hpp"
+#include "Engine/Platform/Result.hpp"
+#include "Engine/Platform/Types.hpp"
 #include "Engine/Platform/Window_Internal.hpp"
 
 #include <Windows.h>
 #include <imgui.h>
+#include <stdint.h>
 
+// Win32 window callback.
 LRESULT CALLBACK MainWndProc(HWND hwnd, UINT message, WPARAM w_param, LPARAM l_param);
+// Win32 window callback needed by ImGui to handle UI events.
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 namespace
 {
+/// Pointer to the main window of the engine.
 blk::Window* window = nullptr;
 }  // namespace
 
-void
-blk::create_window(const char* title)
+blk::Result
+blk::create_window(Allocator* allocator, const char* title)
 {
 	BLK_CHECK(window == nullptr);
 
-	Application* application = get_application();
+	if (!BLK_VERIFY(allocator) || !BLK_VERIFY(title))
+	{
+		return Result::INVALID_ARGUMENTS;
+	}
+
+	const Application* application = get_application();
 	BLK_CHECK(application);
 
-	WNDCLASSEXA window_class = {};
+	WNDCLASSEXW window_class = {};
 	window_class.cbSize = sizeof(window_class);
 	window_class.style = CS_HREDRAW | CS_VREDRAW;
 	window_class.lpfnWndProc = MainWndProc;
 	window_class.hInstance = application->hinstance;
-	window_class.lpszClassName = "BlinkWindowClass";
+	window_class.lpszClassName = L"BlinkWindowClass";
 
-	if (!RegisterClassExA(&window_class))
+	if (!RegisterClassExW(&window_class))
 	{
-		BLK_FATAL("Failed to register window class\n");
+		return Result::OS_ERROR;
 	}
 
-	// FIXME: I think this will cause problems in the future (maybe not reliable in different computers).
 	if (!SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2))
 	{
-		BLK_FATAL("Failed to set DPI awareness\n");
+		return Result::OS_ERROR;
 	}
 
-	HWND hwnd = CreateWindowA(
-		window_class.lpszClassName,
-		title,
-		WS_OVERLAPPEDWINDOW,
-		CW_USEDEFAULT,
-		CW_USEDEFAULT,
-		CW_USEDEFAULT,
-		CW_USEDEFAULT,
-		NULL,
-		NULL,
-		application->hinstance,
-		NULL
-	);
+	wchar_t wtitle[MAX_WINDOW_TITLE_SIZE];
 
-	if (!hwnd)
+	if (MultiByteToWideChar(CP_UTF8, 0, title, -1, wtitle, static_cast<int>(MAX_WINDOW_TITLE_SIZE)) <= 0)
 	{
-		BLK_FATAL("Failed to create window\n");
+		return Result::INVALID_ARGUMENTS;
+	}
+
+	HWND hwnd = nullptr;
+
+	if (hwnd = CreateWindowW(
+			window_class.lpszClassName,
+			wtitle,
+			WS_OVERLAPPEDWINDOW,
+			CW_USEDEFAULT,
+			CW_USEDEFAULT,
+			CW_USEDEFAULT,
+			CW_USEDEFAULT,
+			NULL,
+			NULL,
+			application->hinstance,
+			NULL
+		);
+		!hwnd)
+	{
+		return Result::OS_ERROR;
 	}
 
 	ShowWindow(hwnd, SW_SHOWMAXIMIZED);
 	UpdateWindow(hwnd);
 
-	window = static_cast<Window*>(malloc(sizeof(Window)));
-	BLK_CHECK(window);
+	void* pointer = nullptr;
+
+	if (const Result result = allocate(*allocator, pointer, sizeof(Window), alignof(Window)); result != Result::SUCCESS)
+	{
+		return result;
+	}
+
+	window = static_cast<Window*>(pointer);
+	window->allocator = allocator;
 	window->hwnd = hwnd;
 
-	// FIXME: When moving view with mouse all becomes like jittery.
 	RAWINPUTDEVICE raw_input_mouse_device = {};
 	raw_input_mouse_device.usUsagePage = 0x01;
 	raw_input_mouse_device.usUsage = 0x02;
@@ -83,35 +108,55 @@ blk::create_window(const char* title)
 
 	if (!RegisterRawInputDevices(&raw_input_mouse_device, 1, sizeof(raw_input_mouse_device)))
 	{
-		BLK_FATAL("Failed to register raw input mouse device\n");
+		return Result::OS_ERROR;
 	}
+
+	return Result::SUCCESS;
 }
 
 void
 blk::destroy_window()
 {
-	if (window)
+	if (!window)
 	{
-		free(window);
+		return;
 	}
+
+	BLK_CHECK(window->allocator);
+
+	// TODO (Bug): The window class registered by `create_window` is never unregistered, so calling `create_window`
+	// again fails with `ERROR_CLASS_ALREADY_EXISTS`. Unregistering it needs the `HINSTANCE` from `Application`.
+	DestroyWindow(window->hwnd);
+	free(*window->allocator, window);
+
+	window = nullptr;
 }
 
-blk::Rect<unsigned>
-blk::get_window_client_size()
+blk::Result
+blk::get_window_client_rect(Rect<unsigned>& rect)
 {
-	BLK_CHECK(window);
-
-	RECT rect;
-
-	if (!GetClientRect(window->hwnd, &rect))
+	if (!BLK_VERIFY(window))
 	{
-		BLK_FATAL("Failed to get client rect\n");
+		rect = {};
+		return Result::INVALID_ARGUMENTS;
 	}
 
-	const auto width = static_cast<unsigned>(rect.right - rect.left);
-	const auto height = static_cast<unsigned>(rect.bottom - rect.top);
+	RECT hwnd_rect = {};
 
-	return Rect{.x = width, .y = height};
+	if (!GetClientRect(window->hwnd, &hwnd_rect))
+	{
+		return Result::OS_ERROR;
+	}
+
+	const auto width = static_cast<unsigned>(hwnd_rect.right - hwnd_rect.left);
+	const auto height = static_cast<unsigned>(hwnd_rect.bottom - hwnd_rect.top);
+
+	rect = Rect{
+		.x = width,
+		.y = height,
+	};
+
+	return Result::SUCCESS;
 }
 
 blk::Window*
@@ -142,7 +187,12 @@ MainWndProc(HWND hwnd, const UINT message, const WPARAM w_param, const LPARAM l_
 		break;
 	case WM_CLOSE:
 		PostQuitMessage(0);
-		application->should_quit = true;
+
+		if (BLK_VERIFY(application))
+		{
+			application->should_quit = true;
+		}
+
 		break;
 	case WM_INPUT: {
 		UINT raw_input_data_size;
@@ -160,7 +210,10 @@ MainWndProc(HWND hwnd, const UINT message, const WPARAM w_param, const LPARAM l_
 
 		constexpr size_t max_raw_input_size = 1024;
 		alignas(RAWINPUT) BYTE raw_input_data[max_raw_input_size];
-		BLK_CHECK(raw_input_data_size <= sizeof(raw_input_data));
+		if (!BLK_VERIFY(raw_input_data_size <= sizeof(raw_input_data)))
+		{
+			return DefWindowProcW(hwnd, message, w_param, l_param);
+		}
 
 		if (GetRawInputData(
 				reinterpret_cast<HRAWINPUT>(l_param),
@@ -178,11 +231,11 @@ MainWndProc(HWND hwnd, const UINT message, const WPARAM w_param, const LPARAM l_
 		{
 			const RAWMOUSE& mouse_input = raw_input->data.mouse;
 
-			if ((mouse_input.usFlags & MOUSE_MOVE_RELATIVE) == MOUSE_MOVE_RELATIVE)
+			if ((mouse_input.usFlags & MOUSE_MOVE_ABSOLUTE) != MOUSE_MOVE_ABSOLUTE)
 			{
 				event.type = blk::Event_Type::MOUSE_MOVE;
-				event.mouse_delta_x = mouse_input.lLastX;
-				event.mouse_delta_y = mouse_input.lLastY;
+				event.mouse_delta_x = static_cast<int32_t>(mouse_input.lLastX);
+				event.mouse_delta_y = static_cast<int32_t>(mouse_input.lLastY);
 				blk::write_event(event);
 			}
 
@@ -203,7 +256,7 @@ MainWndProc(HWND hwnd, const UINT message, const WPARAM w_param, const LPARAM l_
 	}
 
 		// WM_INPUT requires DefWindowProc for cleanup.
-		return DefWindowProcA(hwnd, message, w_param, l_param);
+		return DefWindowProcW(hwnd, message, w_param, l_param);
 	case WM_KEYDOWN:
 		event.type = blk::Event_Type::KEY_DOWN;
 		// Fallthrough.
@@ -225,6 +278,10 @@ MainWndProc(HWND hwnd, const UINT message, const WPARAM w_param, const LPARAM l_
 			break;
 		case VK_F2:
 			event.key = blk::Key::KEYBOARD_F2;
+			blk::write_event(event);
+			break;
+		case VK_F3:
+			event.key = blk::Key::KEYBOARD_F3;
 			blk::write_event(event);
 			break;
 		case 'Q':
@@ -256,7 +313,7 @@ MainWndProc(HWND hwnd, const UINT message, const WPARAM w_param, const LPARAM l_
 		}
 		break;
 	default:
-		return DefWindowProcA(hwnd, message, w_param, l_param);
+		return DefWindowProcW(hwnd, message, w_param, l_param);
 	}
 
 	return 0;

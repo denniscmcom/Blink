@@ -5,16 +5,28 @@
 
 #include "Engine/World/World.hpp"
 
+#include "Engine/Core/Array.hpp"
 #include "Engine/Core/Hash.hpp"
 #include "Engine/Core/Pool.hpp"
+#include "Engine/Platform/Assert.hpp"
+#include "Engine/Platform/Result.hpp"
+#include "Engine/Scene/Graph.hpp"
 #include "Engine/Scene/Node.hpp"
-#include "Engine/Scene/Scene_Graph.hpp"
 #include "Engine/World/Actor.hpp"
 #include "Engine/World/Camera.hpp"
 #include "Engine/World/Prop.hpp"
 
+#include <type_traits>
+
 namespace
 {
+/// The following functions are the generic version of each `spawn_*`, `despawn`, `find_*`, `get_node`
+/// functions exposed in the public API. They are only used internally to avoid code duplication. All requirements about
+/// the parameters apply here too.
+///
+/// I decided to only expose the concrete functions because I find it cleaner.
+/// @tparam Type Should be one of the entity types (e.g. `Actor`, `Camera`, ...).
+
 template <typename Type>
 blk::Pool_Handle<Type> spawn_entity(blk::World& world, const char* name, blk::Pool_Handle<blk::Node> parent);
 
@@ -22,11 +34,75 @@ template <typename Type>
 void despawn_entity(blk::World& world, blk::Pool_Handle<Type> handle);
 
 template <typename Type>
-blk::Pool_Handle<Type> find_entity(const blk::World& world, const char* name);
+blk::Pool_Handle<Type> find_entity(blk::World& world, const char* name);
 
 template <typename Type>
-blk::Node* get_entity_node(const blk::World& world, blk::Pool_Handle<Type> handle);
+blk::Node* get_entity_node(blk::World& world, blk::Pool_Handle<Type> handle);
 }  // namespace
+
+blk::Result
+blk::create_world(Allocator* allocator, World& world)
+{
+	if (!BLK_VERIFY(allocator))
+	{
+		return Result::INVALID_ARGUMENTS;
+	}
+
+	world = {};
+	world.allocator = allocator;
+
+	// A failure leaves everything created so far without an owner, so we tear the whole `world` down before returning.
+
+	if (const Result result = create_pool(world.actors, allocator, 100); result != Result::SUCCESS)
+	{
+		destroy_world(world);
+
+		return result;
+	}
+
+	if (const Result result = create_pool(world.cameras, allocator, 3); result != Result::SUCCESS)
+	{
+		destroy_world(world);
+
+		return result;
+	}
+
+	if (const Result result = create_pool(world.props, allocator, 100); result != Result::SUCCESS)
+	{
+		destroy_world(world);
+
+		return result;
+	}
+
+	if (const Result result = create_scene_graph(world.scene_graph, allocator); result != Result::SUCCESS)
+	{
+		destroy_world(world);
+
+		return result;
+	}
+
+	if (const Result result = create_hash_map(world.node_handle_to_entity, allocator, 100, 0.75f);
+		result != Result::SUCCESS)
+	{
+		destroy_world(world);
+
+		return result;
+	}
+
+	return Result::SUCCESS;
+}
+
+void
+blk::destroy_world(World& world)
+{
+	destroy_pool(world.actors);
+	destroy_pool(world.cameras);
+	destroy_pool(world.props);
+	destroy_scene_graph(world.scene_graph);
+	destroy_hash_map(world.node_handle_to_entity);
+
+	world = {};
+}
 
 blk::Pool_Handle<blk::Actor>
 blk::spawn_actor(World& world, const char* name, Pool_Handle<Node> parent)
@@ -47,107 +123,178 @@ blk::spawn_prop(World& world, const char* name, Pool_Handle<Node> parent)
 }
 
 void
-blk::despawn_actor(World& world, Pool_Handle<Actor> handle)
+blk::despawn(World& world, Pool_Handle<Actor> handle)
 {
 	despawn_entity(world, handle);
 }
 
 void
-blk::despawn_camera(World& world, Pool_Handle<Camera> handle)
+blk::despawn(World& world, Pool_Handle<Camera> handle)
 {
 	despawn_entity(world, handle);
 }
 
 void
-blk::despawn_prop(World& world, Pool_Handle<Prop> handle)
+blk::despawn(World& world, Pool_Handle<Prop> handle)
 {
 	despawn_entity(world, handle);
 }
 
 void
-blk::despawn_node(World& world, Pool_Handle<Node> handle)
+blk::despawn(World& world, Pool_Handle<Node> handle)
 {
-	std::vector<Pool_Handle<Node>> removed_node_handles = {};
-	destroy_node(world.scene_graph, handle, removed_node_handles);
+	// First, we destroy the `Node` and all its subtree.
 
-	for (const auto& removed_node_handle : removed_node_handles)
+	Dyn_Array<Pool_Handle<Node>> destroyed_node_handles = {};
+
+	if (create_dyn_array(destroyed_node_handles, world.allocator, 10) != Result::SUCCESS)
 	{
-		auto entity_instance_search = world.node_handle_to_entity_instance.find(removed_node_handle);
+		BLK_ERROR("Failed to despawn node\n");
 
-		if (entity_instance_search == world.node_handle_to_entity_instance.end())
+		return;
+	}
+
+	destroy_node(world.scene_graph, handle, destroyed_node_handles);
+
+	// Now, we update the state of	`world` to reflect the nodes destroyed.
+
+	for (size_t i = 0; i < destroyed_node_handles.count; ++i)
+	{
+		const Pool_Handle<Node> destroyed_node_handle = destroyed_node_handles.buffer[i];
+
+		// Remove the association from `world.node_handle_to_entity`.
+		const Entity* entity = get(world.node_handle_to_entity, destroyed_node_handle);
+
+		if (!BLK_VERIFY(entity))
 		{
+			// Association does not exists, so we continue. This should not really happen unless `world` is corrupted.
 			continue;
 		}
 
-		switch (const Entity_Instance entity_instance = entity_instance_search->second; entity_instance.type)
+		// Then, we remove the concrete entity from its correspondent pool.
+
+		switch (entity->type)
 		{
-		case Entity_Type::Actor:
-			world.actors.remove({.id = entity_instance.id, .version = entity_instance.version});
-			break;
-		case Entity_Type::Camera:
-			world.cameras.remove({.id = entity_instance.id, .version = entity_instance.version});
-			break;
-		case Entity_Type::Prop:
-			world.props.remove({.id = entity_instance.id, .version = entity_instance.version});
-			break;
+		case Entity_Type::ACTOR: {
+			const Pool_Handle<Actor> actor_handle = {.id = entity->id, .version = entity->version};
+			remove(world.actors, actor_handle);
+		}
+		break;
+		case Entity_Type::CAMERA: {
+			const Pool_Handle<Camera> camera_handle = {.id = entity->id, .version = entity->version};
+
+			if (world.active_camera_handle == camera_handle)
+			{
+				// We are despawning the active camera, so `world` is left without one.
+				world.active_camera_handle = {};
+			}
+
+			remove(world.cameras, camera_handle);
+		}
+		break;
+		case Entity_Type::PROP: {
+			const Pool_Handle<Prop> prop_handle = {.id = entity->id, .version = entity->version};
+			remove(world.props, prop_handle);
+		}
+		break;
 		}
 
-		world.node_handle_to_entity_instance.erase(entity_instance_search);
+		// Finally, we remove the association from `world.node_handle_to_entity`.
+		remove(world.node_handle_to_entity, destroyed_node_handle);
 	}
+
+	destroy_dyn_array(destroyed_node_handles);
 }
 
 blk::Pool_Handle<blk::Actor>
-blk::find_actor(const World& world, const char* name)
+blk::find_actor(World& world, const char* name)
 {
 	return find_entity<Actor>(world, name);
 }
 
 blk::Pool_Handle<blk::Camera>
-blk::find_camera(const World& world, const char* name)
+blk::find_camera(World& world, const char* name)
 {
 	return find_entity<Camera>(world, name);
 }
 
 blk::Pool_Handle<blk::Prop>
-blk::find_prop(const World& world, const char* name)
+blk::find_prop(World& world, const char* name)
 {
 	return find_entity<Prop>(world, name);
 }
 
 blk::Actor*
-blk::get_actor(const World& world, Pool_Handle<Actor> handle)
+blk::get(World& world, Pool_Handle<Actor> handle)
 {
-	return world.actors.get(handle);
+	return get(world.actors, handle);
 }
 
 blk::Camera*
-blk::get_camera(const World& world, Pool_Handle<Camera> handle)
+blk::get(World& world, Pool_Handle<Camera> handle)
 {
-	return world.cameras.get(handle);
+	return get(world.cameras, handle);
 }
 
 blk::Prop*
-blk::get_prop(const World& world, Pool_Handle<Prop> handle)
+blk::get(World& world, Pool_Handle<Prop> handle)
 {
-	return world.props.get(handle);
+	return get(world.props, handle);
 }
 
 blk::Node*
-blk::get_entity_node(const World& world, Pool_Handle<Actor> handle)
+blk::get_node(World& world, Pool_Handle<Actor> handle)
 {
-	return ::get_entity_node(world, handle);
+	return get_entity_node(world, handle);
 }
 
 blk::Node*
-blk::get_entity_node(const World& world, Pool_Handle<Camera> handle)
+blk::get_node(World& world, Pool_Handle<Camera> handle)
 {
-	return ::get_entity_node(world, handle);
+	return get_entity_node(world, handle);
 }
 
 blk::Node*
-blk::get_entity_node(const World& world, Pool_Handle<Prop> handle)
+blk::get_node(World& world, Pool_Handle<Prop> handle)
 {
-	return ::get_entity_node(world, handle);
+	return get_entity_node(world, handle);
+}
+
+blk::Result
+blk::attach_mesh(World& world, Pool_Handle<Prop> handle, Pool_Handle<Mesh> mesh)
+{
+	Node* node = get_node(world, handle);
+
+	if (!node)
+	{
+		BLK_ERROR("Failed to node for prop\n");
+
+		return Result::INVALID_ARGUMENTS;
+	}
+
+	push(node->mesh_instance.mesh_handles, mesh);
+
+	return Result::SUCCESS;
+}
+
+blk::Result
+blk::attach_mesh(World& world, Pool_Handle<Prop> handle, Pool_Handle<Mesh> mesh, size_t index)
+{
+	Node* node = get_node(world, handle);
+
+	if (!node)
+	{
+		BLK_ERROR("Failed to node for prop\n");
+
+		return Result::INVALID_ARGUMENTS;
+	}
+
+	if (const Result result = insert(node->mesh_instance.mesh_handles, mesh, index); result != Result::SUCCESS)
+	{
+		return result;
+	}
+
+	return Result::SUCCESS;
 }
 
 namespace
@@ -156,41 +303,79 @@ template <typename Type>
 blk::Pool_Handle<Type>
 spawn_entity(blk::World& world, const char* name, blk::Pool_Handle<blk::Node> parent)
 {
+	// First, we initialize a unique name for the node based on `name`.
+	char unique_node_name[blk::MAX_NODE_NAME_SIZE];
+
+	if (blk::init_unique_node_name(world.scene_graph, name, unique_node_name) != blk::Result::SUCCESS)
+	{
+		BLK_ERROR("Failed to create a unique name for entity\n");
+
+		return {};
+	}
+
+	// Then, create the `Node` for the entity to spawn.
+
 	Type entity = {};
-	entity.node_handle = create_node(world.scene_graph, name, parent);
+	entity.node_handle = create_node(world.scene_graph, unique_node_name, parent);
 
 	if (entity.node_handle == blk::POOL_HANDLE_NONE<blk::Node>)
 	{
 		return {};
 	}
 
+	// Depending on the entity type of `Type`, we assign the value for `generic_entity` and insert `entity` to the
+	// correspondent `Pool` in `world`.
+
 	blk::Pool_Handle<Type> entity_handle = {};
-	blk::Entity_Instance entity_instance = {};
+	blk::Entity generic_entity = {};
 
 	if constexpr (std::is_same_v<Type, blk::Actor>)
 	{
-		entity_handle = world.actors.insert(entity);
-		entity_instance.type = blk::Entity_Type::Actor;
+		// `Type` is `Actor`.
+		entity_handle = insert(world.actors, entity);
+		generic_entity.type = blk::Entity_Type::ACTOR;
 	}
 	else if constexpr (std::is_same_v<Type, blk::Camera>)
 	{
-		entity_handle = world.cameras.insert(entity);
-		entity_instance.type = blk::Entity_Type::Camera;
+		// `Type` is `Camera`.
+		entity_handle = insert(world.cameras, entity);
+		generic_entity.type = blk::Entity_Type::CAMERA;
 	}
 	else if constexpr (std::is_same_v<Type, blk::Prop>)
 	{
-		entity_handle = world.props.insert(entity);
-		entity_instance.type = blk::Entity_Type::Prop;
+		// `Type` is `Prop`.
+		entity_handle = insert(world.props, entity);
+		generic_entity.type = blk::Entity_Type::PROP;
 	}
 	else
 	{
+		// Write more `else if` clauses when more `Entity_Type` are added.
 		static_assert(sizeof(Type) == 0, "Entity type not supported");
 	}
 
-	entity_instance.id = entity_handle.id;
-	entity_instance.version = entity_handle.version;
+	if (entity_handle == blk::POOL_HANDLE_NONE<Type>)
+	{
+		BLK_ERROR("Failed to insert entity into its pool\n");
 
-	world.node_handle_to_entity_instance.insert({entity.node_handle, entity_instance});
+		// The node was created before the entity, so we destroy it here. It has no children and is not associated with
+		// an `Entity` yet, so we cannot use `despawn`.
+		blk::Dyn_Array<blk::Pool_Handle<blk::Node>> destroyed_node_handles = {};
+
+		if (create_dyn_array(destroyed_node_handles, world.allocator, 1) == blk::Result::SUCCESS)
+		{
+			destroy_node(world.scene_graph, entity.node_handle, destroyed_node_handles);
+			destroy_dyn_array(destroyed_node_handles);
+		}
+
+		return {};
+	}
+
+	// Assign the `Pool_Handle` obtained from inserting `entity` into its pool to the fields to `Entity`.
+	generic_entity.id = entity_handle.id;
+	generic_entity.version = entity_handle.version;
+
+	// Finally, we insert `node_handle-entity` pair into the `Hash_Map`.
+	insert(world.node_handle_to_entity, entity.node_handle, generic_entity);
 
 	return entity_handle;
 }
@@ -201,110 +386,144 @@ despawn_entity(blk::World& world, blk::Pool_Handle<Type> handle)
 {
 	const Type* entity = nullptr;
 
+	// Depending on `Type`, we get the entity from its correspondent pool.
+
 	if constexpr (std::is_same_v<Type, blk::Camera>)
 	{
-		entity = world.cameras.get(handle);
+		// `Type` is `Camera`.
+		entity = get(world.cameras, handle);
 	}
 	else if constexpr (std::is_same_v<Type, blk::Actor>)
 	{
-		entity = world.actors.get(handle);
+		// `Type` is `Actor`.
+		entity = get(world.actors, handle);
 	}
 	else if constexpr (std::is_same_v<Type, blk::Prop>)
 	{
-		entity = world.props.get(handle);
+		// `Type` is `Prop`.
+		entity = get(world.props, handle);
 	}
 	else
 	{
+		// Write more `else if` clauses when more `Entity_Type` are added.
 		static_assert(sizeof(Type) == 0, "Entity type not supported");
 	}
 
 	if (!entity)
 	{
+		// Entity does not exists in the pool, so there is nothing to despawn.
 		return;
 	}
 
-	blk::despawn_node(world, entity->node_handle);
+	blk::despawn(world, entity->node_handle);
 }
 
 template <typename Type>
 blk::Pool_Handle<Type>
-find_entity(const blk::World& world, const char* name)
+find_entity(blk::World& world, const char* name)
 {
-	auto node_handle_search = world.scene_graph.name_id_to_handle.find(blk::hash_fnv1a(name));
-
-	if (node_handle_search == world.scene_graph.name_id_to_handle.end())
+	if (!BLK_VERIFY(name))
 	{
 		return {};
 	}
 
-	const blk::Pool_Handle<blk::Node> node_handle = node_handle_search->second;
-	auto entity_instance_search = world.node_handle_to_entity_instance.find(node_handle);
+	// TODO (Consistency): This reaches into `Scene_Graph::hash_to_handle`, so `World` depends on how `Scene_Graph`
+	// stores node names. `find_node` cannot be used because it returns a `Node*` and we need the handle. Add a
+	// `find_node_handle` to `Scene/Graph.hpp` and call it here instead.
 
-	if (entity_instance_search == world.node_handle_to_entity_instance.end())
+	// Get `Pool_Handle<Type>` from `world.scene_graph` given its hash.
+	const uint64_t hash = blk::hash_fnv1a(name);
+	const blk::Pool_Handle<blk::Node>* node_handle = blk::get(world.scene_graph.hash_to_handle, hash);
+
+	if (!node_handle)
 	{
+		// Node does not exists with `name`.
 		return {};
 	}
 
-	blk::Entity_Instance entity_instance = entity_instance_search->second;
+	// Get `Entity` associated with `node_handle`.
+	const blk::Entity* entity = get(world.node_handle_to_entity, *node_handle);
+
+	if (!entity)
+	{
+		// Node is not an `Entity`. See `find_node`.
+		return {};
+	}
+
+	// Now, we check if `entity->type` is the same as `Type`. This should be always the case at least something is wrong
+	// with the implementation.
+
 	blk::Entity_Type expected_entity_type = {};
 
 	if constexpr (std::is_same_v<Type, blk::Camera>)
 	{
-		expected_entity_type = blk::Entity_Type::Camera;
+		expected_entity_type = blk::Entity_Type::CAMERA;
 	}
 	else if constexpr (std::is_same_v<Type, blk::Actor>)
 	{
-		expected_entity_type = blk::Entity_Type::Actor;
+		expected_entity_type = blk::Entity_Type::ACTOR;
 	}
 	else if constexpr (std::is_same_v<Type, blk::Prop>)
 	{
-		expected_entity_type = blk::Entity_Type::Prop;
+		expected_entity_type = blk::Entity_Type::PROP;
 	}
 	else
 	{
 		static_assert(sizeof(Type) == 0, "Entity type not supported");
 	}
 
-	if (entity_instance.type != expected_entity_type)
+	if (!BLK_VERIFY(entity->type == expected_entity_type))
 	{
 		return {};
 	}
 
-	return {.id = entity_instance.id, .version = entity_instance.version};
+	return blk::Pool_Handle<Type>{
+		.id = entity->id,
+		.version = entity->version,
+	};
 }
 
 template <typename Type>
 blk::Node*
-get_entity_node(const blk::World& world, blk::Pool_Handle<Type> handle)
+get_entity_node(blk::World& world, blk::Pool_Handle<Type> handle)
 {
-	Type* entity = nullptr;
+	// Get the entity from its correspondent pool in `world`.
+
+	const Type* entity = nullptr;
 
 	if constexpr (std::is_same_v<Type, blk::Camera>)
 	{
-		entity = world.cameras.get(handle);
+		// `Type` is `Camera`.
+		entity = get(world.cameras, handle);
 	}
 	else if constexpr (std::is_same_v<Type, blk::Actor>)
 	{
-		entity = world.actors.get(handle);
+		// `Type` is `Actor`.
+		entity = get(world.actors, handle);
 	}
 	else if constexpr (std::is_same_v<Type, blk::Prop>)
 	{
-		entity = world.props.get(handle);
+		// `Type` is `Prop`.
+		entity = get(world.props, handle);
 	}
 	else
 	{
+		// Write more `else if` clauses when adding more `Entity_Type`.
 		static_assert(sizeof(Type) == 0, "Entity type not supported");
 	}
 
 	if (!entity)
 	{
+		// Entity does not exists in pool.
 		return nullptr;
 	}
 
-	blk::Node* node = world.scene_graph.nodes.get(entity->node_handle);
+	blk::Node* node = get(world.scene_graph.nodes, entity->node_handle);
 
-	if (!node)
+	if (!BLK_VERIFY(node))
 	{
+		// This should not happen because every entity in `world` has a `Node` in `world.scene_graph`. If this happens,
+		// it means `world` is corrupted.
 		return nullptr;
 	}
 

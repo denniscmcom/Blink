@@ -10,25 +10,32 @@
 
 #include <vulkan/vulkan.h>
 
-#include <optional>
-
 namespace blk
 {
 struct Context;
 struct Arena;
 struct Texture;
 
+/// A device texture.
 struct Texture_Device
 {
-	Pool_Handle<Texture> handle = {};
-	Image image = {};
+	/// Host texture handle.
+	Pool_Handle<Texture> host_handle;
+	/// Device image backing the texture.
+	Image image;
 };
 
-/// Transfers texture to GPU device.
-std::optional<Texture_Device> transfer_texture(
+/// Transfer a host `Texture` into device.
+///
+/// It checks for duplicated textures before transferring. If a texture already exists in device, it reuses it.
+Result transfer_texture(
 	const Context& context,
 	Arena& arena,
-	const Pool_Handle<Texture>& handle,
-	VkFormat format
+	Pool_Handle<Texture> host_handle,
+	VkFormat format,
+	Texture_Device& texture
 );
+/// Unloads a `texture` from device.
+// TODO (Bug): not implemented.
+void unload_texture_from_device(const Context& context, Arena& arena, Texture_Device& texture);
 }  // namespace blk

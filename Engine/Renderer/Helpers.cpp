@@ -6,6 +6,7 @@
 #include "Engine/Renderer/Helpers.hpp"
 
 #include "Engine/Platform/Log.hpp"
+#include "Engine/Platform/Result.hpp"
 #include "Engine/Renderer/Lifetime/Context.hpp"
 #include "Engine/Resource/Mesh.hpp"
 
@@ -13,11 +14,12 @@
 
 #include <stdint.h>
 
-uint32_t
+blk::Result
 blk::find_memory_type_index(
 	const Context& context,
 	const uint32_t memory_type_bits,
-	const VkMemoryPropertyFlags memory_property_flags
+	const VkMemoryPropertyFlags memory_property_flags,
+	uint32_t& device_memory_index
 )
 {
 	VkPhysicalDeviceMemoryProperties2 physical_device_memory_properties = {};
@@ -25,27 +27,30 @@ blk::find_memory_type_index(
 
 	vkGetPhysicalDeviceMemoryProperties2(context.physical_device, &physical_device_memory_properties);
 
-	uint32_t selected_physical_device_memory_type_index = ~0;
+	bool found_physical_device_memory_type = false;
 
 	for (uint32_t i = 0; i < physical_device_memory_properties.memoryProperties.memoryTypeCount; i++)
 	{
-		const uint32_t memory_type_filter = memory_type_bits & 1 << i;
+		const uint32_t memory_type_filter = memory_type_bits & (1 << i);
 		const VkMemoryPropertyFlags memory_property_flags_filter =
 			physical_device_memory_properties.memoryProperties.memoryTypes[i].propertyFlags & memory_property_flags;
 
 		if (memory_type_filter && memory_property_flags_filter == memory_property_flags)
 		{
-			selected_physical_device_memory_type_index = i;
+			device_memory_index = i;
+			found_physical_device_memory_type = true;
 			break;
 		}
 	}
 
-	if (selected_physical_device_memory_type_index == ~0)
+	if (!found_physical_device_memory_type)
 	{
-		BLK_FATAL("Failed to find suitable physical device memory type\n");
+		BLK_ERROR("Failed to find suitable physical device memory type\n");
+
+		return Result::DEVICE_ERROR;
 	}
 
-	return selected_physical_device_memory_type_index;
+	return Result::SUCCESS;
 }
 
 void
@@ -85,7 +90,7 @@ blk::transition_image_layout(
 	vkCmdPipelineBarrier2(command_buffer, &dependency_info);
 }
 
-void
+blk::Result
 blk::begin_one_time_commands(VkCommandBuffer command_buffer)
 {
 	VkCommandBufferBeginInfo command_buffer_begin_info = {};
@@ -94,16 +99,22 @@ blk::begin_one_time_commands(VkCommandBuffer command_buffer)
 
 	if (vkBeginCommandBuffer(command_buffer, &command_buffer_begin_info) != VK_SUCCESS)
 	{
-		BLK_FATAL("Failed to begin command buffer\n");
+		BLK_ERROR("Failed to begin one time command buffer\n");
+
+		return Result::DEVICE_ERROR;
 	}
+
+	return Result::SUCCESS;
 }
 
-void
+blk::Result
 blk::end_one_time_commands(const Context& context, VkCommandBuffer command_buffer)
 {
 	if (vkEndCommandBuffer(command_buffer) != VK_SUCCESS)
 	{
-		BLK_FATAL("Failed to end command buffer\n");
+		BLK_ERROR("Failed to end one time command buffer\n");
+
+		return Result::DEVICE_ERROR;
 	}
 
 	VkCommandBufferSubmitInfo command_buffer_submit_info = {};
@@ -117,13 +128,19 @@ blk::end_one_time_commands(const Context& context, VkCommandBuffer command_buffe
 
 	if (vkQueueSubmit2(context.graphics_queue, 1, &submit_info_2, VK_NULL_HANDLE) != VK_SUCCESS)
 	{
-		BLK_FATAL("Failed to submit command buffer\n");
+		BLK_ERROR("Failed to submit one time command buffer\n");
+
+		return Result::DEVICE_ERROR;
 	}
 
 	if (vkQueueWaitIdle(context.graphics_queue) != VK_SUCCESS)
 	{
-		BLK_FATAL("Failed to wait for queue\n");
+		BLK_ERROR("Failed to wait for queue\n");
+
+		return Result::DEVICE_ERROR;
 	}
+
+	return Result::SUCCESS;
 }
 
 VkPipelineShaderStageCreateInfo
@@ -138,69 +155,22 @@ blk::get_pipeline_shader_stage_create_info(VkShaderModule module, VkShaderStageF
 	return create_info;
 }
 
-template <>
-std::vector<VkVertexInputAttributeDescription>
-blk::get_vertex_input_attribute_descriptions<blk::Vertex>()
+blk::Array<VkVertexInputBindingDescription, 1>
+blk::get_vertex_uv_input_binding_descriptions()
 {
-	std::vector<VkVertexInputAttributeDescription> descriptions = {
-		{.location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(Vertex, position)},
-		{.location = 1, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(Vertex, normal)},
-		{.location = 2, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(Vertex, tangent)},
-		{.location = 3, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(Vertex, bitangent)},
-		{.location = 4, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(Vertex, texture_coord)},
-	};
-
-	return descriptions;
+	return {{
+		{.binding = 0, .stride = sizeof(Vertex_UV), .inputRate = VK_VERTEX_INPUT_RATE_VERTEX},
+	}};
 }
 
-VkCommandBuffer
-blk::create_command_buffer(const Context& context, VkCommandPool pool)
+blk::Array<VkVertexInputAttributeDescription, 5>
+blk::get_vertex_uv_input_attribute_descriptions()
 {
-	VkCommandBufferAllocateInfo command_buffer_allocate_info = {};
-	command_buffer_allocate_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-	command_buffer_allocate_info.commandPool = pool;
-	command_buffer_allocate_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	command_buffer_allocate_info.commandBufferCount = 1;
-
-	VkCommandBuffer command_buffer;
-
-	if (vkAllocateCommandBuffers(context.logical_device, &command_buffer_allocate_info, &command_buffer) != VK_SUCCESS)
-	{
-		BLK_FATAL("Failed to allocate command buffers\n");
-	}
-
-	return command_buffer;
-}
-
-VkSemaphore
-blk::create_semaphore(const Context& context)
-{
-	VkSemaphoreCreateInfo semaphore_create_info = {};
-	semaphore_create_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-
-	VkSemaphore semaphore;
-
-	if (vkCreateSemaphore(context.logical_device, &semaphore_create_info, nullptr, &semaphore) != VK_SUCCESS)
-	{
-		BLK_FATAL("Failed to create render finished semaphore\n");
-	}
-
-	return semaphore;
-}
-
-VkFence
-blk::create_fence(const Context& context)
-{
-	VkFenceCreateInfo fence_create_info = {};
-	fence_create_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-	fence_create_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-
-	VkFence fence;
-
-	if (vkCreateFence(context.logical_device, &fence_create_info, nullptr, &fence) != VK_SUCCESS)
-	{
-		BLK_FATAL("Failed to create in-flight fence\n");
-	}
-
-	return fence;
+	return {{
+		{.location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(Vertex_UV, position)},
+		{.location = 1, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(Vertex_UV, normal)},
+		{.location = 2, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(Vertex_UV, tangent)},
+		{.location = 3, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(Vertex_UV, bitangent)},
+		{.location = 4, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(Vertex_UV, texture_coord)},
+	}};
 }

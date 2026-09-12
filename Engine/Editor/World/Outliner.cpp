@@ -13,10 +13,9 @@
 #include "Engine/Platform/Assert.hpp"
 #include "Engine/Resource/Material.hpp"
 #include "Engine/Resource/Mesh.hpp"
-#include "Engine/Resource/Texture.hpp"
+#include "Engine/Scene/Graph.hpp"
 #include "Engine/Scene/Light.hpp"
 #include "Engine/Scene/Node.hpp"
-#include "Engine/Scene/Scene_Graph.hpp"
 #include "Engine/World/World.hpp"
 
 #include <imgui.h>
@@ -24,19 +23,23 @@
 
 namespace
 {
+/// Helper function to draw the node tree starting at `handle`.
 void draw_node(blk::Editor_Context& context, blk::Pool_Handle<blk::Node> handle);
 }  // namespace
 
 void
 blk::draw_outliner(Editor_Context& context)
 {
-	BLK_CHECK(context.world_context._game_world);
+	if (!BLK_VERIFY(context.world_context.game_world))
+	{
+		return;
+	}
 
+	// Get ImGui viewport.
 	const ImGuiViewport* viewport = ImGui::GetMainViewport();
 
-	// ============================================================================
-	// Scene graph.
-	// ============================================================================
+	// Compute size and position for the outliner.
+	// The outliner is located at the left side of the screen, below the menu bar and above the status bar.
 
 	const float available_height =
 		viewport->WorkSize.y - context.viewport_context.status_bar_size.y - context.toolbar_size.y;
@@ -44,8 +47,12 @@ blk::draw_outliner(Editor_Context& context)
 	context.world_context.scene_graph_position.x = viewport->WorkPos.x;
 	context.world_context.scene_graph_position.y = viewport->WorkPos.y + context.toolbar_size.y;
 	context.world_context.scene_graph_size = ImVec2(context.left_column_width, available_height * 0.6f);
-	context.world_context.scene_graph_min_size = ImVec2(LEFT_COLUMN_MIN_WIDTH, context.world_context.scene_graph_size.y);
-	context.world_context.scene_graph_max_size = ImVec2(LEFT_COLUMN_MAX_WIDTH, context.world_context.scene_graph_size.y);
+	context.world_context.scene_graph_min_size =
+		ImVec2(LEFT_COLUMN_MIN_WIDTH, context.world_context.scene_graph_size.y);
+	context.world_context.scene_graph_max_size =
+		ImVec2(LEFT_COLUMN_MAX_WIDTH, context.world_context.scene_graph_size.y);
+
+	// Pass size, position, and constraints to ImGui.
 
 	ImGui::SetNextWindowPos(context.world_context.scene_graph_position, ImGuiCond_Always);
 	ImGui::SetNextWindowSize(context.world_context.scene_graph_size, ImGuiCond_Always);
@@ -54,14 +61,20 @@ blk::draw_outliner(Editor_Context& context)
 		context.world_context.scene_graph_max_size
 	);
 
+	// We draw first the scene graph. The scene graph is resizable horizontally by the user within limits.
+
 	ImGui::Begin("Scene graph", nullptr, ImGuiWindowFlags_NoMove);
+
+	// Ask ImGui for the width of the scene graph widget.
 	context.left_column_width = ImGui::GetWindowWidth();
-	draw_node(context, context.world_context._game_world->scene_graph.root);
+
+	// We draw nodes recursively, starting at the root.
+	draw_node(context, context.world_context.game_world->scene_graph.root);
+
 	ImGui::End();
 
-	// ============================================================================
-	// Settings.
-	// ============================================================================
+	// Compute size and position of the node settings widget.
+	// This widget is located at the right of the screen, below the menu and above the status bar.
 
 	context.world_context.settings_size = ImVec2(context.right_column_width, available_height);
 	context.world_context.settings_min_size = ImVec2(RIGHT_COLUMN_MIN_WIDTH, context.world_context.settings_size.y);
@@ -71,47 +84,78 @@ blk::draw_outliner(Editor_Context& context)
 		viewport->WorkPos.x + viewport->WorkSize.x - context.world_context.settings_size.x;
 	context.world_context.settings_position.y = viewport->WorkPos.y + context.toolbar_size.y;
 
+	// Pass size and position to ImGui.
+
 	ImGui::SetNextWindowPos(context.world_context.settings_position, ImGuiCond_Always);
 	ImGui::SetNextWindowSize(context.world_context.settings_size, ImGuiCond_Always);
-	ImGui::SetNextWindowSizeConstraints(context.world_context.settings_min_size, context.world_context.settings_max_size);
+	ImGui::SetNextWindowSizeConstraints(
+		context.world_context.settings_min_size,
+		context.world_context.settings_max_size
+	);
+
+	// Draw the settings widget.
 
 	ImGui::Begin("Settings", nullptr, ImGuiWindowFlags_NoMove);
+
+	// Ask ImGui for the width of the settings widget.
 	context.right_column_width = ImGui::GetWindowWidth();
+
+	// Inside the settings widget, we have two tabs: one for node settings and another for world settings.
 
 	if (ImGui::BeginTabBar("##Settings"))
 	{
+		// Node settings tab.
+
 		if (ImGui::BeginTabItem("Node settings"))
 		{
-			if (Node* node =
-					context.world_context._game_world->scene_graph.nodes.get(context.world_context.selected_node_handle))
-			{
-				// ============================================================================
-				// Name.
-				// ============================================================================
+			// Get the current selected node.
 
-				if (ImGui::InputText("Name", &node->name, ImGuiInputTextFlags_EnterReturnsTrue))
+			if (Node* node =
+					get_node(context.world_context.game_world->scene_graph, context.world_context.selected_node_handle))
+			{
+				// Display node name.
+
+				if (ImGui::InputText("Name", node->name, MAX_NODE_NAME_SIZE, ImGuiInputTextFlags_EnterReturnsTrue))
 				{
-					const std::string unique_node_name =
-						make_unique_node_name(context.world_context._game_world->scene_graph, node->name.c_str());
-					rename_node(
-						context.world_context._game_world->scene_graph,
-						context.world_context.selected_node_handle,
-						unique_node_name.c_str()
-					);
+					char unique_node_name[MAX_NODE_NAME_SIZE];
+
+					BLK_IF_NOT_SUCCESS(init_unique_node_name(
+						context.world_context.game_world->scene_graph,
+						node->name,
+						unique_node_name
+					))
+					{
+						// `unique_node_name` is left uninitialized, so we cannot rename with it. We do not return here
+						// because that would leave the ImGui tab and window stacks unbalanced.
+						BLK_ERROR("Failed to get unique node name\n");
+					}
+					else
+					{
+						BLK_IF_NOT_SUCCESS(rename_node(
+							context.world_context.game_world->scene_graph,
+							context.world_context.selected_node_handle,
+							unique_node_name
+						))
+						{
+							BLK_ERROR("Failed to rename node\n");
+						}
+					}
 				}
 
-				// ============================================================================
-				// Transform.
-				// ============================================================================
+				// Display node transform.
 
 				if (ImGui::TreeNodeEx("Transform", ImGuiTreeNodeFlags_DefaultOpen))
 				{
+					// Display node position.
 					ImGui::DragFloat3("Position", &node->transform.position.x, 0.01f);
 
+					// We display rotation in degrees, so we have to convert it since we store it in radians.
 					Vector3 rotation = {};
 					rotation.x = to_degrees(Radians{node->transform.rotation.x}).value;
 					rotation.y = to_degrees(Radians{node->transform.rotation.y}).value;
 					rotation.z = to_degrees(Radians{node->transform.rotation.z}).value;
+
+					// Display node rotation.
 
 					if (ImGui::DragFloat3("Rotation", &rotation.x, 0.1f))
 					{
@@ -120,62 +164,81 @@ blk::draw_outliner(Editor_Context& context)
 						node->transform.rotation.z = to_radians(Degrees{rotation.z}).value;
 					}
 
+					// Display node scale.
+
 					ImGui::DragFloat3("Scale", &node->transform.scale.x, 0.01f);
 
 					ImGui::TreePop();
 				}
 
-				// ============================================================================
-				// Mesh instance.
-				// ============================================================================
+				// Depending on the `Node::type` we display either the mesh instance or point light data.
 
-				if (node->mesh_instance && ImGui::TreeNodeEx("Mesh instance", ImGuiTreeNodeFlags_DefaultOpen))
+				switch (node->type)
 				{
-					if (node->mesh_instance.value().mesh_handle != POOL_HANDLE_NONE<Mesh>)
+				case Node_Type::MESH_INSTANCE: {
+					// Display node instance.
+
+					if (ImGui::TreeNodeEx("Mesh instance", ImGuiTreeNodeFlags_DefaultOpen))
 					{
-						const Mesh* mesh = get_mesh(node->mesh_instance.value().mesh_handle);
-						std::string mesh_stem = "";
-
-						if (mesh)
+						// We display the stem of each mesh-material pair in the mesh instance.
+						for (size_t slot_index = 0; slot_index < node->mesh_instance.mesh_handles.count; ++slot_index)
 						{
-							mesh_stem = mesh->metadata.stem;
+							ImGui::Text("Slot %llu", slot_index);
+
+							const Pool_Handle<Mesh> mesh_handle = node->mesh_instance.mesh_handles.buffer[slot_index];
+							Mesh* mesh = get_mesh(mesh_handle);
+
+							if (mesh)
+							{
+								// Allow user to modify the mesh at this slot.
+
+								if (ImGui::InputText(
+										"Mesh",
+										mesh->metadata.stem,
+										MAX_RESOURCE_STEM_SIZE,
+										ImGuiInputTextFlags_EnterReturnsTrue
+									))
+								{
+									// TODO (Bug): Not implemented currently.
+								}
+							}
+
+							const Pool_Handle<Material> material_handle =
+								node->mesh_instance.material_handles.buffer[slot_index];
+							Material* material = get_material(material_handle);
+
+							if (material)
+							{
+								// Allow user to modify the material at this slot.
+
+								if (ImGui::InputText(
+										"Material",
+										material->metadata.stem,
+										MAX_RESOURCE_STEM_SIZE,
+										ImGuiInputTextFlags_EnterReturnsTrue
+									))
+								{
+									// TODO (Bug): Not implemented currently.
+								}
+							}
 						}
 
-						if (ImGui::InputText("Mesh", &mesh_stem, ImGuiInputTextFlags_EnterReturnsTrue))
-						{
-							node->mesh_instance.value().mesh_handle = load_mesh(mesh_stem.c_str());
-						}
+						ImGui::TreePop();
 					}
-
-					if (node->mesh_instance.value().material_handle != POOL_HANDLE_NONE<Material>)
-					{
-						const Material* material = get_material(node->mesh_instance.value().material_handle);
-						std::string material_stem = "";
-
-						if (material)
-						{
-							material_stem = material->metadata.stem;
-						}
-
-						if (ImGui::InputText("Material", &material_stem, ImGuiInputTextFlags_EnterReturnsTrue))
-						{
-							node->mesh_instance.value().material_handle = load_material(material_stem.c_str());
-						}
-					}
-
-					ImGui::TreePop();
 				}
+				break;
+				case Node_Type::POINT_LIGHT: {
+					// Display point light data.
 
-				// ============================================================================
-				// Point light.
-				// ============================================================================
+					if (ImGui::TreeNodeEx("Point light", ImGuiTreeNodeFlags_DefaultOpen))
+					{
+						// This relies on `Color_RGB` being packed together.
+						ImGui::ColorPicker3("Color", &node->point_light.color.r);
 
-				if (node->point_light && ImGui::TreeNodeEx("Point light", ImGuiTreeNodeFlags_DefaultOpen))
-				{
-					Point_Light& point_light = node->point_light.value();
-					ImGui::ColorPicker3("Color", &point_light.color.r);
-
-					ImGui::TreePop();
+						ImGui::TreePop();
+					}
+				}
+				break;
 				}
 			}
 			else
@@ -186,13 +249,16 @@ blk::draw_outliner(Editor_Context& context)
 			ImGui::EndTabItem();
 		}
 
+		// World settings tab.
+
 		if (ImGui::BeginTabItem("World settings"))
 		{
 			ImGui::EndTabItem();
 		}
+
+		ImGui::EndTabBar();
 	}
 
-	ImGui::EndTabBar();
 	ImGui::End();
 }
 
@@ -201,44 +267,60 @@ namespace
 void
 draw_node(blk::Editor_Context& context, const blk::Pool_Handle<blk::Node> handle)
 {
-	BLK_CHECK(context.world_context._game_world);
-
-	const blk::Node* node = context.world_context._game_world->scene_graph.nodes.get(handle);
-
-	if (!node)
+	if (!BLK_VERIFY(context.world_context.game_world))
 	{
 		return;
 	}
 
+	// Get the node to draw.
+
+	const blk::Node* node = get_node(context.world_context.game_world->scene_graph, handle);
+
+	if (!node)
+	{
+		BLK_ERROR("Failed to find node to draw\n");
+
+		return;
+	}
+
+	// Tree node flags.
+
 	ImGuiTreeNodeFlags flags =
 		ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_DefaultOpen;
+
+	// If the node to draw is the one currently selected in the outliner, we add the selected flag.
 
 	if (handle == context.world_context.selected_node_handle)
 	{
 		flags |= ImGuiTreeNodeFlags_Selected;
 	}
 
+	// If the node to draw does not have children, this node is a leaf.
+
 	if (node->first_child_handle == blk::POOL_HANDLE_NONE<blk::Node>)
 	{
 		flags |= ImGuiTreeNodeFlags_Leaf;
 	}
 
-	// Node names are not unique, so the handle provides the ImGui id instead of the label.
-	const size_t node_hash = blk::Pool_Handle_Hash<blk::Node>{}(handle);
-	ImGui::PushID(static_cast<int>(node_hash));
+	// Node names are unique, so we use it as ImGui ID.
+	ImGui::PushID(node->name);
 
-	const bool is_open = ImGui::TreeNodeEx(node->name.empty() ? "Unnamed" : node->name.c_str(), flags);
+	const bool is_open = ImGui::TreeNodeEx(node->name, flags);
+
+	// Handle node selection.
 
 	if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
 	{
 		context.world_context.selected_node_handle = handle;
 	}
 
+	// If the node tree is open, we draw its subtree.
+
 	if (is_open)
 	{
 		blk::Pool_Handle<blk::Node> child_handle = node->first_child_handle;
 
-		while (const blk::Node* child = context.world_context._game_world->scene_graph.nodes.get(child_handle))
+		while (const blk::Node* child = get_node(context.world_context.game_world->scene_graph, child_handle))
 		{
 			draw_node(context, child_handle);
 			child_handle = child->next_sibling_handle;

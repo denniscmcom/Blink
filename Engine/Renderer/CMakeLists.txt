@@ -11,12 +11,14 @@ target_sources(BlkEngine
 		BASE_DIRS ${CMAKE_SOURCE_DIR}
 		FILES
 			Lifetime/Buffer.hpp
+			Lifetime/Command.hpp
 			Lifetime/Context.hpp
 			Lifetime/Descriptor.hpp
 			Lifetime/Frame.hpp
 			Lifetime/Image.hpp
 			Lifetime/Pipeline.hpp
 			Lifetime/Swapchain.hpp
+			Lifetime/Sync.hpp
 			Resource/Arena.hpp
 			Resource/Material_Device.hpp
 			Resource/Mesh_Device.hpp
@@ -25,12 +27,14 @@ target_sources(BlkEngine
 			Renderer_Internal.hpp
 	PRIVATE
 		Lifetime/Buffer.cpp
+		Lifetime/Command.cpp
 		Lifetime/Context.cpp
 		Lifetime/Descriptor.cpp
 		Lifetime/Frame.cpp
 		Lifetime/Image.cpp
 		Lifetime/Pipeline.cpp
 		Lifetime/Swapchain.cpp
+		Lifetime/Sync.cpp
 		Resource/Arena.cpp
 		Resource/Material_Device.cpp
 		Resource/Mesh_Device.cpp

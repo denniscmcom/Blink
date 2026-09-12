@@ -11,12 +11,18 @@
 
 namespace blk
 {
+struct Allocator;
+
 #ifdef _WIN32
+/// Win32 window.
 struct Window
 {
+	/// `Allocator` used to create the window.
+	Allocator* allocator;
 	HWND hwnd;
 };
 #endif
 
+/// Returns a handle to the win32 window.
 Window* get_window();
 }  // namespace blk

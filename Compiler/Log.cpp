@@ -12,7 +12,7 @@ blk::log_console(const char* msg)
 {
 	printf("%s", msg);
 
-	// Stdout is fully buffered when redirected to a pipe -e.g. the build system-, and `BLK_DEBUG_BREAK` kills the
+	// Stdout is fully buffered when redirected to a pipe –e.g. the build system-, and `BLK_DEBUG_BREAK` kills the
 	// process before the buffer is flushed.
 	fflush(stdout);
 }
