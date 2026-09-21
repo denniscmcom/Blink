@@ -126,14 +126,14 @@ blk::end_one_time_commands(const Context& context, VkCommandBuffer command_buffe
 	submit_info_2.commandBufferInfoCount = 1;
 	submit_info_2.pCommandBufferInfos = &command_buffer_submit_info;
 
-	if (vkQueueSubmit2(context.graphics_queue, 1, &submit_info_2, VK_NULL_HANDLE) != VK_SUCCESS)
+	if (vkQueueSubmit2(context.queue, 1, &submit_info_2, VK_NULL_HANDLE) != VK_SUCCESS)
 	{
 		BLK_ERROR("Failed to submit one time command buffer\n");
 
 		return Result::DEVICE_ERROR;
 	}
 
-	if (vkQueueWaitIdle(context.graphics_queue) != VK_SUCCESS)
+	if (vkQueueWaitIdle(context.queue) != VK_SUCCESS)
 	{
 		BLK_ERROR("Failed to wait for queue\n");
 

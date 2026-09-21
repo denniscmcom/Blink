@@ -1,11 +1,35 @@
+# AI
 .claude/
+
+# IDEs & Cache
 .idea/
-.svn/
-.venv/
 .vs/
-Assets/
+.venv/
+
+# VCS
+.svn/
+
+# Game Assets
+Assets/*
+!Assets/CMakeLists.txt
+
+!Assets/Materials/
+Assets/Materials/*
+!Assets/Materials/Suzanne_*.bmaterial
+
+!Assets/Meshes/
+Assets/Meshes/*
+!Assets/Meshes/Suzanne.fbx
+
+!Assets/Textures/
+Assets/Textures/*
+!Assets/Textures/Suzanne_*.png
+
+# Build
 Build/
-Engine/Editor/Resources
-External/
+
+# Game code.
 Game/
+
+# Internal files.
 TODO.md

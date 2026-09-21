@@ -163,7 +163,7 @@ main(int argc, char** argv)
 	// The arena backs the input file buffer, the output file buffer, and every intermediate array the `compile_*`
 	// functions allocate. It never reclaims what it hands out, so we size it generously rather than tightly. This is an
 	// offline tool that compiles a single asset per invocation, so the memory is not worth economising.
-	constexpr size_t allocator_capacity = 128 * 1'024 * 1'024;
+	constexpr size_t allocator_capacity = 512 * 1'024 * 1'024;
 
 	blk::Allocator allocator = {};
 
@@ -224,7 +224,7 @@ main(int argc, char** argv)
 	// The `compile_*` functions cannot resize this buffer yet, so it is a fixed size that fits any asset we compile. It
 	// cannot be derived from the input size: a compressed input says nothing about how big its decoded form is – a flat
 	// 1024x1024 PNG is a few kilobytes on disk and 4 MiB once decoded.
-	constexpr size_t output_buffer_size = 64 * 1'024 * 1'024;
+	constexpr size_t output_buffer_size = 256 * 1'024 * 1'024;
 
 	BLK_IF_NOT_SUCCESS(blk::allocate(allocator, output_buffer_pointer, output_buffer_size, alignof(char)))
 	{

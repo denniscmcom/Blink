@@ -40,14 +40,14 @@ blk::compiler::compile_mesh(Allocator* allocator, Serial& input_serial, Serial& 
 
 	// Verify FBX Magic number.
 
-	uint8_t fbx_magic[23] = {};
+	uint8_t fbx_magic[sizeof(FBX_MAGIC)] = {};
 
 	BLK_IF_NOT_SUCCESS(read(input_serial, fbx_magic))
 	{
 		BLK_FATAL("Failed to read FBX magic number\n");
 	}
 
-	if (memcmp(fbx_magic, FBX_MAGIC, 23) != 0)
+	if (memcmp(fbx_magic, FBX_MAGIC, sizeof(FBX_MAGIC)) != 0)
 	{
 		BLK_FATAL("Invalid FBX magic number; file is corrupted\n");
 	}

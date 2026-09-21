@@ -28,34 +28,37 @@ struct Context
 {
 	/// Vulkan API version.
 	uint32_t api_version;
-	/// Vulkan instance.
+	/// Instance.
 	VkInstance instance = VK_NULL_HANDLE;
-	/// Vulkan debug messenger. It routes validation layer output to `Platform/Log.hpp`.
+	/// Debug messenger.
+	/// It routes validation layer output to `Platform/Log.hpp`.
 	VkDebugUtilsMessengerEXT debug_messenger = VK_NULL_HANDLE;
-	/// Vulkan surface.
+	/// Surface.
 	VkSurfaceKHR surface = VK_NULL_HANDLE;
 
-	/// Selected Vulkan physical device.
+	/// Selected physical device.
 	VkPhysicalDevice physical_device = VK_NULL_HANDLE;
-	/// Vulkan logical device.
+	/// Logical device.
 	VkDevice logical_device = VK_NULL_HANDLE;
-	/// Vulkan queue to render graphics.
-	VkQueue graphics_queue = VK_NULL_HANDLE;
-	/// Vulkan queue family index for `graphics_queue`.
-	/// `UINT32_MAX` is used as a sentinel value to represent no graphics queue family index yet.
-	uint32_t graphics_queue_family_index = UINT32_MAX;
+	/// Queue to render graphics and compute.
+	VkQueue queue = VK_NULL_HANDLE;
+	/// Selected queue family.
+	/// `UINT32_MAX` is used as a sentinel value to represent no queue family index yet.
+	uint32_t queue_family_index = UINT32_MAX;
 
-	/// Vulkan frame command pool.
+	/// Frame command pool.
 	/// Used to records all commands in a frame.
 	/// Created using `VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT`.
 	VkCommandPool frame_command_pool = VK_NULL_HANDLE;
-	/// Vulkan transient command pool.
+	/// Transient command pool.
 	/// Used to record short-lived commands in any point.
 	/// Created using `VK_COMMAND_POOL_CREATE_TRANSIENT_BIT`.
 	VkCommandPool transient_command_pool = VK_NULL_HANDLE;
 
-	/// Vulkan texture sampler.
-	VkSampler sampler = VK_NULL_HANDLE;
+	/// Sampler for textures.
+	VkSampler texture_sampler = VK_NULL_HANDLE;
+	/// Sampler for lookup tables.
+	VkSampler lut_sampler = VK_NULL_HANDLE;
 
 	/// Renderer host allocator.
 	Allocator* allocator;

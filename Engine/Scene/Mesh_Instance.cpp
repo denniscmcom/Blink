@@ -30,6 +30,14 @@ blk::create_mesh_instance(Mesh_Instance& mesh_instance, Allocator* allocator, co
 		return result;
 	}
 
+	// Fill both arrays with invalid handles so every slot is live and can be assigned later by index.
+
+	for (size_t index = 0; index < capacity; ++index)
+	{
+		push(mesh_instance.mesh_handles, POOL_HANDLE_NONE<Mesh>);
+		push(mesh_instance.material_handles, POOL_HANDLE_NONE<Material>);
+	}
+
 	return Result::SUCCESS;
 }
 

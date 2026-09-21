@@ -37,6 +37,8 @@ void destroy_texture_storage();
 /// Loads a `.btexture` file with `hash` into memory.
 /// @note It is used by `load_material` to load each texture by hash.
 Pool_Handle<Texture> load_texture(uint64_t hash);
+/// Loads a `Texture` created at runtime into storage.
+Pool_Handle<Texture> load_texture(const Texture& texture);
 /// Unloads a texture from memory.
 void unload_texture(Pool_Handle<Texture> handle);
 /// Gets a pointer to a texture's data.

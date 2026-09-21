@@ -28,8 +28,8 @@ struct Pipeline
 Result create_shader_module(const Context& context, const char* stem, VkShaderModule& module);
 /// Destroys a Vulkan shader module.
 void destroy_shader_module(const Context& context, VkShaderModule module);
-/// Creates a `pipeline`.
-Result create_pipeline(
+/// Creates a graphics `pipeline`.
+Result create_graphics_pipeline(
 	const Context& context,
 	VkSurfaceFormatKHR surface_format,
 	VkFormat depth_format,
@@ -37,6 +37,17 @@ Result create_pipeline(
 	const Array_View<const VkPipelineShaderStageCreateInfo>& shader_stages,
 	const Array_View<const VkVertexInputBindingDescription>& vertex_binding_descriptions,
 	const Array_View<const VkVertexInputAttributeDescription>& vertex_attribute_descriptions,
+	const Array_View<const VkPushConstantRange>& push_constant_ranges,
+	VkBool32 enable_depth_test,
+	VkBool32 enable_depth_write,
+	VkCompareOp depth_compare_op,
+	Pipeline& pipeline
+);
+/// Creates a compute `pipeline`.
+Result create_compute_pipeline(
+	const Context& context,
+	const Array_View<const VkDescriptorSetLayout>& descriptor_layouts,
+	const VkPipelineShaderStageCreateInfo& shader_stage,
 	const Array_View<const VkPushConstantRange>& push_constant_ranges,
 	Pipeline& pipeline
 );

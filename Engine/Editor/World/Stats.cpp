@@ -197,6 +197,12 @@ blk::compute_stats(const Editor_Context& context, const double delta_time)
 		for (size_t mesh_index = 0; mesh_index < node.mesh_instance.mesh_handles.count; ++mesh_index)
 		{
 			const Pool_Handle<Mesh> mesh_handle = node.mesh_instance.mesh_handles.buffer[mesh_index];
+
+			if (mesh_handle == POOL_HANDLE_NONE<Mesh>)
+			{
+				continue;
+			}
+
 			const Mesh* mesh = get_mesh(mesh_handle);
 
 			if (!mesh)

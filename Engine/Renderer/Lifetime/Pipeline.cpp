@@ -44,7 +44,7 @@ blk::create_shader_module(const Context& context, const char* stem, VkShaderModu
 }
 
 blk::Result
-blk::create_pipeline(
+blk::create_graphics_pipeline(
 	const Context& context,
 	VkSurfaceFormatKHR surface_format,
 	VkFormat depth_format,
@@ -53,6 +53,9 @@ blk::create_pipeline(
 	const Array_View<const VkVertexInputBindingDescription>& vertex_binding_descriptions,
 	const Array_View<const VkVertexInputAttributeDescription>& vertex_attribute_descriptions,
 	const Array_View<const VkPushConstantRange>& push_constant_ranges,
+	VkBool32 enable_depth_test,
+	VkBool32 enable_depth_write,
+	VkCompareOp depth_compare_op,
 	Pipeline& pipeline
 )
 {
@@ -108,9 +111,9 @@ blk::create_pipeline(
 
 	VkPipelineDepthStencilStateCreateInfo pipeline_depth_stencil_state_create_info = {};
 	pipeline_depth_stencil_state_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-	pipeline_depth_stencil_state_create_info.depthTestEnable = VK_TRUE;
-	pipeline_depth_stencil_state_create_info.depthWriteEnable = VK_TRUE;
-	pipeline_depth_stencil_state_create_info.depthCompareOp = VK_COMPARE_OP_LESS;
+	pipeline_depth_stencil_state_create_info.depthTestEnable = enable_depth_test;
+	pipeline_depth_stencil_state_create_info.depthWriteEnable = enable_depth_write;
+	pipeline_depth_stencil_state_create_info.depthCompareOp = depth_compare_op;
 
 	// Color blend.
 
@@ -194,6 +197,67 @@ blk::create_pipeline(
 		) != VK_SUCCESS)
 	{
 		BLK_ERROR("Failed to create graphics pipeline\n");
+		destroy_pipeline(context, pipeline);
+
+		return Result::DEVICE_ERROR;
+	}
+
+	pipeline.pipeline = vk_pipeline;
+
+	return Result::SUCCESS;
+}
+
+blk::Result
+blk::create_compute_pipeline(
+	const Context& context,
+	const Array_View<const VkDescriptorSetLayout>& descriptor_layouts,
+	const VkPipelineShaderStageCreateInfo& shader_stage,
+	const Array_View<const VkPushConstantRange>& push_constant_ranges,
+	Pipeline& pipeline
+)
+{
+	pipeline = {};
+
+	// Layout.
+
+	VkPipelineLayoutCreateInfo pipeline_layout_create_info = {};
+	pipeline_layout_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	pipeline_layout_create_info.setLayoutCount = descriptor_layouts.count;
+	pipeline_layout_create_info.pSetLayouts = descriptor_layouts.buffer;
+	pipeline_layout_create_info.pushConstantRangeCount = push_constant_ranges.count;
+	pipeline_layout_create_info.pPushConstantRanges = push_constant_ranges.buffer;
+
+	VkPipelineLayout layout = VK_NULL_HANDLE;
+
+	if (vkCreatePipelineLayout(context.logical_device, &pipeline_layout_create_info, nullptr, &layout) != VK_SUCCESS)
+	{
+		BLK_ERROR("Failed to create compute pipeline layout\n");
+
+		return Result::DEVICE_ERROR;
+	}
+
+	pipeline.layout = layout;
+
+	// Create pipeline.
+	// A compute pipeline has a single stage and no fixed-function state, so there
+
+	VkComputePipelineCreateInfo compute_pipeline_create_info = {};
+	compute_pipeline_create_info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+	compute_pipeline_create_info.stage = shader_stage;
+	compute_pipeline_create_info.layout = layout;
+
+	VkPipeline vk_pipeline = VK_NULL_HANDLE;
+
+	if (vkCreateComputePipelines(
+			context.logical_device,
+			VK_NULL_HANDLE,
+			1,
+			&compute_pipeline_create_info,
+			nullptr,
+			&vk_pipeline
+		) != VK_SUCCESS)
+	{
+		BLK_ERROR("Failed to create compute pipeline\n");
 		destroy_pipeline(context, pipeline);
 
 		return Result::DEVICE_ERROR;

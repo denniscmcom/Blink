@@ -6,8 +6,9 @@
 #pragma once
 
 #include "Engine/Core/Pool.hpp"
-#include "Engine/Scene/Light.hpp"
+#include "Engine/Scene/Directional_Light.hpp"
 #include "Engine/Scene/Mesh_Instance.hpp"
+#include "Engine/Scene/Point_Light.hpp"
 #include "Engine/Scene/Transform.hpp"
 
 namespace blk
@@ -24,10 +25,14 @@ constexpr size_t MAX_NODE_NAME_SIZE = 256;
 /// @see `Node`.
 enum class Node_Type
 {
+	/// A `Node` with a `Transform` component.
+	SPATIAL,
 	/// @see `Mesh_Instance`.
 	MESH_INSTANCE,
 	/// @see `Point_Light`.
 	POINT_LIGHT,
+	/// @see `Directional_Light`.
+	DIRECTIONAL_LIGHT,
 };
 
 /// The low-level representation of an entity in a `World`. A `Node` can have additional data specific for a type of
@@ -68,11 +73,9 @@ struct Node
 	Mesh_Instance mesh_instance;
 	/// If `Node::type` is `Node_Type::POINT_LIGHT`, this field is populated.
 	Point_Light point_light;
+	/// If `Node::type` is `Node_Type::DIRECTIONAL_LIGHT`, this field is populated.
+	Directional_Light directional_light;
 };
-
-// TODO (Consistency): `create_node` and `destroy_node` are overloaded with the `Scene_Graph` versions in `Graph.hpp`.
-// The ones here own the node's data, the ones there link and unlink the node from the tree. Overload resolution keeps
-// them apart, but the shared name is confusing at the call site. Consider renaming one of the two pairs.
 
 /// Creates a `Node` and the data it owns.
 /// @param mesh_capacity The number of meshes its `Mesh_Instance` can hold.

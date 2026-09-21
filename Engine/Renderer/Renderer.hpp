@@ -28,6 +28,14 @@ struct Camera_View
 /// Creates the renderer.
 /// @param rect The renderer resolution.
 Result create_renderer(const Rect<unsigned>& rect);
+/// Precomputes the renderer's static lookup tables.
+Result bake_renderer();
+/// Waits until the device has finished every submitted command.
+///
+/// `render_frame` returns as soon as the frame is submitted, so the GPU is still reading the resources of the last
+/// `MAX_FRAMES_IN_FLIGHT` frames after the main loop exits. Anything that destroys a resource those frames refer to has
+/// to call this first.
+void wait_renderer_idle();
 /// Destroys the renderer.
 void destroy_renderer();
 /// Updates the frame to render next.

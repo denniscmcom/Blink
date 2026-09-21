@@ -14,9 +14,6 @@ namespace blk
 struct Radians;
 enum class Result;
 
-// TODO: Ensure alignment and size compatibility with renderer in all shared structures. I think it is best to have
-//		 different structures for Vulkan std140 and std430.
-
 /// Column-major 2x2 matrix.
 struct Matrix2
 {
@@ -52,6 +49,13 @@ struct Matrix4
 
 Matrix4 operator*(const Matrix4& lhs, const Matrix4& rhs);
 
+/// Initializes a `Matrix3` with the upper-left 3x3 block of `matrix4`, dropping its last row and its last column. For
+/// an affine transform, the dropped column is the translation, so only the linear part survives.
+Matrix3 init_matrix3(const Matrix4& matrix4);
+
+/// Initializes a `Matrix4` with `matrix3` as its upper-left 3x3 block. The added last row and last column are taken
+/// from the identity, so the result is `matrix3` as an affine transform with no translation.
+Matrix4 init_matrix4(const Matrix3& matrix3);
 Matrix4 init_identity_matrix();
 Matrix4 init_translation_matrix(const Vector3& translation);
 Matrix4 init_scale_matrix(const Vector3& scale);

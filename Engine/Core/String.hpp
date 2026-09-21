@@ -6,6 +6,12 @@
 #pragma once
 
 #include <stddef.h>
+#include <stdio.h>
+
+/// Wrapper over `snprintf` that checks whether it was successful.
+#define BLK_IF_NOT_SNPRINTF(src, dst, max_size, format)                                                                \
+	if (const int written = snprintf(dst, max_size, format, src);                                                      \
+		written < 0 || static_cast<size_t>(written) >= max_size)
 
 namespace blk
 {

@@ -24,6 +24,7 @@ function(blk_add_shaders TARGET)
 				-profile spirv_1_4
 				-emit-spirv-directly
 				-fvk-use-entrypoint-name
+				-I ${CMAKE_CURRENT_SOURCE_DIR}
 				-entry ${ENTRY}
 				-o ${OUTPUT_FILE}
 				-depfile ${DEPEND_FILE}
@@ -57,7 +58,9 @@ function(blk_add_shaders TARGET)
 endfunction()
 
 blk_add_shaders(BlkShaders
-	FS_Light.slang|fs_main
+	CS_Skybox_Transmittance.slang|cs_main
 	FS_Mesh.slang|fs_main
-	VS_Main.slang|vs_main
+	FS_Skybox.slang|fs_main
+	VS_Mesh.slang|vs_main
+	VS_Skybox.slang|vs_main
 )

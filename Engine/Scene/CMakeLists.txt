@@ -4,7 +4,8 @@ target_sources(BlkEngine
 		TYPE HEADERS
 		BASE_DIRS ${CMAKE_SOURCE_DIR}
 		FILES
-			Light.hpp
+			Directional_Light.hpp
+			Point_Light.hpp
 			Mesh_Instance.hpp
 			Node.hpp
 			Graph.hpp

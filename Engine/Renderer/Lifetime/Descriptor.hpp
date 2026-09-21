@@ -18,18 +18,16 @@ struct Descriptor_Layouts
 {
 	/// Descriptor pool from which descriptor set layouts are allocated.
 	VkDescriptorPool pool = VK_NULL_HANDLE;
-	/// Descriptor layout for camera data.
-	VkDescriptorSetLayout camera_layout = VK_NULL_HANDLE;
-	/// Descriptor layout for light data.
-	VkDescriptorSetLayout light_layout = VK_NULL_HANDLE;
-	/// Descriptor layout for PBR textured material data.
-	/// @see `Material`.
+	/// One descriptor set layout per frame in flight.
+	VkDescriptorSetLayout frame_layout = VK_NULL_HANDLE;
+	/// One descriptor set layout per material.
 	VkDescriptorSetLayout material_layout = VK_NULL_HANDLE;
+	/// A single set shared by every frame, written once at initialization.
+	VkDescriptorSetLayout global_layout = VK_NULL_HANDLE;
 };
 
 /// Creates all descriptor layouts needed by the renderer.
 Result create_descriptor_layouts(const Context& context, Descriptor_Layouts& layouts);
 /// Destroys all renderer's descriptor layouts.
-// TODO (Bug): Implementation missing.
 void destroy_descriptor_layouts(const Context& context, Descriptor_Layouts& layouts);
 }  // namespace blk

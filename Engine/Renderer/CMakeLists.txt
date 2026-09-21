@@ -14,6 +14,7 @@ target_sources(BlkEngine
 			Lifetime/Command.hpp
 			Lifetime/Context.hpp
 			Lifetime/Descriptor.hpp
+			Lifetime/Draw_Command.hpp
 			Lifetime/Frame.hpp
 			Lifetime/Image.hpp
 			Lifetime/Pipeline.hpp

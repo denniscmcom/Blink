@@ -136,25 +136,26 @@ blk::transfer_material(
 
 	// Update the descriptor set.
 
-	VkDescriptorImageInfo albedo_image_info = {};
-	albedo_image_info.sampler = context.sampler;
-	albedo_image_info.imageView = material.albedo.image.view;
-	albedo_image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-	VkDescriptorImageInfo normal_image_info = {};
-	normal_image_info.sampler = context.sampler;
-	normal_image_info.imageView = material.normal.image.view;
-	normal_image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-	VkDescriptorImageInfo orm_image_info = {};
-	orm_image_info.sampler = context.sampler;
-	orm_image_info.imageView = material.orm.image.view;
-	orm_image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
 	VkDescriptorBufferInfo material_buffer_info = {};
 	material_buffer_info.buffer = material.uniform_buffer.buffer;
 	material_buffer_info.range = material.uniform_buffer.size;
 
+	VkDescriptorImageInfo albedo_image_info = {};
+	albedo_image_info.sampler = context.texture_sampler;
+	albedo_image_info.imageView = material.albedo.image.view;
+	albedo_image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	VkDescriptorImageInfo normal_image_info = {};
+	normal_image_info.sampler = context.texture_sampler;
+	normal_image_info.imageView = material.normal.image.view;
+	normal_image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	VkDescriptorImageInfo orm_image_info = {};
+	orm_image_info.sampler = context.texture_sampler;
+	orm_image_info.imageView = material.orm.image.view;
+	orm_image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	// The bindings have to match `Descriptor_Layouts::material_layout`.
 	const Array<VkWriteDescriptorSet, 4> descriptor_writes = {{
 		{
 			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -162,8 +163,8 @@ blk::transfer_material(
 			.dstBinding = 0,
 			.dstArrayElement = 0,
 			.descriptorCount = 1,
-			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-			.pImageInfo = &albedo_image_info,
+			.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			.pBufferInfo = &material_buffer_info,
 		},
 		{
 			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -172,7 +173,7 @@ blk::transfer_material(
 			.dstArrayElement = 0,
 			.descriptorCount = 1,
 			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-			.pImageInfo = &normal_image_info,
+			.pImageInfo = &albedo_image_info,
 		},
 		{
 			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -181,7 +182,7 @@ blk::transfer_material(
 			.dstArrayElement = 0,
 			.descriptorCount = 1,
 			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-			.pImageInfo = &orm_image_info,
+			.pImageInfo = &normal_image_info,
 		},
 		{
 			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -189,8 +190,8 @@ blk::transfer_material(
 			.dstBinding = 3,
 			.dstArrayElement = 0,
 			.descriptorCount = 1,
-			.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-			.pBufferInfo = &material_buffer_info,
+			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			.pImageInfo = &orm_image_info,
 		},
 	}};
 

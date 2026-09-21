@@ -22,16 +22,21 @@ blk::create_descriptor_layouts(const Context& context, Descriptor_Layouts& layou
 
 	// Pre-sized pool for everything the renderer will ever need.
 	// How many descriptor sets we need for each type.
-	constexpr Array<VkDescriptorPoolSize, 2> descriptor_pool_sizes = {{
-		{
+	constexpr Array descriptor_pool_sizes = {{
+		VkDescriptorPoolSize{
 			.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-			// We need 1 per frame in flight * 2 (camera UBO + light UBO) + 1 UBO per material.
-			.descriptorCount = MAX_FRAMES_IN_FLIGHT * 2 + MAX_MATERIAL_COUNT,
+			// 3 UBOs (camera, light, skybox) * frame + 1 material UBO * material count.
+			.descriptorCount = 3 * MAX_FRAMES_IN_FLIGHT + MAX_MATERIAL_COUNT,
 		},
-		{
+		VkDescriptorPoolSize{
 			.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-			// Three textures per material (albedo, normal, orm).
-			.descriptorCount = MAX_MATERIAL_COUNT * 3,
+			// 3 textures (albedo, normal, ORM) * material count + skybox transmittance LUT.
+			.descriptorCount = 3 * MAX_MATERIAL_COUNT + 1,
+		},
+		VkDescriptorPoolSize{
+			.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+			// Skybox transmittance LUT.
+			.descriptorCount = 1,
 		},
 	}};
 
@@ -39,8 +44,9 @@ blk::create_descriptor_layouts(const Context& context, Descriptor_Layouts& layou
 	descriptor_pool_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	descriptor_pool_create_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 	// How many descriptor sets total we can allocate from this pool.
-	// We have 2 sets per frame in flight (camera + light), plus one set per material.
-	descriptor_pool_create_info.maxSets = MAX_FRAMES_IN_FLIGHT * 2 + MAX_MATERIAL_COUNT;
+	// 3 sets (camera UBO + light UBO + skybox UBO) * frame + 1 material UBO * material count + skybox transmittance LUT
+	// samples + skybox transmittance LUT storage.
+	descriptor_pool_create_info.maxSets = 3 * MAX_FRAMES_IN_FLIGHT + MAX_MATERIAL_COUNT + 2;
 	descriptor_pool_create_info.poolSizeCount = descriptor_pool_sizes.capacity;
 	descriptor_pool_create_info.pPoolSizes = descriptor_pool_sizes.buffer;
 
@@ -55,89 +61,78 @@ blk::create_descriptor_layouts(const Context& context, Descriptor_Layouts& layou
 
 	layouts.pool = pool;
 
-	// Create camera descriptor set layout.
+	// Create descriptor set layout per frame in flight.
 
-	constexpr Array<VkDescriptorSetLayoutBinding, 1> camera_bindings = {{
-		{
+	constexpr Array frame_bindings = {{
+		// Camera UBO.
+		VkDescriptorSetLayoutBinding{
 			.binding = 0,
+			.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			.descriptorCount = 1,
+			.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+		},
+		// Light UBO.
+		VkDescriptorSetLayoutBinding{
+			.binding = 1,
+			.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			.descriptorCount = 1,
+			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+		},
+		// Skybox UBO.
+		VkDescriptorSetLayoutBinding{
+			.binding = 2,
 			.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
 			.descriptorCount = 1,
 			.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
 		},
 	}};
 
-	VkDescriptorSetLayoutCreateInfo camera_layout_create_info = {};
-	camera_layout_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	camera_layout_create_info.bindingCount = camera_bindings.capacity;
-	camera_layout_create_info.pBindings = camera_bindings.buffer;
+	VkDescriptorSetLayoutCreateInfo frame_layout_create_info = {};
+	frame_layout_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	frame_layout_create_info.bindingCount = frame_bindings.capacity;
+	frame_layout_create_info.pBindings = frame_bindings.buffer;
 
-	VkDescriptorSetLayout camera_layout = VK_NULL_HANDLE;
+	VkDescriptorSetLayout frame_layout = VK_NULL_HANDLE;
 
-	if (vkCreateDescriptorSetLayout(context.logical_device, &camera_layout_create_info, nullptr, &camera_layout) !=
+	if (vkCreateDescriptorSetLayout(context.logical_device, &frame_layout_create_info, nullptr, &frame_layout) !=
 		VK_SUCCESS)
 	{
-		BLK_ERROR("Failed to create camera descriptor set layout\n");
+		BLK_ERROR("Failed to create per frame in flight descriptor set layout\n");
 		destroy_descriptor_layouts(context, layouts);
 
 		return Result::DEVICE_ERROR;
 	}
 
-	layouts.camera_layout = camera_layout;
+	layouts.frame_layout = frame_layout;
 
-	// Create light descriptor set layout.
+	// Create descriptor set layout per material.
 
-	constexpr Array<VkDescriptorSetLayoutBinding, 1> light_bindings = {{
-		{.binding = 0,
-		 .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-		 .descriptorCount = 1,
-		 .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT},
-	}};
-
-	VkDescriptorSetLayoutCreateInfo light_layout_info = {};
-	light_layout_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	light_layout_info.bindingCount = light_bindings.capacity;
-	light_layout_info.pBindings = light_bindings.buffer;
-
-	VkDescriptorSetLayout light_layout = VK_NULL_HANDLE;
-
-	if (vkCreateDescriptorSetLayout(context.logical_device, &light_layout_info, nullptr, &light_layout) != VK_SUCCESS)
-	{
-		BLK_ERROR("Failed to create light descriptor set layout\n");
-		destroy_descriptor_layouts(context, layouts);
-
-		return Result::DEVICE_ERROR;
-	}
-
-	layouts.light_layout = light_layout;
-
-	// Create material descriptor set layout.
-
-	constexpr Array<VkDescriptorSetLayoutBinding, 4> material_bindings = {{
-		// Albedo texture.
-		{
+	constexpr Array material_bindings = {{
+		// Material UBO.
+		VkDescriptorSetLayoutBinding{
 			.binding = 0,
-			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
 			.descriptorCount = 1,
 			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
 		},
-		// Normal texture.
-		{
+		// Albedo texture.
+		VkDescriptorSetLayoutBinding{
 			.binding = 1,
 			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
 			.descriptorCount = 1,
 			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
 		},
-		// ORM texture.
-		{
+		// Normal texture.
+		VkDescriptorSetLayoutBinding{
 			.binding = 2,
 			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
 			.descriptorCount = 1,
 			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
 		},
-		// `Material_UBO`. It is written by `transfer_material`.
-		{
+		// ORM texture.
+		VkDescriptorSetLayoutBinding{
 			.binding = 3,
-			.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
 			.descriptorCount = 1,
 			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
 		},
@@ -153,7 +148,7 @@ blk::create_descriptor_layouts(const Context& context, Descriptor_Layouts& layou
 	if (vkCreateDescriptorSetLayout(context.logical_device, &material_layout_create_info, nullptr, &material_layout) !=
 		VK_SUCCESS)
 	{
-		BLK_ERROR("Failed to create descriptor set layout\n");
+		BLK_ERROR("Failed to create per material descriptor set layout\n");
 		destroy_descriptor_layouts(context, layouts);
 
 		return Result::DEVICE_ERROR;
@@ -161,15 +156,51 @@ blk::create_descriptor_layouts(const Context& context, Descriptor_Layouts& layou
 
 	layouts.material_layout = material_layout;
 
+	// Create global descriptor set layout.
+
+	constexpr Array global_bindings = {{
+		// To write the skybox transmittance LUT.
+		VkDescriptorSetLayoutBinding{
+			.binding = 0,
+			.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+			.descriptorCount = 1,
+			.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+		},
+		// Transmittance LUT.
+		VkDescriptorSetLayoutBinding{
+			.binding = 1,
+			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			.descriptorCount = 1,
+			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+		},
+	}};
+
+	VkDescriptorSetLayoutCreateInfo global_layout_info = {};
+	global_layout_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	global_layout_info.bindingCount = global_bindings.capacity;
+	global_layout_info.pBindings = global_bindings.buffer;
+
+	VkDescriptorSetLayout global_layout = VK_NULL_HANDLE;
+
+	if (vkCreateDescriptorSetLayout(context.logical_device, &global_layout_info, nullptr, &global_layout) != VK_SUCCESS)
+	{
+		BLK_ERROR("Failed to create global descriptor set layout\n");
+		destroy_descriptor_layouts(context, layouts);
+
+		return Result::DEVICE_ERROR;
+	}
+
+	layouts.global_layout = global_layout;
+
 	return Result::SUCCESS;
 }
 
 void
 blk::destroy_descriptor_layouts(const Context& context, Descriptor_Layouts& layouts)
 {
+	vkDestroyDescriptorSetLayout(context.logical_device, layouts.frame_layout, nullptr);
 	vkDestroyDescriptorSetLayout(context.logical_device, layouts.material_layout, nullptr);
-	vkDestroyDescriptorSetLayout(context.logical_device, layouts.light_layout, nullptr);
-	vkDestroyDescriptorSetLayout(context.logical_device, layouts.camera_layout, nullptr);
+	vkDestroyDescriptorSetLayout(context.logical_device, layouts.global_layout, nullptr);
 
 	// Destroying the pool frees every descriptor set allocated from it.
 	vkDestroyDescriptorPool(context.logical_device, layouts.pool, nullptr);

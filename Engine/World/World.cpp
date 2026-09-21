@@ -20,22 +20,29 @@
 
 namespace
 {
-/// The following functions are the generic version of each `spawn_*`, `despawn`, `find_*`, `get_node`
+/// The following functions are the generic version of each `spawn_*`, `despawn_*`, `find_*`, `get_node`
 /// functions exposed in the public API. They are only used internally to avoid code duplication. All requirements about
 /// the parameters apply here too.
-///
-/// I decided to only expose the concrete functions because I find it cleaner.
-/// @tparam Type Should be one of the entity types (e.g. `Actor`, `Camera`, ...).
 
+/// Spawns a entity into world.
+/// @tparam Type Should be one of the entity types (e.g. `Actor`, `Camera`, ...).
 template <typename Type>
 blk::Pool_Handle<Type> spawn_entity(blk::World& world, const char* name, blk::Pool_Handle<blk::Node> parent);
 
+/// Despawns an entity from `world`.
+/// @tparam Type Should be one of the entity types (e.g. `Actor`, `Camera`, ...).
 template <typename Type>
 void despawn_entity(blk::World& world, blk::Pool_Handle<Type> handle);
 
+/// Finds an entity in `world` by `name` and returns its handle.
+/// If it does not exists, returns `POOL_HANDLE_NODE<Type>`.
+/// @tparam Type Should be one of the entity types (e.g. `Actor`, `Camera`, ...).
 template <typename Type>
 blk::Pool_Handle<Type> find_entity(blk::World& world, const char* name);
 
+/// Gets the `Node` of an entity by its `handle` and returns a pointer to it.
+/// If it does not exists, returns a `nullptr`.
+/// @tparam Type Should be one of the entity types (e.g. `Actor`, `Camera`, ...).
 template <typename Type>
 blk::Node* get_entity_node(blk::World& world, blk::Pool_Handle<Type> handle);
 }  // namespace
@@ -123,25 +130,25 @@ blk::spawn_prop(World& world, const char* name, Pool_Handle<Node> parent)
 }
 
 void
-blk::despawn(World& world, Pool_Handle<Actor> handle)
+blk::despawn_actor(World& world, Pool_Handle<Actor> handle)
 {
 	despawn_entity(world, handle);
 }
 
 void
-blk::despawn(World& world, Pool_Handle<Camera> handle)
+blk::despawn_camera(World& world, Pool_Handle<Camera> handle)
 {
 	despawn_entity(world, handle);
 }
 
 void
-blk::despawn(World& world, Pool_Handle<Prop> handle)
+blk::despawn_prop(World& world, Pool_Handle<Prop> handle)
 {
 	despawn_entity(world, handle);
 }
 
 void
-blk::despawn(World& world, Pool_Handle<Node> handle)
+blk::despawn_entity_by_node(World& world, Pool_Handle<Node> handle)
 {
 	// First, we destroy the `Node` and all its subtree.
 
@@ -154,7 +161,7 @@ blk::despawn(World& world, Pool_Handle<Node> handle)
 		return;
 	}
 
-	destroy_node(world.scene_graph, handle, destroyed_node_handles);
+	despawn_node(world.scene_graph, handle, destroyed_node_handles);
 
 	// Now, we update the state of	`world` to reflect the nodes destroyed.
 
@@ -165,9 +172,10 @@ blk::despawn(World& world, Pool_Handle<Node> handle)
 		// Remove the association from `world.node_handle_to_entity`.
 		const Entity* entity = get(world.node_handle_to_entity, destroyed_node_handle);
 
-		if (!BLK_VERIFY(entity))
+		if (!entity)
 		{
-			// Association does not exists, so we continue. This should not really happen unless `world` is corrupted.
+			// Association does not exists, so we continue. This could happen with certain node types like
+			// `POINT_LIGHT`.
 			continue;
 		}
 
@@ -225,19 +233,19 @@ blk::find_prop(World& world, const char* name)
 }
 
 blk::Actor*
-blk::get(World& world, Pool_Handle<Actor> handle)
+blk::get_actor(World& world, Pool_Handle<Actor> handle)
 {
 	return get(world.actors, handle);
 }
 
 blk::Camera*
-blk::get(World& world, Pool_Handle<Camera> handle)
+blk::get_camera(World& world, Pool_Handle<Camera> handle)
 {
 	return get(world.cameras, handle);
 }
 
 blk::Prop*
-blk::get(World& world, Pool_Handle<Prop> handle)
+blk::get_prop(World& world, Pool_Handle<Prop> handle)
 {
 	return get(world.props, handle);
 }
@@ -258,6 +266,24 @@ blk::Node*
 blk::get_node(World& world, Pool_Handle<Prop> handle)
 {
 	return get_entity_node(world, handle);
+}
+
+blk::Result
+blk::attach_mesh(World& /*world*/, Pool_Handle<Actor> /*handle*/, Pool_Handle<Mesh> /*mesh*/)
+{
+	// TODO (Feature): not implemented.
+	BLK_NOT_IMPLEMENTED();
+
+	return Result::SUCCESS;
+}
+
+blk::Result
+blk::attach_mesh(World& /*world*/, Pool_Handle<Actor> /*handle*/, Pool_Handle<Mesh> /*mesh*/, size_t /*index*/)
+{
+	// TODO (Feature): not implemented.
+	BLK_NOT_IMPLEMENTED();
+
+	return Result::SUCCESS;
 }
 
 blk::Result
@@ -289,10 +315,18 @@ blk::attach_mesh(World& world, Pool_Handle<Prop> handle, Pool_Handle<Mesh> mesh,
 		return Result::INVALID_ARGUMENTS;
 	}
 
-	if (const Result result = insert(node->mesh_instance.mesh_handles, mesh, index); result != Result::SUCCESS)
+	// Verify if `index` is out of bounds.
+
+	if (node->mesh_instance.mesh_handles.capacity < index)
 	{
-		return result;
+		// `index` starts at `0`, so we need a capacity of 1 at least.
+		BLK_SUCCESS_OR_ERROR_RETURN(
+			resize(node->mesh_instance.mesh_handles, index + 1),
+			"Failed to resize mesh handles array\n"
+		);
 	}
+
+	BLK_SUCCESS_OR_RETURN(set(node->mesh_instance.mesh_handles, mesh, index));
 
 	return Result::SUCCESS;
 }
@@ -303,47 +337,31 @@ template <typename Type>
 blk::Pool_Handle<Type>
 spawn_entity(blk::World& world, const char* name, blk::Pool_Handle<blk::Node> parent)
 {
-	// First, we initialize a unique name for the node based on `name`.
-	char unique_node_name[blk::MAX_NODE_NAME_SIZE];
-
-	if (blk::init_unique_node_name(world.scene_graph, name, unique_node_name) != blk::Result::SUCCESS)
-	{
-		BLK_ERROR("Failed to create a unique name for entity\n");
-
-		return {};
-	}
-
-	// Then, create the `Node` for the entity to spawn.
-
-	Type entity = {};
-	entity.node_handle = create_node(world.scene_graph, unique_node_name, parent);
-
-	if (entity.node_handle == blk::POOL_HANDLE_NONE<blk::Node>)
-	{
-		return {};
-	}
-
 	// Depending on the entity type of `Type`, we assign the value for `generic_entity` and insert `entity` to the
 	// correspondent `Pool` in `world`.
 
+	Type entity = {};
 	blk::Pool_Handle<Type> entity_handle = {};
 	blk::Entity generic_entity = {};
 
 	if constexpr (std::is_same_v<Type, blk::Actor>)
 	{
 		// `Type` is `Actor`.
+		entity.node_handle = spawn_node(world.scene_graph, name, blk::Node_Type::MESH_INSTANCE, parent);
 		entity_handle = insert(world.actors, entity);
 		generic_entity.type = blk::Entity_Type::ACTOR;
 	}
 	else if constexpr (std::is_same_v<Type, blk::Camera>)
 	{
 		// `Type` is `Camera`.
+		entity.node_handle = spawn_node(world.scene_graph, name, blk::Node_Type::SPATIAL, parent);
 		entity_handle = insert(world.cameras, entity);
 		generic_entity.type = blk::Entity_Type::CAMERA;
 	}
 	else if constexpr (std::is_same_v<Type, blk::Prop>)
 	{
 		// `Type` is `Prop`.
+		entity.node_handle = spawn_node(world.scene_graph, name, blk::Node_Type::MESH_INSTANCE, parent);
 		entity_handle = insert(world.props, entity);
 		generic_entity.type = blk::Entity_Type::PROP;
 	}
@@ -353,17 +371,24 @@ spawn_entity(blk::World& world, const char* name, blk::Pool_Handle<blk::Node> pa
 		static_assert(sizeof(Type) == 0, "Entity type not supported");
 	}
 
+	if (entity.node_handle == blk::POOL_HANDLE_NONE<blk::Node>)
+	{
+		BLK_ERROR("Failed to spawn entity node\n");
+
+		return {};
+	}
+
 	if (entity_handle == blk::POOL_HANDLE_NONE<Type>)
 	{
 		BLK_ERROR("Failed to insert entity into its pool\n");
 
 		// The node was created before the entity, so we destroy it here. It has no children and is not associated with
-		// an `Entity` yet, so we cannot use `despawn`.
+		// an `Entity` yet, so we cannot use `despawn_*`.
 		blk::Dyn_Array<blk::Pool_Handle<blk::Node>> destroyed_node_handles = {};
 
 		if (create_dyn_array(destroyed_node_handles, world.allocator, 1) == blk::Result::SUCCESS)
 		{
-			destroy_node(world.scene_graph, entity.node_handle, destroyed_node_handles);
+			despawn_node(world.scene_graph, entity.node_handle, destroyed_node_handles);
 			destroy_dyn_array(destroyed_node_handles);
 		}
 
@@ -415,7 +440,7 @@ despawn_entity(blk::World& world, blk::Pool_Handle<Type> handle)
 		return;
 	}
 
-	blk::despawn(world, entity->node_handle);
+	blk::despawn_entity_by_node(world, entity->node_handle);
 }
 
 template <typename Type>

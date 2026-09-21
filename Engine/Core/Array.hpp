@@ -66,9 +66,11 @@ Result resize(Dyn_Array<Type>& array, size_t capacity);
 /// Removes all elements from `array`.
 template <typename Type>
 void empty(Dyn_Array<Type>& array);
-/// Inserts a `value` into `array` at `index`.
+/// Sets `value` at `index`.
+///
+/// @warning It does not increase `array.count`, it only replaces a value at `index` with a new `value`.
 template <typename Type>
-Result insert(Dyn_Array<Type>& array, Type value, size_t index);
+Result set(Dyn_Array<Type>& array, Type value, size_t index);
 }  // namespace blk
 
 namespace blk
@@ -197,7 +199,7 @@ empty(Dyn_Array<Type>& array)
 
 template <typename Type>
 Result
-insert(Dyn_Array<Type>& array, Type value, size_t index)
+set(Dyn_Array<Type>& array, Type value, size_t index)
 {
 	if (array.capacity <= index)
 	{

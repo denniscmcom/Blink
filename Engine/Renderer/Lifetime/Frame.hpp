@@ -7,22 +7,37 @@
 
 #include "Engine/Core/Array.hpp"
 #include "Engine/Core/Math/Matrix.hpp"
+#include "Engine/Core/Math/Unit.hpp"
 #include "Engine/Core/Math/Vector.hpp"
 #include "Engine/Renderer/Lifetime/Buffer.hpp"
-#include "Engine/Renderer/Resource/Material_Device.hpp"
-#include "Engine/Renderer/Resource/Mesh_Device.hpp"
+#include "Engine/Renderer/Lifetime/Descriptor.hpp"
 
+#include <stddef.h>
 #include <vulkan/vulkan.h>
 
 namespace blk
 {
+struct Draw_Command;
 struct Context;
 struct Pipeline;
 enum class Result;
 
-/// Camera uniform buffer object.
+/// A `Vector3` carrying the alignment std140 requires of a `float3` inside a uniform block.
 ///
-/// It lives the entire frame.
+/// A three-component vector has a base alignment of four times its scalar alignment, and an array's alignment is
+/// rounded up to a multiple of 16, so a `float3` array in a uniform block has a 16-byte stride. `Vector3` is 12 bytes,
+/// so an array of them puts every element but the first at an offset the shader does not read from.
+///
+/// @see https://docs.vulkan.org/spec/latest/chapters/interfaces.html#interfaces-resources-layout
+struct alignas(16) Vector3_STD140
+{
+	Vector3 vector;
+};
+
+// Uniform Buffer Objects lives the entire frame.
+
+/// Camera uniform buffer object.
+/// It should match the GPU-side `Camera_UBO` structure in `Shaders/Interface/Frame_Set.slang`.
 struct Camera_UBO
 {
 	/// View matrix.
@@ -30,60 +45,59 @@ struct Camera_UBO
 	/// Projection matrix.
 	Matrix4 projection;
 	/// View/eye position.
-	Vector3 view_position;
+	Vector3_STD140 view_position;
 };
+
+static_assert(sizeof(Camera_UBO) == 64 + 64 + 16);
+static_assert(offsetof(Camera_UBO, view) == 0);
+static_assert(offsetof(Camera_UBO, projection) == 64);
+static_assert(offsetof(Camera_UBO, view_position) == 64 + 64);
 
 /// Maximum amount of lights in a scene supported by the renderer.
 constexpr uint32_t MAX_LIGHT_COUNT = 16;
 
 /// Light uniform buffer object.
-///
-/// It lives the entire frame.
+/// It should match the GPU-side `Light_UBO` structure in `Shaders/Interface/Frame_Set.slang`.
 struct Light_UBO
 {
 	/// Amount of lights in the scene.
 	uint32_t light_count;
 	/// Array of light positions.
-	Vector3 light_positions[MAX_LIGHT_COUNT];
+	Vector3_STD140 light_positions[MAX_LIGHT_COUNT];
 	/// Array of light colors.
-	Vector3 light_colors[MAX_LIGHT_COUNT];
+	Vector3_STD140 light_colors[MAX_LIGHT_COUNT];
 };
 
-/// Per-mesh parameters.
-struct Mesh_Constants
+static_assert(sizeof(Light_UBO) == 16 + (16 * MAX_LIGHT_COUNT) + (16 * MAX_LIGHT_COUNT));
+static_assert(offsetof(Light_UBO, light_count) == 0);
+static_assert(offsetof(Light_UBO, light_positions) == 16);
+static_assert(offsetof(Light_UBO, light_colors) == 16 + 16 * MAX_LIGHT_COUNT);
+
+/// Skybox uniform buffer object.
+/// It should match the GPU-side `Skybox_UBO` structure in `Shaders/Interface/Frame_Set.slang`.
+struct Skybox_UBO
 {
-	/// Mesh model matrix.
-	Matrix4 model;
-	/// Mesh normal matrix.
-	Matrix4 normal_matrix;
+	/// The inverse of projection times view with the translation component removed.
+	Matrix4 inversed_view_projection;
+	/// Normalized direction toward the sun.
+	///
+	/// A plain `Vector3` and not a `Vector3_STD140`: std140 gives a `float3` a base alignment of 16 but a size of 12,
+	/// and the four bytes that follow it are only padded away to align whatever comes next. `sun_radius` is a scalar,
+	/// so it aligns to 4 and the shader packs it into those leftover bytes at offset 76. A `Vector3_STD140` here
+	/// would push `sun_radius` to offset 80 and the shader would read it from the padding instead.
+	/// `Vector3_STD140` is for arrays, where the 16-byte stride applies to every element.
+	Vector3 sun_direction;
+	/// The radius of the sun in radians.
+	Radians sun_radius;
+	/// View height above the planet surface in meters.
+	float view_height;
 };
 
-/// Per-light parameters.
-struct Light_Constants
-{
-	/// Index of this light in `Light_UBO`'s position and color arrays, so that the fragment shader can look it up.
-	uint32_t light_index;
-};
-
-/// Data needed by the renderer to issue a single draw command.
-///
-/// Many draw commands are issued per frame.
-struct Draw_Command
-{
-	/// Whether this is a mesh or a light is decided by which array it lives in — `Frame::mesh_draw_commands` or
-	/// `Frame::light_draw_commands` — so only the fields relevant to that array are populated.
-
-	/// Pipeline to use when issuing the draw command.
-	Pipeline* pipeline;
-	/// Mesh parameters.
-	Mesh_Constants mesh_constants;
-	/// Light parameters.
-	Light_Constants light_constants;
-	///	Mesh data uploaded to device.
-	Mesh_Device mesh_device;
-	/// Material data uploaded to device.
-	Material_Device material_device;
-};
+static_assert(sizeof(Skybox_UBO) == 64 + 12 + 4 + 4);
+static_assert(offsetof(Skybox_UBO, inversed_view_projection) == 0);
+static_assert(offsetof(Skybox_UBO, sun_direction) == 64);
+static_assert(offsetof(Skybox_UBO, sun_radius) == 64 + 12);
+static_assert(offsetof(Skybox_UBO, view_height) == 64 + 12 + 4);
 
 /// Initial number of draw commands a frame can hold before its arrays have to grow.
 constexpr size_t INITIAL_DRAW_COMMAND_COUNT = 64;
@@ -104,17 +118,17 @@ struct Frame
 	Buffer camera_buffer;
 	/// Light buffer to store `Light_UBO`.
 	Buffer light_buffer;
+	/// Skybox buffer to store `Skybox_UBO`.
+	Buffer skybox_buffer;
 	/// The `Descriptor_Layouts::pool` the descriptor sets below were allocated from. We keep it so that `destroy_frame`
 	/// can return them to it.
 	VkDescriptorPool descriptor_pool = VK_NULL_HANDLE;
-	/// Camera descriptor set allocated from `descriptor_pool`.
-	VkDescriptorSet camera_descriptor_set = VK_NULL_HANDLE;
-	/// Light descriptor set allocated from `descriptor_pool`.
-	VkDescriptorSet light_descriptor_set = VK_NULL_HANDLE;
+	/// Frame descriptor set allocated from `descriptor_pool`.
+	VkDescriptorSet descriptor_set = VK_NULL_HANDLE;
 	/// Array of draw commands to render meshes.
 	Dyn_Array<Draw_Command> mesh_draw_commands;
-	/// Array of draw commands to render lights.
-	Dyn_Array<Draw_Command> light_draw_commands;
+	/// Array of draw commands to render the skybox.
+	Dyn_Array<Draw_Command> skybox_draw_commands;
 };
 
 /// Creates `frame` data.

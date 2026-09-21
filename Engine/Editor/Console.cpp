@@ -86,8 +86,9 @@ blk::draw_console(Editor_Context& context)
 	context.world_context.console_size.y = 650.0f;
 
 	context.world_context.console_position.x = viewport->WorkPos.x + context.world_context.stats_size.x;
-	context.world_context.console_position.y =
-		viewport->WorkPos.y + viewport->WorkSize.y - context.world_context.console_size.y;
+	context.world_context.console_position.y = viewport->WorkPos.y + viewport->WorkSize.y -
+											   context.world_context.console_size.y -
+											   context.viewport_context.status_bar_size.y;
 
 	// Pass size and position to ImGui.
 

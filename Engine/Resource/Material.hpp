@@ -38,6 +38,8 @@ Result create_material_storage(Allocator* allocator);
 void destroy_material_storage();
 /// Loads a `.bmaterial` file named `stem` into memory.
 Pool_Handle<Material> load_material(const char* stem);
+/// Loads a `Material` created at runtime into storage.
+Pool_Handle<Material> load_material(const Material& material);
 /// Unloads a material from memory.
 void unload_material(Pool_Handle<Material> handle);
 /// Gets a pointer to a material's data.

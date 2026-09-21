@@ -107,14 +107,9 @@ BLK_ENTRY()
 	// `load_mesh`, `load_shader` and friends. That includes `create_renderer`, which loads its shader modules while it
 	// starts up, so the storages come before it and not after.
 
-	BLK_IF_NOT_SUCCESS(blk::create_mesh_storage(&allocator))
+	BLK_IF_NOT_SUCCESS(blk::create_shader_storage(&allocator))
 	{
-		BLK_FATAL("Failed to create the mesh storage\n");
-	}
-
-	BLK_IF_NOT_SUCCESS(blk::create_material_storage(&allocator))
-	{
-		BLK_FATAL("Failed to create the material storage\n");
+		BLK_FATAL("Failed to create the shader storage\n");
 	}
 
 	BLK_IF_NOT_SUCCESS(blk::create_texture_storage(&allocator))
@@ -122,9 +117,14 @@ BLK_ENTRY()
 		BLK_FATAL("Failed to create the texture storage\n");
 	}
 
-	BLK_IF_NOT_SUCCESS(blk::create_shader_storage(&allocator))
+	BLK_IF_NOT_SUCCESS(blk::create_material_storage(&allocator))
 	{
-		BLK_FATAL("Failed to create the shader storage\n");
+		BLK_FATAL("Failed to create the material storage\n");
+	}
+
+	BLK_IF_NOT_SUCCESS(blk::create_mesh_storage(&allocator))
+	{
+		BLK_FATAL("Failed to create the mesh storage\n");
 	}
 
 	// ============================================================================
@@ -134,6 +134,11 @@ BLK_ENTRY()
 	BLK_IF_NOT_SUCCESS(blk::create_renderer(client_rect))
 	{
 		BLK_FATAL("Failed to create the renderer\n");
+	}
+
+	BLK_IF_NOT_SUCCESS(blk::bake_renderer())
+	{
+		BLK_FATAL(" Failed to bake the renderer\n");
 	}
 
 	// ============================================================================
@@ -218,7 +223,7 @@ BLK_ENTRY()
 
 		blk::Camera_View camera_view = {};
 
-		if (const blk::Camera* camera = blk::get(game_context.world, game_context.world.active_camera_handle))
+		if (const blk::Camera* camera = blk::get_camera(game_context.world, game_context.world.active_camera_handle))
 		{
 			const auto aspect_ratio = static_cast<float>(client_rect.x) / static_cast<float>(client_rect.y);
 
@@ -255,10 +260,10 @@ BLK_ENTRY()
 
 	blk::destroy_renderer();
 
-	blk::destroy_shader_storage();
-	blk::destroy_texture_storage();
-	blk::destroy_material_storage();
 	blk::destroy_mesh_storage();
+	blk::destroy_material_storage();
+	blk::destroy_texture_storage();
+	blk::destroy_shader_storage();
 
 	blk::destroy_timer(frame_timer);
 	blk::destroy_window();

@@ -122,7 +122,7 @@ blk::create_editor_context(
 void
 blk::destroy_editor_context(Editor_Context& context)
 {
-	// The editor camera lives in the game world, which the editor does not own. `despawn` clears
+	// The editor camera lives in the game world, which the editor does not own. `despawn_camera` clears
 	// `active_camera_handle` when it is the camera being despawned, so if the editor camera is the active one we hand
 	// the game camera back before despawning ours.
 	if (context.world_context.game_world)
@@ -132,7 +132,7 @@ blk::destroy_editor_context(Editor_Context& context)
 			context.world_context.game_world->active_camera_handle = context.world_context.game_camera_handle;
 		}
 
-		despawn(*context.world_context.game_world, context.world_context.editor_camera_handle);
+		despawn_camera(*context.world_context.game_world, context.world_context.editor_camera_handle);
 	}
 
 	destroy_world(context.material_context.world);

@@ -12,9 +12,6 @@ namespace blk
 struct Matrix4;
 enum class Result;
 
-// TODO: Ensure alignment and size compatibility with renderer in all shared structures. I think it is best to have
-//		 different structures for Vulkan std140 and std430.
-
 struct Vector2
 {
 	float x;

@@ -141,11 +141,12 @@ blk::create_context(Allocator* allocator, HWND window)
 
 	bool found_physical_device = false;
 	VkPhysicalDevice selected_physical_device = VK_NULL_HANDLE;
-	uint32_t graphics_queue_family_index = UINT32_MAX;
+
+	uint32_t queue_family_index = UINT32_MAX;
 
 	for (const auto& physical_device : physical_devices)
 	{
-		graphics_queue_family_index = UINT32_MAX;
+		queue_family_index = UINT32_MAX;
 
 		BLK_DEBUG("Getting physical device properties\n");
 		VkPhysicalDeviceProperties2 physical_device_properties = {};
@@ -258,17 +259,19 @@ blk::create_context(Allocator* allocator, HWND window)
 
 			const VkQueueFamilyProperties2 queue_family_properties =
 				queue_families_properties.at(queue_family_properties_index);
-			const auto supports_graphics =
-				static_cast<bool>(queue_family_properties.queueFamilyProperties.queueFlags & VK_QUEUE_GRAPHICS_BIT);
 
-			if (supports_graphics && supports_surface)
+			const auto find_suitable_queque = static_cast<bool>(
+				queue_family_properties.queueFamilyProperties.queueFlags & VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT
+			);
+
+			if (supports_surface && find_suitable_queque)
 			{
-				graphics_queue_family_index = queue_family_properties_index;
+				queue_family_index = queue_family_properties_index;
 				break;
 			}
 		}
 
-		if (graphics_queue_family_index == UINT32_MAX)
+		if (queue_family_index == UINT32_MAX)
 		{
 			BLK_DEBUG("Failed to find suitable queue\n");
 			continue;
@@ -367,7 +370,7 @@ blk::create_context(Allocator* allocator, HWND window)
 
 	VkDeviceQueueCreateInfo device_queue_create_info = {};
 	device_queue_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-	device_queue_create_info.queueFamilyIndex = graphics_queue_family_index;
+	device_queue_create_info.queueFamilyIndex = queue_family_index;
 	device_queue_create_info.queueCount = 1;
 	constexpr float queue_priority = 0.5f;
 	device_queue_create_info.pQueuePriorities = &queue_priority;
@@ -391,8 +394,8 @@ blk::create_context(Allocator* allocator, HWND window)
 
 	BLK_DEBUG("Getting graphics queue handle\n");
 
-	VkQueue graphics_queue = VK_NULL_HANDLE;
-	vkGetDeviceQueue(logical_device, graphics_queue_family_index, 0, &graphics_queue);
+	VkQueue queue = VK_NULL_HANDLE;
+	vkGetDeviceQueue(logical_device, queue_family_index, 0, &queue);
 
 	// ============================================================================
 	// Create command pools.
@@ -401,7 +404,7 @@ blk::create_context(Allocator* allocator, HWND window)
 	VkCommandPoolCreateInfo command_pool_info = {};
 	command_pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 	command_pool_info.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-	command_pool_info.queueFamilyIndex = graphics_queue_family_index;
+	command_pool_info.queueFamilyIndex = queue_family_index;
 
 	VkCommandPool transient_command_pool = VK_NULL_HANDLE;
 
@@ -426,24 +429,43 @@ blk::create_context(Allocator* allocator, HWND window)
 	VkPhysicalDeviceProperties physical_device_properties = {};
 	vkGetPhysicalDeviceProperties(selected_physical_device, &physical_device_properties);
 
-	VkSamplerCreateInfo sampler_create_info = {};
-	sampler_create_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-	sampler_create_info.magFilter = VK_FILTER_LINEAR;
-	sampler_create_info.minFilter = VK_FILTER_LINEAR;
-	sampler_create_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-	sampler_create_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	sampler_create_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	sampler_create_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	sampler_create_info.anisotropyEnable = VK_TRUE;
-	sampler_create_info.maxAnisotropy = physical_device_properties.limits.maxSamplerAnisotropy;
-	sampler_create_info.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-	sampler_create_info.compareOp = VK_COMPARE_OP_ALWAYS;
+	VkSamplerCreateInfo texture_sampler_create_info = {};
+	texture_sampler_create_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+	texture_sampler_create_info.magFilter = VK_FILTER_LINEAR;
+	texture_sampler_create_info.minFilter = VK_FILTER_LINEAR;
+	texture_sampler_create_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+	texture_sampler_create_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	texture_sampler_create_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	texture_sampler_create_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	texture_sampler_create_info.anisotropyEnable = VK_TRUE;
+	texture_sampler_create_info.maxAnisotropy = physical_device_properties.limits.maxSamplerAnisotropy;
+	texture_sampler_create_info.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+	texture_sampler_create_info.compareOp = VK_COMPARE_OP_ALWAYS;
 
-	VkSampler sampler = VK_NULL_HANDLE;
+	VkSampler texture_sampler = VK_NULL_HANDLE;
 
-	if (vkCreateSampler(logical_device, &sampler_create_info, nullptr, &sampler) != VK_SUCCESS)
+	if (vkCreateSampler(logical_device, &texture_sampler_create_info, nullptr, &texture_sampler) != VK_SUCCESS)
 	{
-		BLK_FATAL("Failed to create sampler\n");
+		BLK_FATAL("Failed to create texture sampler\n");
+	}
+
+	// Create LUT sampler.
+
+	VkSamplerCreateInfo lut_sampler_create_info = {};
+	lut_sampler_create_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+	lut_sampler_create_info.magFilter = VK_FILTER_LINEAR;
+	lut_sampler_create_info.minFilter = VK_FILTER_LINEAR;
+	lut_sampler_create_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+	lut_sampler_create_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	lut_sampler_create_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	lut_sampler_create_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	lut_sampler_create_info.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+
+	VkSampler lut_sampler = VK_NULL_HANDLE;
+
+	if (vkCreateSampler(logical_device, &lut_sampler_create_info, nullptr, &lut_sampler) != VK_SUCCESS)
+	{
+		BLK_FATAL("Failed to create LUT sampler\n");
 	}
 
 	return Context{
@@ -453,11 +475,12 @@ blk::create_context(Allocator* allocator, HWND window)
 		.surface = surface,
 		.physical_device = selected_physical_device,
 		.logical_device = logical_device,
-		.graphics_queue = graphics_queue,
-		.graphics_queue_family_index = graphics_queue_family_index,
+		.queue = queue,
+		.queue_family_index = queue_family_index,
 		.frame_command_pool = frame_command_pool,
 		.transient_command_pool = transient_command_pool,
-		.sampler = sampler,
+		.texture_sampler = texture_sampler,
+		.lut_sampler = lut_sampler,
 		.allocator = allocator
 	};
 }
@@ -467,7 +490,8 @@ blk::destroy_context(Context& context)
 {
 	// Device-level objects first, then the device, then the instance-level ones.
 
-	vkDestroySampler(context.logical_device, context.sampler, nullptr);
+	vkDestroySampler(context.logical_device, context.texture_sampler, nullptr);
+	vkDestroySampler(context.logical_device, context.lut_sampler, nullptr);
 	vkDestroyCommandPool(context.logical_device, context.frame_command_pool, nullptr);
 	vkDestroyCommandPool(context.logical_device, context.transient_command_pool, nullptr);
 	vkDestroyDevice(context.logical_device, nullptr);
@@ -531,7 +555,12 @@ vulkan_debug_callback(
 		BLK_WARNING("%s%s\n", message_type_buffer, callback_data->pMessage);
 		break;
 	case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
-		BLK_ERROR("%s%s\n", message_type_buffer, callback_data->pMessage);
+		// `BLK_LOG("ERROR", ...)` and not `BLK_ERROR`, which breaks into the debugger. A validation error is a
+		// diagnostic, not a reason to stop: graphics debuggers replay our command buffers with a swapchain image they
+		// manage themselves, so they report errors against our submissions that we did not cause and cannot fix. Under
+		// a tool that launches us without attaching a debugger, that breakpoint is an unhandled exception that kills
+		// the process on the first message.
+		BLK_LOG("ERROR", "%s%s\n", message_type_buffer, callback_data->pMessage);
 		break;
 	default:
 		break;

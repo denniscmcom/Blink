@@ -9,6 +9,8 @@
 
 namespace blk
 {
+struct Vector3;
+
 /// Angle expressed in radians.
 ///
 /// It wraps a bare `float` so that an angle cannot be passed where the other unit is expected.
@@ -43,4 +45,6 @@ Degrees operator-(Degrees degrees);
 Radians to_radians(Degrees degrees);
 /// Converts `radians` to degrees.
 Degrees to_degrees(Radians radians);
+/// Converts Euler angles to a unit direction vector (spherical-to-Cartesian).
+Vector3 to_cartesian(const Vector3& rotation);
 }  // namespace blk

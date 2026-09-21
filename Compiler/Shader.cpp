@@ -40,14 +40,14 @@ blk::compiler::compile_shader(Serial& input_serial, Serial& output_serial)
 
 	// Verify SPV magic number.
 
-	uint8_t spv_magic[4] = {};
+	uint8_t spv_magic[sizeof(SPV_MAGIC)] = {};
 
 	BLK_IF_NOT_SUCCESS(read(input_serial, spv_magic))
 	{
 		BLK_FATAL("Failed to read SPV magic number\n");
 	}
 
-	if (memcmp(spv_magic, SPV_MAGIC, 4) != 0)
+	if (memcmp(spv_magic, SPV_MAGIC, sizeof(SPV_MAGIC)) != 0)
 	{
 		BLK_FATAL("Invalid SPV magic number; file is corrupted\n");
 	}

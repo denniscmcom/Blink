@@ -76,12 +76,24 @@ blk::draw_menu(Editor_Context& context)
 
 			if (ImGui::MenuItem("Show all", "Ctrl+Shift+H", show_all))
 			{
-				BLK_NOT_IMPLEMENTED();
+				context.show_toolbar = true;
+
+				context.world_context.show_console = true;
+				context.world_context.show_outliner = true;
+				context.world_context.show_stats = true;
+
+				context.material_context.show_material_settings = true;
 			}
 
 			if (ImGui::MenuItem("Hide all", "Ctrl+H", hide_all))
 			{
-				BLK_NOT_IMPLEMENTED();
+				context.show_toolbar = false;
+
+				context.world_context.show_console = false;
+				context.world_context.show_outliner = false;
+				context.world_context.show_stats = false;
+
+				context.material_context.show_material_settings = false;
 			}
 
 			ImGui::Separator();

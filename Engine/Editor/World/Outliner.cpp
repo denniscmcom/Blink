@@ -8,14 +8,15 @@
 #include "Engine/Core/Math/Unit.hpp"
 #include "Engine/Core/Math/Vector.hpp"
 #include "Engine/Core/Pool.hpp"
+#include "Engine/Core/String.hpp"
 #include "Engine/Editor/Context.hpp"
 #include "Engine/Platform/Application.hpp"
 #include "Engine/Platform/Assert.hpp"
 #include "Engine/Resource/Material.hpp"
 #include "Engine/Resource/Mesh.hpp"
 #include "Engine/Scene/Graph.hpp"
-#include "Engine/Scene/Light.hpp"
 #include "Engine/Scene/Node.hpp"
+#include "Engine/Scene/Point_Light.hpp"
 #include "Engine/World/World.hpp"
 
 #include <imgui.h>
@@ -115,30 +116,24 @@ blk::draw_outliner(Editor_Context& context)
 			{
 				// Display node name.
 
-				if (ImGui::InputText("Name", node->name, MAX_NODE_NAME_SIZE, ImGuiInputTextFlags_EnterReturnsTrue))
-				{
-					char unique_node_name[MAX_NODE_NAME_SIZE];
+				// We copy the node name to this local variable to avoid modifying the actual node name on every
+				// keystroke.
+				char node_name[MAX_NODE_NAME_SIZE] = {};
 
-					BLK_IF_NOT_SUCCESS(init_unique_node_name(
+				BLK_IF_NOT_SNPRINTF(node->name, node_name, MAX_NODE_NAME_SIZE, "%s")
+				{
+					BLK_ERROR("Failed to copy node name to local variable\n");
+				}
+
+				if (ImGui::InputText("Name", node_name, MAX_NODE_NAME_SIZE, ImGuiInputTextFlags_EnterReturnsTrue))
+				{
+					BLK_IF_NOT_SUCCESS(rename_node(
 						context.world_context.game_world->scene_graph,
-						node->name,
-						unique_node_name
+						context.world_context.selected_node_handle,
+						node_name
 					))
 					{
-						// `unique_node_name` is left uninitialized, so we cannot rename with it. We do not return here
-						// because that would leave the ImGui tab and window stacks unbalanced.
-						BLK_ERROR("Failed to get unique node name\n");
-					}
-					else
-					{
-						BLK_IF_NOT_SUCCESS(rename_node(
-							context.world_context.game_world->scene_graph,
-							context.world_context.selected_node_handle,
-							unique_node_name
-						))
-						{
-							BLK_ERROR("Failed to rename node\n");
-						}
+						BLK_ERROR("Failed to rename node\n");
 					}
 				}
 
@@ -181,6 +176,8 @@ blk::draw_outliner(Editor_Context& context)
 					if (ImGui::TreeNodeEx("Mesh instance", ImGuiTreeNodeFlags_DefaultOpen))
 					{
 						// We display the stem of each mesh-material pair in the mesh instance.
+						// We Loop over its capacity to display available slots, so they can be modified.
+
 						for (size_t slot_index = 0; slot_index < node->mesh_instance.mesh_handles.count; ++slot_index)
 						{
 							ImGui::Text("Slot %llu", slot_index);
@@ -188,18 +185,33 @@ blk::draw_outliner(Editor_Context& context)
 							const Pool_Handle<Mesh> mesh_handle = node->mesh_instance.mesh_handles.buffer[slot_index];
 							Mesh* mesh = get_mesh(mesh_handle);
 
+							// Show mesh stem.
+							char mesh_stem[MAX_RESOURCE_STEM_SIZE] = {};
+
 							if (mesh)
 							{
-								// Allow user to modify the mesh at this slot.
+								// Copy mesh stem.
 
-								if (ImGui::InputText(
-										"Mesh",
-										mesh->metadata.stem,
-										MAX_RESOURCE_STEM_SIZE,
-										ImGuiInputTextFlags_EnterReturnsTrue
-									))
+								BLK_IF_NOT_SNPRINTF(mesh->metadata.stem, mesh_stem, MAX_RESOURCE_STEM_SIZE, "%s")
 								{
-									// TODO (Bug): Not implemented currently.
+									BLK_ERROR("Failed to copy mesh stem to local variable\n");
+								}
+							}
+
+							if (ImGui::InputText(
+									"Mesh stem",
+									mesh_stem,
+									MAX_NODE_NAME_SIZE,
+									ImGuiInputTextFlags_EnterReturnsTrue
+								))
+							{
+								// Load new mesh.
+
+								const Pool_Handle<Mesh> new_mesh_handle = load_mesh(mesh_stem);
+
+								BLK_IF_NOT_SUCCESS(set(node->mesh_instance.mesh_handles, new_mesh_handle, slot_index))
+								{
+									BLK_ERROR("Failed to set mesh handle in slot %zu\n", slot_index);
 								}
 							}
 
@@ -207,21 +219,45 @@ blk::draw_outliner(Editor_Context& context)
 								node->mesh_instance.material_handles.buffer[slot_index];
 							Material* material = get_material(material_handle);
 
+							// Show material stem.
+							char material_stem[MAX_RESOURCE_STEM_SIZE] = {};
+
 							if (material)
 							{
-								// Allow user to modify the material at this slot.
+								// Copy material stem.
 
-								if (ImGui::InputText(
-										"Material",
-										material->metadata.stem,
-										MAX_RESOURCE_STEM_SIZE,
-										ImGuiInputTextFlags_EnterReturnsTrue
-									))
+								BLK_IF_NOT_SNPRINTF(
+									material->metadata.stem,
+									material_stem,
+									MAX_RESOURCE_STEM_SIZE,
+									"%s"
+								)
 								{
-									// TODO (Bug): Not implemented currently.
+									BLK_ERROR("Failed to copy material stem to local variable\n");
+								}
+							}
+
+							if (ImGui::InputText(
+									"Material",
+									material_stem,
+									MAX_RESOURCE_STEM_SIZE,
+									ImGuiInputTextFlags_EnterReturnsTrue
+								))
+							{
+								// Load new material.
+
+								const Pool_Handle<Material> new_material_handle = load_material(material_stem);
+
+								BLK_IF_NOT_SUCCESS(
+									set(node->mesh_instance.material_handles, new_material_handle, slot_index)
+								)
+								{
+									BLK_ERROR("Failed to set material handle in slot %zu\n", slot_index);
 								}
 							}
 						}
+
+						ImGui::Separator();
 
 						ImGui::TreePop();
 					}
@@ -234,6 +270,23 @@ blk::draw_outliner(Editor_Context& context)
 					{
 						// This relies on `Color_RGB` being packed together.
 						ImGui::ColorPicker3("Color", &node->point_light.color.r);
+
+						ImGui::TreePop();
+					}
+				}
+				break;
+				case Node_Type::SPATIAL: {
+					// Nothing special to a `SPATIAL` node.
+				}
+				break;
+				case Node_Type::DIRECTIONAL_LIGHT: {
+					// Display directional light data.
+
+					if (ImGui::TreeNodeEx("Directional light", ImGuiTreeNodeFlags_DefaultOpen))
+					{
+						// This relies on `Color_RGB` being packed together.
+						ImGui::ColorPicker3("Color", &node->directional_light.color.r);
+						ImGui::Checkbox("Is sun", &node->directional_light.is_sun);
 
 						ImGui::TreePop();
 					}
@@ -253,6 +306,7 @@ blk::draw_outliner(Editor_Context& context)
 
 		if (ImGui::BeginTabItem("World settings"))
 		{
+
 			ImGui::EndTabItem();
 		}
 

@@ -31,7 +31,7 @@ blk::create_scene_graph(Scene_Graph& scene_graph, Allocator* allocator)
 	BLK_SUCCESS_OR_RETURN(create_hash_map(scene_graph.hash_to_handle, allocator, 1'024, 0.75f));
 
 	scene_graph.allocator = allocator;
-	scene_graph.root = create_node(scene_graph, "Root", {});
+	scene_graph.root = spawn_node(scene_graph, "Root", Node_Type::SPATIAL, {});
 
 	if (!BLK_VERIFY(scene_graph.root != POOL_HANDLE_NONE<Node>))
 	{
@@ -57,10 +57,20 @@ blk::destroy_scene_graph(Scene_Graph& scene_graph)
 }
 
 blk::Pool_Handle<blk::Node>
-blk::create_node(Scene_Graph& scene_graph, const char* name, const Pool_Handle<Node> parent)
+blk::spawn_node(Scene_Graph& scene_graph, const char* name, Node_Type type, const Pool_Handle<Node> parent)
 {
 	if (!BLK_VERIFY(name))
 	{
+		return {};
+	}
+
+	// First, we initialize a unique name for the node based on `name`.
+	char unique_node_name[MAX_NODE_NAME_SIZE];
+
+	BLK_IF_NOT_SUCCESS(init_unique_node_name(scene_graph, name, unique_node_name))
+	{
+		BLK_ERROR("Failed to create a unique name for node\n");
+
 		return {};
 	}
 
@@ -70,14 +80,24 @@ blk::create_node(Scene_Graph& scene_graph, const char* name, const Pool_Handle<N
 
 	// Create node structure to insert.
 	Node node = {};
+
+	BLK_IF_NOT_SUCCESS(create_node(node, scene_graph.allocator, 1))
+	{
+		BLK_ERROR("Failed to create node\n");
+
+		return {};
+	}
+
+	node.type = type;
 	node.parent_handle = parent_handle;
-	node.hash = hash_fnv1a(name);
+	node.hash = hash_fnv1a(unique_node_name);
 
 	// Copy `name` to `node.name` because `Node` owns its name.
-	if (const int written = snprintf(node.name, MAX_NODE_NAME_SIZE, "%s", name);
+	if (const int written = snprintf(node.name, MAX_NODE_NAME_SIZE, "%s", unique_node_name);
 		written < 0 || static_cast<size_t>(written) >= MAX_NODE_NAME_SIZE)
 	{
 		BLK_ERROR("Invalid node name\n");
+		destroy_node(node);
 
 		return {};
 	}
@@ -86,6 +106,7 @@ blk::create_node(Scene_Graph& scene_graph, const char* name, const Pool_Handle<N
 	if (contains(scene_graph.hash_to_handle, node.hash))
 	{
 		BLK_ERROR("Cannot create node with duplicate name\n");
+		destroy_node(node);
 
 		return {};
 	}
@@ -97,6 +118,7 @@ blk::create_node(Scene_Graph& scene_graph, const char* name, const Pool_Handle<N
 		// Something with `scene_graph.nodes` is wrong. This should not happen unless there is a bug in its
 		// implementation, or its state has been corrupted.
 		BLK_ERROR("Failed to insert node\n");
+		destroy_node(node);
 
 		return {};
 	}
@@ -123,8 +145,16 @@ blk::create_node(Scene_Graph& scene_graph, const char* name, const Pool_Handle<N
 		// so the node does not stay in `scene_graph` unreachable from the tree, holding a pool slot and its name.
 		BLK_ERROR("Failed to get parent node\n");
 
-		remove(scene_graph.hash_to_handle, node.hash);
-		remove(scene_graph.nodes, node_handle);
+		Dyn_Array<Pool_Handle<Node>> destroyed_handles = {};
+
+		BLK_IF_NOT_SUCCESS(create_dyn_array(destroyed_handles, scene_graph.allocator, 10))
+		{
+			BLK_ERROR("Failed to create dynamic array to store removed node handles\n");
+
+			return {};
+		}
+
+		despawn_node(scene_graph, node_handle, destroyed_handles);
 
 		return {};
 	}
@@ -151,7 +181,7 @@ blk::create_node(Scene_Graph& scene_graph, const char* name, const Pool_Handle<N
 }
 
 void
-blk::destroy_node(
+blk::despawn_node(
 	Scene_Graph& scene_graph,
 	const Pool_Handle<Node> handle,
 	Dyn_Array<Pool_Handle<Node>>& destroyed_handles
@@ -176,7 +206,7 @@ blk::destroy_node(
 	// with an explicit stack instead.
 	while (node->first_child_handle != POOL_HANDLE_NONE<Node>)
 	{
-		destroy_node(scene_graph, node->first_child_handle, destroyed_handles);
+		despawn_node(scene_graph, node->first_child_handle, destroyed_handles);
 	}
 
 	// At this point all the subtree below `handle` has been removed. So there are no orphans.
@@ -345,12 +375,12 @@ blk::rename_node(Scene_Graph& scene_graph, Pool_Handle<Node> handle, const char*
 	return Result::SUCCESS;
 }
 
-blk::Node*
+blk::Pool_Handle<blk::Node>
 blk::find_node(Scene_Graph& scene_graph, const char* name)
 {
 	if (!BLK_VERIFY(name))
 	{
-		return nullptr;
+		return {};
 	}
 
 	const Pool_Handle<Node>* handle = get(scene_graph.hash_to_handle, hash_fnv1a(name));
@@ -358,10 +388,10 @@ blk::find_node(Scene_Graph& scene_graph, const char* name)
 	if (!handle)
 	{
 		// There is no node named `name` in `scene_graph`.
-		return nullptr;
+		return {};
 	}
 
-	return get(scene_graph.nodes, *handle);
+	return *handle;
 }
 
 blk::Node*

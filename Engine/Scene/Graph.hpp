@@ -10,6 +10,7 @@
 
 namespace blk
 {
+enum class Node_Type;
 enum class Result;
 struct Node;
 struct Allocator;
@@ -36,18 +37,14 @@ Result create_scene_graph(Scene_Graph& scene_graph, Allocator* allocator);
 /// Destroys all nodes from `scene_graph`.
 void destroy_scene_graph(Scene_Graph& scene_graph);
 
-// TODO (Consistency): `create_node` and `destroy_node` are overloaded with the `Node` versions in `Node.hpp`. The ones
-// here link and unlink the node from the tree, the ones there own the node's data. Overload resolution keeps them
-// apart, but the shared name is confusing at the call site. Consider renaming one of the two pairs.
-
-/// Creates a node in `scene_graph` with `name` and attaches it to `parent`. If `parent == POOL_HANDLE_NONE`, it
-/// attaches it to `scene_graph.root`. If `scene_graph` has no root yet, the node becomes the root.
-/// @param name A null-terminated unique string; we cannot have nodes with the same name. @see init_unique_node_name.
+/// Spawns a node of `type` in `scene_graph` with `name` and attaches it to `parent`. If `parent == POOL_HANDLE_NONE`,
+/// it attaches it to `scene_graph.root`. If `scene_graph` has no root yet, the node becomes the root.
+/// @param name A null-terminated string.
 /// @warning It can return a `POOL_HANDLE_NONE` if it fails creating the node.
-Pool_Handle<Node> create_node(Scene_Graph& scene_graph, const char* name, Pool_Handle<Node> parent);
-/// Destroys a node and all its children from `scene_graph`.
+Pool_Handle<Node> spawn_node(Scene_Graph& scene_graph, const char* name, Node_Type type, Pool_Handle<Node> parent);
+/// Despawns a node and all its children from `scene_graph`.
 /// @param destroyed_handles The node handles that have been removed.
-void destroy_node(Scene_Graph& scene_graph, Pool_Handle<Node> handle, Dyn_Array<Pool_Handle<Node>>& destroyed_handles);
+void despawn_node(Scene_Graph& scene_graph, Pool_Handle<Node> handle, Dyn_Array<Pool_Handle<Node>>& destroyed_handles);
 
 /// Creates a unique name based on `base_name`. It does so by appending a numeric counter to the end of `base_name`.
 /// @note Nodes in `scene_graph.nodes` cannot have the same name.
@@ -60,8 +57,10 @@ Result init_unique_node_name(const Scene_Graph& scene_graph, const char* base_na
 /// init_unique_node_name.
 Result rename_node(Scene_Graph& scene_graph, Pool_Handle<Node> handle, const char* name);
 
-/// Returns a pointer to the `Node` named `name`, or `nullptr` if `scene_graph` has no node with that name.
-Node* find_node(Scene_Graph& scene_graph, const char* name);
+/// Finds a `Node` named `name` in `scene_graph`.
+/// It returns `POOL_HANDLE_NONE` if `Node` does not exist.
+/// @param name A null-terminated string.
+Pool_Handle<Node> find_node(Scene_Graph& scene_graph, const char* name);
 /// Returns a pointer to `Node` in `scene_graph.nodes` given its `handle`.
 /// @note It's just a wrapper over `get(scene_graph.nodes, handle)`. You can use whatever you see fit.
 Node* get_node(Scene_Graph& scene_graph, Pool_Handle<Node> handle);

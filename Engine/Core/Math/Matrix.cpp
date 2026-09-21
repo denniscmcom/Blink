@@ -72,6 +72,39 @@ blk::operator*(const Matrix4& lhs, const Matrix4& rhs)
 	return matrix;
 }
 
+blk::Matrix3
+blk::init_matrix3(const Matrix4& matrix4)
+{
+	Matrix3 matrix = {};
+
+	for (size_t i = 0; i < 3; ++i)
+	{
+		matrix.columns[i].x = matrix4.columns[i].x;
+		matrix.columns[i].y = matrix4.columns[i].y;
+		matrix.columns[i].z = matrix4.columns[i].z;
+	}
+
+	return matrix;
+}
+
+blk::Matrix4
+blk::init_matrix4(const Matrix3& matrix3)
+{
+	Matrix4 matrix = {};
+
+	for (size_t i = 0; i < 3; ++i)
+	{
+		matrix.columns[i].x = matrix3.columns[i].x;
+		matrix.columns[i].y = matrix3.columns[i].y;
+		matrix.columns[i].z = matrix3.columns[i].z;
+	}
+
+	// The homogeneous component. Without it the last row and column are zero and the matrix is singular.
+	matrix.columns[3].w = 1.0f;
+
+	return matrix;
+}
+
 blk::Matrix4
 blk::init_identity_matrix()
 {

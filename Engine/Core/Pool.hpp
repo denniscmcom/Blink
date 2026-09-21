@@ -288,8 +288,13 @@ resize(Pool<Type>& pool, const size_t capacity)
 	pool.capacity = capacity;
 
 	// Finally, fill `pool.free_indices` with the new indices that fit in the new `capacity`.
+
 	for (size_t i = pool.capacity; i > old_capacity; --i)
 	{
+		// When zero initializing a `Pool_Handle`, the `id` and `version` fields are zero, which are a
+		// valid handle. So, `version` start at 1 so a zeroed `Pool_Handle` can never match a live slot.
+		pool.slots[i - 1].version = 1;
+
 		pool.free_indices[pool.free_indices_count] = i - 1;
 		pool.free_indices_count += 1;
 	}

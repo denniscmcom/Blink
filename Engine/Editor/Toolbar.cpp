@@ -7,6 +7,7 @@
 
 #include "Engine/Core/Array.hpp"
 #include "Engine/Editor/Context.hpp"
+#include "Engine/Scene/Node.hpp"
 #include "Engine/World/World.hpp"
 
 #include <IconsMaterialDesign.h>
@@ -140,7 +141,31 @@ blk::draw_toolbar(Editor_Context& context)
 		// Spawns a point light into the game world.
 		if (draw_button(ICON_MD_LIGHTBULB "", "Spawn a point light", button_size))
 		{
-			BLK_NOT_IMPLEMENTED();
+			if (spawn_node(
+					context.world_context.game_world->scene_graph,
+					"Point_Light",
+					Node_Type::POINT_LIGHT,
+					context.world_context.selected_node_handle
+				) == POOL_HANDLE_NONE<Node>)
+			{
+				BLK_ERROR("Failed to spawn point light\n");
+			}
+		}
+
+		ImGui::SameLine();
+
+		// Spawns a directional light into the game world.
+		if (draw_button(ICON_MD_SUNNY "", "Spawn a directional light", button_size))
+		{
+			if (spawn_node(
+					context.world_context.game_world->scene_graph,
+					"Directional_Light",
+					Node_Type::DIRECTIONAL_LIGHT,
+					context.world_context.selected_node_handle
+				) == POOL_HANDLE_NONE<Node>)
+			{
+				BLK_ERROR("Failed to spawn directional light\n");
+			}
 		}
 
 		ImGui::SameLine();
@@ -151,7 +176,7 @@ blk::draw_toolbar(Editor_Context& context)
 			if (spawn_prop(*context.world_context.game_world, "Prop", context.world_context.selected_node_handle) ==
 				POOL_HANDLE_NONE<Prop>)
 			{
-				BLK_ERROR("Failed to spawn a prop\n");
+				BLK_ERROR("Failed to spawn prop\n");
 			}
 		}
 
@@ -160,7 +185,7 @@ blk::draw_toolbar(Editor_Context& context)
 		// Despawns the current selected node in the outliner.
 		if (draw_button(ICON_MD_DELETE "", "Despawn selected node", button_size))
 		{
-			despawn(*context.world_context.game_world, context.world_context.selected_node_handle);
+			despawn_entity_by_node(*context.world_context.game_world, context.world_context.selected_node_handle);
 			context.world_context.selected_node_handle = {};
 		}
 	}

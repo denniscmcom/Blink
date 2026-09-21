@@ -51,7 +51,9 @@ blk::open_file(Allocator* allocator, const char* path, File_Access_Mode mode, Fi
 		break;
 	case File_Access_Mode::WRITE:
 		access_mode = GENERIC_WRITE;
-		create_disposition = OPEN_ALWAYS;
+		// `CREATE_ALWAYS` truncates an existing file to zero length. `OPEN_ALWAYS` does not, so writing a file smaller
+		// than the one it replaces leaves the previous file's tail behind.
+		create_disposition = CREATE_ALWAYS;
 		break;
 	}
 

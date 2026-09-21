@@ -13,6 +13,7 @@
 
 namespace
 {
+/// In-memory storage for textures.
 blk::Resource_Storage<blk::Texture> storage = {};
 }  // namespace
 
@@ -112,6 +113,13 @@ blk::load_texture(uint64_t hash)
 	// A `.bmaterial` only stores its textures' hashes, so `load_material` has no filename to pass here. The stem stays
 	// empty and `Editor/` shows the texture unnamed.
 	return store_resource(storage, texture, hash, "");
+}
+
+blk::Pool_Handle<blk::Texture>
+blk::load_texture(const Texture& texture)
+{
+	// We do not need hash nor stem when loading textures created at runtime.
+	return store_resource(storage, texture, 0, "");
 }
 
 void

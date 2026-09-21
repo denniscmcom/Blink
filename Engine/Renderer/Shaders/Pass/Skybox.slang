@@ -3,14 +3,11 @@
 // Licensed under the Blink Engine Source Access License, see LICENSE.txt
 // ============================================================================
 
-#include "Shared.slang"
+#pragma once
 
-[shader("fragment")]
-float4
-fs_main(VS_Main_Output input)
-	: SV_Target
+/// Data `VS_Skybox.slang` passes to `FS_Skybox.slang`.
+struct VS_Skybox_Output
 {
-	return float4(1.0, 1.0, 1.0, 1.0);
-}
-
-
+	float4 position : SV_Position;
+	float3 direction : TEXCOORD0;
+};

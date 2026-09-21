@@ -3,29 +3,15 @@
 // Licensed under the Blink Engine Source Access License, see LICENSE.txt
 // ============================================================================
 
-#include "Shared.slang"
-
-[[vk::binding(0, 0)]]
-ConstantBuffer<Camera_UBO> camera_ubo;
-
-[[vk::binding(0, 1)]]
-ConstantBuffer<Light_UBO> light_ubo;
-
-[[vk::binding(0, 2)]]
-Sampler2D albedo_map;
-
-[[vk::binding(1, 2)]]
-Sampler2D normal_map;
-
-[[vk::binding(2, 2)]]
-Sampler2D orm_map;
-
-float geometry_schlick_ggx(float normal_dot_v, float roughness);
+#include "Interface/Frame_Set.slang"
+#include "Interface/Material_Set.slang"
+#include "Library/BRDF.slang"
+#include "Library/Math.slang"
+#include "Pass/Mesh.slang"
 
 [shader("fragment")]
 float4
-fs_main(VS_Main_Output input)
-	: SV_Target
+fs_main(VS_Mesh_Output input) : SV_Target
 {
 	float3 albedo_sample = albedo_map.Sample(input.texture_coord).rgb;
 	float3 normal_sample = normal_map.Sample(input.texture_coord).rgb;
@@ -61,22 +47,14 @@ fs_main(VS_Main_Output input)
 
 		// Cook-Torrance BRDF.
 
-		// Distribution GGX.
-		float roughness4 = pow(roughness, 4);
 		float normal_dot_halfway_direction = max(dot(normal, halfway_direction), 0.0);
-		float normal_dot_halfway_direction2 = pow(normal_dot_halfway_direction, 2);
-		float NDF = roughness4 / (pow((normal_dot_halfway_direction2 * (roughness4 - 1.0) + 1.0), 2) * (float)PI);
-
-		// Geometry Smith.
 		float normal_dot_view_direction = max(dot(normal, view_direction), 0.0);
 		float normal_dot_light_direction = max(dot(normal, light_direction), 0.0);
-		float ggx2 = geometry_schlick_ggx(normal_dot_view_direction, roughness);
-		float ggx1 = geometry_schlick_ggx(normal_dot_light_direction, roughness);
-		float G = ggx1 * ggx2;
+		float halfway_direction_dot_view_direction = max(dot(halfway_direction, view_direction), 0.0);
 
-		// Fresnel Schlick.
-		float3 cos_theta = max(dot(halfway_direction, view_direction), 0.0);
-		float3 F = F0 + (1.0 - F0) * pow(clamp(1.0 - cos_theta, 0.0, 1.0), 5.0);
+		float NDF = distribution_ggx(normal_dot_halfway_direction, roughness);
+		float G = geometry_smith(normal_dot_view_direction, normal_dot_light_direction, roughness);
+		float3 F = fresnel_schlick(halfway_direction_dot_view_direction, F0);
 
 		float3 reflection = F;
 		float3 refraction = (float3(1.0) - reflection) * (1.0 - metallic);
@@ -92,16 +70,3 @@ fs_main(VS_Main_Output input)
 
 	return float4(color, 1.0);
 }
-
-float
-geometry_schlick_ggx(float normal_dot_v, float roughness)
-{
-	float r = (roughness + 1.0);
-	float k = (r * r) / 8.0;
-	float num = normal_dot_v;
-	float denom = normal_dot_v * (1.0 - k) + k;
-
-	return num / denom;
-}
-
-

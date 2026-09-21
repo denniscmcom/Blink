@@ -16,8 +16,10 @@
 #include "Engine/Platform/Result.hpp"
 #include "Engine/Platform/Window_Internal.hpp"
 #include "Engine/Renderer/Helpers.hpp"
+#include "Engine/Renderer/Lifetime/Command.hpp"
 #include "Engine/Renderer/Lifetime/Context.hpp"
 #include "Engine/Renderer/Lifetime/Descriptor.hpp"
+#include "Engine/Renderer/Lifetime/Draw_Command.hpp"
 #include "Engine/Renderer/Lifetime/Frame.hpp"
 #include "Engine/Renderer/Lifetime/Image.hpp"
 #include "Engine/Renderer/Lifetime/Pipeline.hpp"
@@ -28,13 +30,15 @@
 #include "Engine/Renderer/Resource/Mesh_Device.hpp"
 #include "Engine/Resource/Mesh.hpp"
 #include "Engine/Scene/Graph.hpp"
-#include "Engine/Scene/Light.hpp"
 #include "Engine/Scene/Mesh_Instance.hpp"
 #include "Engine/Scene/Node.hpp"
+#include "Engine/Scene/Point_Light.hpp"
 #include "Engine/Scene/Transform.hpp"
 
 #include <Windows.h>
 #include <vulkan/vulkan.h>
+
+#include <math.h>
 
 namespace
 {
@@ -43,21 +47,42 @@ struct Renderer
 {
 	/// Swapchain.
 	blk::Swapchain swapchain;
+
 	/// Pipeline to render meshes.
 	blk::Pipeline mesh_pipeline;
-	/// Pipeline to render light gizmos.
-	blk::Pipeline light_pipeline;
+	/// Pipeline to render the dynamic skybox.
+	blk::Pipeline skybox_pipeline;
+	/// Pipeline to compute the skybox transmittance LUT.
+	blk::Pipeline skybox_transmittance_pipeline;
+
 	/// Descriptor layouts.
 	blk::Descriptor_Layouts descriptor_layouts;
+	/// Single set allocated from `descriptor_layouts.global_layout`.
+	VkDescriptorSet global_descriptor_set = VK_NULL_HANDLE;
 
 	/// Image for depth testing.
 	blk::Image depth_image;
+	/// Transmittance LUT for the skybox.
+	blk::Image skybox_transmittance_lut;
 
 	/// Frame data.
 	blk::Array<blk::Frame, blk::MAX_FRAMES_IN_FLIGHT> frames;
 	/// Current frame index. It goes from 0 to `MAX_FRAMES_IN_FLIGHT - 1`.
 	uint32_t frame_index;
 };
+
+/// Width of the skybox transmittance LUT.
+constexpr uint32_t SKYBOX_TRANSMITTANCE_LUT_WIDTH = 256;
+/// Height of the skybox transmittance LUT.
+constexpr uint32_t SKYBOX_TRANSMITTANCE_LUT_HEIGHT = 64;
+
+/// Workgroup size of skybox transmittance. It has to match the `numthreads` declared in
+/// `Shaders/CS_Skybox_Transmittance.slang`.
+constexpr uint32_t SKYBOX_TRANSMITTANCE_WORKGROUP_SIZE = 8;
+
+// The dispatch below rounds down, so a LUT that is not a whole number of workgroups would leave texels unwritten.
+static_assert(SKYBOX_TRANSMITTANCE_LUT_WIDTH % SKYBOX_TRANSMITTANCE_WORKGROUP_SIZE == 0);
+static_assert(SKYBOX_TRANSMITTANCE_LUT_HEIGHT % SKYBOX_TRANSMITTANCE_WORKGROUP_SIZE == 0);
 
 blk::Allocator allocator = {};
 blk::Context context = {};
@@ -135,10 +160,19 @@ blk::create_renderer(const Rect<unsigned>& /*rect*/)
 		return result;
 	}
 
-	const Array pipeline_layouts = {{
-		renderer.descriptor_layouts.camera_layout,
-		renderer.descriptor_layouts.light_layout,
+	const Array mesh_pipeline_layouts = {{
+		renderer.descriptor_layouts.global_layout,
+		renderer.descriptor_layouts.frame_layout,
 		renderer.descriptor_layouts.material_layout,
+	}};
+
+	const Array skybox_pipeline_layouts = {{
+		renderer.descriptor_layouts.global_layout,
+		renderer.descriptor_layouts.frame_layout,
+	}};
+
+	const Array skybox_transmittance_pipeline_layouts = {{
+		renderer.descriptor_layouts.global_layout,
 	}};
 
 	// Create depth image.
@@ -162,19 +196,96 @@ blk::create_renderer(const Rect<unsigned>& /*rect*/)
 		return result;
 	}
 
-	// Create shader modules;
+	// Create skybox transmittance LUT.
+	// The format should match the `vk::image_format` of `transmittance_storage_image` in
+	// `Shaders/Interface/Global_Set.slang`.
 
-	VkShaderModule fs_light = VK_NULL_HANDLE;
-	VkShaderModule fs_mesh = VK_NULL_HANDLE;
-	VkShaderModule vs_main = VK_NULL_HANDLE;
-
-	if (const Result result = create_shader_module(context, "FS_Light", fs_light); result != Result::SUCCESS)
+	if (const Result result = create_image(
+			context,
+			SKYBOX_TRANSMITTANCE_LUT_WIDTH,
+			SKYBOX_TRANSMITTANCE_LUT_HEIGHT,
+			VK_FORMAT_R16G16B16A16_SFLOAT,
+			VK_IMAGE_TILING_OPTIMAL,
+			VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+			VK_IMAGE_ASPECT_COLOR_BIT,
+			renderer.skybox_transmittance_lut
+		);
+		result != Result::SUCCESS)
 	{
-		BLK_ERROR("Failed to create `FS_Light` shader module\n");
+		BLK_ERROR("Failed to create skybox transmittance LUT image\n");
 		destroy_renderer();
 
 		return result;
 	}
+
+	// Allocate global descriptor set.
+
+	VkDescriptorSetAllocateInfo global_descriptor_set_allocate_info = {};
+	global_descriptor_set_allocate_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	global_descriptor_set_allocate_info.descriptorPool = renderer.descriptor_layouts.pool;
+	global_descriptor_set_allocate_info.descriptorSetCount = 1;
+	global_descriptor_set_allocate_info.pSetLayouts = &renderer.descriptor_layouts.global_layout;
+
+	if (vkAllocateDescriptorSets(
+			context.logical_device,
+			&global_descriptor_set_allocate_info,
+			&renderer.global_descriptor_set
+		) != VK_SUCCESS)
+	{
+		BLK_ERROR("Failed to allocate global descriptor set\n");
+		destroy_renderer();
+
+		return Result::DEVICE_ERROR;
+	}
+
+	// Write global descriptor set.
+
+	VkDescriptorImageInfo transmittance_storage_image_info = {};
+	transmittance_storage_image_info.imageView = renderer.skybox_transmittance_lut.view;
+	transmittance_storage_image_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+	VkDescriptorImageInfo transmittance_sampler_image_info = {};
+	transmittance_sampler_image_info.sampler = context.lut_sampler;
+	transmittance_sampler_image_info.imageView = renderer.skybox_transmittance_lut.view;
+	transmittance_sampler_image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	const Array global_descriptor_writes = {{
+		VkWriteDescriptorSet{
+			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+			.dstSet = renderer.global_descriptor_set,
+			.dstBinding = 0,
+			.dstArrayElement = 0,
+			.descriptorCount = 1,
+			.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+			.pImageInfo = &transmittance_storage_image_info,
+		},
+		VkWriteDescriptorSet{
+			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+			.dstSet = renderer.global_descriptor_set,
+			.dstBinding = 1,
+			.dstArrayElement = 0,
+			.descriptorCount = 1,
+			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			.pImageInfo = &transmittance_sampler_image_info,
+		},
+	}};
+
+	vkUpdateDescriptorSets(
+		context.logical_device,
+		global_descriptor_writes.capacity,
+		global_descriptor_writes.buffer,
+		0,
+		nullptr
+	);
+
+	// Create shader modules;
+
+	VkShaderModule fs_mesh = VK_NULL_HANDLE;
+	VkShaderModule vs_mesh = VK_NULL_HANDLE;
+	VkShaderModule vs_skybox = VK_NULL_HANDLE;
+	VkShaderModule fs_skybox = VK_NULL_HANDLE;
+	VkShaderModule cs_skybox_transmittance = VK_NULL_HANDLE;
 
 	if (const Result result = create_shader_module(context, "FS_Mesh", fs_mesh); result != Result::SUCCESS)
 	{
@@ -184,9 +295,34 @@ blk::create_renderer(const Rect<unsigned>& /*rect*/)
 		return result;
 	}
 
-	if (const Result result = create_shader_module(context, "VS_Main", vs_main); result != Result::SUCCESS)
+	if (const Result result = create_shader_module(context, "VS_Mesh", vs_mesh); result != Result::SUCCESS)
 	{
-		BLK_ERROR("Failed to create `VS_Main` shader module\n");
+		BLK_ERROR("Failed to create `VS_Mesh` shader module\n");
+		destroy_renderer();
+
+		return result;
+	}
+
+	if (const Result result = create_shader_module(context, "VS_Skybox", vs_skybox); result != Result::SUCCESS)
+	{
+		BLK_ERROR("Failed to create `VS_Skybox` shader module\n");
+		destroy_renderer();
+
+		return result;
+	}
+
+	if (const Result result = create_shader_module(context, "FS_Skybox", fs_skybox); result != Result::SUCCESS)
+	{
+		BLK_ERROR("Failed to create `FS_Skybox` shader module\n");
+		destroy_renderer();
+
+		return result;
+	}
+
+	if (const Result result = create_shader_module(context, "CS_Skybox_Transmittance", cs_skybox_transmittance);
+		result != Result::SUCCESS)
+	{
+		BLK_ERROR("Failed to create `CS_Skybox_Transmittance` shader module\n");
 		destroy_renderer();
 
 		return result;
@@ -194,21 +330,25 @@ blk::create_renderer(const Rect<unsigned>& /*rect*/)
 
 	// Initialize pipeline shader stage infos.
 
-	const VkPipelineShaderStageCreateInfo fs_light_stage_info =
-		get_pipeline_shader_stage_create_info(fs_light, VK_SHADER_STAGE_FRAGMENT_BIT, "fs_main");
 	const VkPipelineShaderStageCreateInfo fs_mesh_stage_info =
 		get_pipeline_shader_stage_create_info(fs_mesh, VK_SHADER_STAGE_FRAGMENT_BIT, "fs_main");
-	const VkPipelineShaderStageCreateInfo vs_main_stage_info =
-		get_pipeline_shader_stage_create_info(vs_main, VK_SHADER_STAGE_VERTEX_BIT, "vs_main");
+	const VkPipelineShaderStageCreateInfo vs_mesh_stage_info =
+		get_pipeline_shader_stage_create_info(vs_mesh, VK_SHADER_STAGE_VERTEX_BIT, "vs_main");
+	const VkPipelineShaderStageCreateInfo vs_skybox_stage_info =
+		get_pipeline_shader_stage_create_info(vs_skybox, VK_SHADER_STAGE_VERTEX_BIT, "vs_main");
+	const VkPipelineShaderStageCreateInfo fs_skybox_stage_info =
+		get_pipeline_shader_stage_create_info(fs_skybox, VK_SHADER_STAGE_FRAGMENT_BIT, "fs_main");
+	const VkPipelineShaderStageCreateInfo cs_skybox_transmittance_stage_info =
+		get_pipeline_shader_stage_create_info(cs_skybox_transmittance, VK_SHADER_STAGE_COMPUTE_BIT, "cs_main");
 
 	const Array mesh_pipeline_shader_stages = {{
-		vs_main_stage_info,
+		vs_mesh_stage_info,
 		fs_mesh_stage_info,
 	}};
 
-	const Array light_pipeline_shader_stages = {{
-		vs_main_stage_info,
-		fs_light_stage_info,
+	const Array skybox_pipeline_shader_stages = {{
+		vs_skybox_stage_info,
+		fs_skybox_stage_info,
 	}};
 
 	// Initialize vertex descriptions.
@@ -225,27 +365,24 @@ blk::create_renderer(const Rect<unsigned>& /*rect*/)
 	mesh_push_contant_range.offset = 0;
 	mesh_push_contant_range.size = sizeof(Mesh_Constants);
 
-	VkPushConstantRange light_push_constant_range = {};
-	light_push_constant_range.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-	light_push_constant_range.offset = sizeof(Mesh_Constants);
-	light_push_constant_range.size = sizeof(Light_Constants);
-
 	const Array pipeline_push_constant_ranges = {{
 		mesh_push_contant_range,
-		light_push_constant_range,
 	}};
 
 	// Create mesh pipeline.
 
-	if (const Result result = create_pipeline(
+	if (const Result result = create_graphics_pipeline(
 			context,
 			renderer.swapchain.surface_format,
 			renderer.depth_image.format,
-			to_array_view(pipeline_layouts),
+			to_array_view(mesh_pipeline_layouts),
 			to_array_view(mesh_pipeline_shader_stages),
 			to_array_view(vertex_input_descriptions),
 			to_array_view(vertex_attribute_descriptions),
 			to_array_view(pipeline_push_constant_ranges),
+			VK_TRUE,
+			VK_TRUE,
+			VK_COMPARE_OP_LESS,
 			renderer.mesh_pipeline
 		);
 		result != Result::SUCCESS)
@@ -256,22 +393,47 @@ blk::create_renderer(const Rect<unsigned>& /*rect*/)
 		return result;
 	}
 
-	// Create light pipeline.
+	// Create skybox pipeline.
+	// We do not need vertex descriptions because we are not passing vertex data.
 
-	if (const Result result = create_pipeline(
+	// The skybox is drawn last, after the scene has filled the depth buffer, and its fragments sit exactly on the far
+	// plane. `VK_COMPARE_OP_LESS_OR_EQUAL` therefore only lets it through where the depth buffer still holds the 1.0
+	// clear value, which is where nothing was drawn. It writes no depth of its own.
+
+	if (const Result result = create_graphics_pipeline(
 			context,
 			renderer.swapchain.surface_format,
 			renderer.depth_image.format,
-			to_array_view(pipeline_layouts),
-			to_array_view(light_pipeline_shader_stages),
-			to_array_view(vertex_input_descriptions),
-			to_array_view(vertex_attribute_descriptions),
-			to_array_view(pipeline_push_constant_ranges),
-			renderer.light_pipeline
+			to_array_view(skybox_pipeline_layouts),
+			to_array_view(skybox_pipeline_shader_stages),
+			{},
+			{},
+			{},
+			VK_TRUE,
+			VK_FALSE,
+			VK_COMPARE_OP_LESS_OR_EQUAL,
+			renderer.skybox_pipeline
 		);
 		result != Result::SUCCESS)
 	{
-		BLK_ERROR("Failed to create light pipeline\n");
+		BLK_ERROR("Failed to create skybox pipeline\n");
+		destroy_renderer();
+
+		return result;
+	}
+
+	// Create skybox transmittance compute pipeline.
+
+	if (const Result result = create_compute_pipeline(
+			context,
+			to_array_view(skybox_transmittance_pipeline_layouts),
+			cs_skybox_transmittance_stage_info,
+			{},
+			renderer.skybox_transmittance_pipeline
+		);
+		result != Result::SUCCESS)
+	{
+		BLK_ERROR("Failed to create skybox transmittance pipeline\n");
 		destroy_renderer();
 
 		return result;
@@ -294,33 +456,133 @@ blk::create_renderer(const Rect<unsigned>& /*rect*/)
 	return Result::SUCCESS;
 }
 
+blk::Result
+blk::bake_renderer()
+{
+	// Bake the skybox transmittance LUT.
+
+	// Create transient command buffer.
+
+	VkCommandBuffer command_buffer = VK_NULL_HANDLE;
+	BLK_SUCCESS_OR_RETURN(create_command_buffer(context, context.transient_command_pool, command_buffer));
+
+	// Record commands.
+
+	BLK_SUCCESS_OR_ERROR_RETURN(begin_one_time_commands(command_buffer), "Failed to begin one time commands\n");
+
+	// Transition skybox transmittance image to write.
+	transition_image_layout(
+		command_buffer,
+		renderer.skybox_transmittance_lut.image,
+		VK_IMAGE_LAYOUT_UNDEFINED,
+		VK_IMAGE_LAYOUT_GENERAL,
+		{},
+		VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
+		VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
+		VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+		VK_IMAGE_ASPECT_COLOR_BIT
+	);
+
+	// Bind skybox transmittance pipeline.
+	vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, renderer.skybox_transmittance_pipeline.pipeline);
+
+	// Bind skybox transmittance descriptor set.
+	vkCmdBindDescriptorSets(
+		command_buffer,
+		VK_PIPELINE_BIND_POINT_COMPUTE,
+		renderer.skybox_transmittance_pipeline.layout,
+		0,
+		1,
+		&renderer.global_descriptor_set,
+		0,
+		nullptr
+	);
+
+	// Dispatch.
+	// One thread per texel.
+	vkCmdDispatch(
+		command_buffer,
+		SKYBOX_TRANSMITTANCE_LUT_WIDTH / SKYBOX_TRANSMITTANCE_WORKGROUP_SIZE,
+		SKYBOX_TRANSMITTANCE_LUT_HEIGHT / SKYBOX_TRANSMITTANCE_WORKGROUP_SIZE,
+		1
+	);
+
+	// The LUT is read-only from here on, so hand it to the skybox fragment shader.
+	transition_image_layout(
+		command_buffer,
+		renderer.skybox_transmittance_lut.image,
+		VK_IMAGE_LAYOUT_GENERAL,
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
+		VK_ACCESS_2_SHADER_READ_BIT,
+		VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+		VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+		VK_IMAGE_ASPECT_COLOR_BIT
+	);
+
+	// Finish recording commands.
+	BLK_SUCCESS_OR_ERROR_RETURN(end_one_time_commands(context, command_buffer), "Failed to end one time commands\n");
+
+	// Destroy transient command buffer.
+	destroy_command_buffer(context, context.transient_command_pool, command_buffer);
+
+	return Result::SUCCESS;
+}
+
+void
+blk::wait_renderer_idle()
+{
+	if (context.logical_device == VK_NULL_HANDLE)
+	{
+		// `create_renderer` never got as far as creating a device, so there is nothing submitted to wait for.
+		return;
+	}
+
+	if (vkDeviceWaitIdle(context.logical_device) != VK_SUCCESS)
+	{
+		BLK_ERROR("Failed to wait for the device to be idle\n");
+	}
+}
+
 void
 blk::destroy_renderer()
 {
+	// Every resource below is still being read by the frames `render_frame` submitted, so we cannot destroy any of them
+	// until the GPU is done with them. `destroy_editor` waits too, because it runs before us and destroys the ImGui
+	// backend's own resources.
+	wait_renderer_idle();
+
+	// TODO (Bug): we are leaking resources created in `create_renderer`.
+	// It is not that important because we only destroy the renderer at exit.
 }
 
 void
 blk::update_frame(const Scene_Graph& scene_graph, const Camera_View& camera_view)
 {
-	// ============================================================================
-	// Initialize `Camera_UBO` for later.
-	// ============================================================================
+	// Initialize `Camera_UBO`.
 
 	Camera_UBO camera_ubo = {};
 	camera_ubo.view = camera_view.view;
 	camera_ubo.projection = camera_view.projection;
-	camera_ubo.view_position = camera_view.view_position;
+	camera_ubo.view_position.vector = camera_view.view_position;
 
-	// ============================================================================
-	// Initialize empty `Light_UBO` for later.
-	// ============================================================================
+	// Initialize empty `Light_UBO`.
 
 	Light_UBO light_ubo = {};
 
+	// Initialize skybox UBO.
+
+	Skybox_UBO skybox_ubo = {};
+
+	// We only can have one sun in the scene, so we use this variable to keep that invariant and report the possible
+	// error.
+	bool sun_exists = false;
+
 	// Empty draw command of the current frame.
+
 	Frame& frame = renderer.frames.buffer[renderer.frame_index];
 	empty(frame.mesh_draw_commands);
-	empty(frame.light_draw_commands);
+	empty(frame.skybox_draw_commands);
 
 	// Now, we iterate over all the `Node`s in the scene and compute new draw commands.
 
@@ -343,15 +605,11 @@ blk::update_frame(const Scene_Graph& scene_graph, const Camera_View& camera_view
 		// Now, we now this slot has a live node, so we get a pointer to it.
 		const Node* node = &node_slot.element;
 
-		// ============================================================================
 		// Initialize draw command.
-		// ============================================================================
 
 		Draw_Command draw_command = {};
 
-		// ============================================================================
 		// Set `Draw_Command::Mesh_Constants`.
-		// ============================================================================
 
 		// We compute `Mesh_Constants` for all node types because there are some nodes that have gizmo meshes. They are
 		// not really a `Node_Type::MESH_INSTANCE` because the gizmo mesh is only used by the `Editor/`.
@@ -372,9 +630,7 @@ blk::update_frame(const Scene_Graph& scene_graph, const Camera_View& camera_view
 		switch (node->type)
 		{
 		case Node_Type::MESH_INSTANCE: {
-			// ============================================================================
 			// Set `Draw_Command::Pipeline`.
-			// ============================================================================
 
 			draw_command.pipeline = &renderer.mesh_pipeline;
 
@@ -384,11 +640,14 @@ blk::update_frame(const Scene_Graph& scene_graph, const Camera_View& camera_view
 			for (size_t mesh_handle_index = 0; mesh_handle_index < node->mesh_instance.mesh_handles.count;
 				 ++mesh_handle_index)
 			{
+				// Set `Draw_Command::Mesh_Device`.
+
 				const Pool_Handle<Mesh> host_handle_mesh = node->mesh_instance.mesh_handles.buffer[mesh_handle_index];
 
-				// ============================================================================
-				// Set `Draw_Command::Mesh_Device`.
-				// ============================================================================
+				if (host_handle_mesh == POOL_HANDLE_NONE<Mesh>)
+				{
+					continue;
+				}
 
 				// Transfer host mesh to device. `transfer_mesh` will handle duplicated meshes correctly.
 				BLK_IF_NOT_SUCCESS(transfer_mesh(context, arena, host_handle_mesh, draw_command.mesh_device))
@@ -397,13 +656,11 @@ blk::update_frame(const Scene_Graph& scene_graph, const Camera_View& camera_view
 					continue;
 				}
 
+				// Set `Draw_Command::Material_Device`.
+
 				// A `Mesh_Instance` has always the same mesh handles than material handles.
 				const Pool_Handle<Material> host_material_handle =
 					node->mesh_instance.material_handles.buffer[mesh_handle_index];
-
-				// ============================================================================
-				// Set `Draw_Command::Material_Device`.
-				// ============================================================================
 
 				BLK_IF_NOT_SUCCESS(transfer_material(
 					context,
@@ -431,58 +688,80 @@ blk::update_frame(const Scene_Graph& scene_graph, const Camera_View& camera_view
 				continue;
 			}
 
-			// ============================================================================
-			// Set `Draw_Command::Pipeline`.
-			// ============================================================================
+			// A point light contributes no geometry, so it emits no draw command. We only store its position and
+			// color in the arrays declared at the start of this function.
 
-			draw_command.pipeline = &renderer.light_pipeline;
-
-			// ============================================================================
-			// Set `Draw_Command::Light_Constants`.
-			// ============================================================================
-
-			draw_command.light_constants.light_index = light_ubo.light_count;
-
-			// ============================================================================
-			// Set `Draw_Command:: Mesh_Device`.
-			// This is the `Point_Light` gizmo.
-			// ============================================================================
-
-			const Pool_Handle<Mesh> light_uv_sphere_handle = compute_uv_sphere(1.0f, 18, 32);
-
-			BLK_IF_NOT_SUCCESS(transfer_mesh(context, arena, light_uv_sphere_handle, draw_command.mesh_device))
-			{
-				BLK_ERROR("Failed to transfer point light UV sphere mesh to device\n");
-				continue;
-			}
-
-			// Now, we store the point light position and color in our arrays at the start of this function.
-
-			light_ubo.light_positions[light_ubo.light_count] = node->transform.position;
+			light_ubo.light_positions[light_ubo.light_count].vector = node->transform.position;
 
 			// We have to convert the light color to linear space.
 			const Color_RGB<float> linear_color = convert_srgb_to_linear(node->point_light.color);
 
-			light_ubo.light_colors[light_ubo.light_count] =
+			light_ubo.light_colors[light_ubo.light_count].vector =
 				Vector3{.x = linear_color.r, .y = linear_color.g, .z = linear_color.b};
 
 			// Increase the number of lights counter.
 			light_ubo.light_count += 1;
+		}
+		break;
+		case Node_Type::SPATIAL: {
+		}
+		break;
+		case Node_Type::DIRECTIONAL_LIGHT: {
+			if (node->directional_light.is_sun)
+			{
+				if (sun_exists)
+				{
+					BLK_ERROR("A sun in the scene already exists\n");
+					continue;
+				}
 
-			// Push `draw_command` to the current `frame`.
-			push(frame.light_draw_commands, draw_command);
+				// We strip the translation component from the view matrix.
+
+				if (const Matrix4 view_no_translation = init_matrix4(init_matrix3(camera_view.view));
+					inverse(camera_view.projection * view_no_translation, skybox_ubo.inversed_view_projection) !=
+					Result::SUCCESS)
+				{
+					BLK_ERROR("Failed to compute the inverse matrix for the sun\n");
+					continue;
+				}
+
+				sun_exists = true;
+
+				// Set skybox UBO.
+				skybox_ubo.view_height = camera_view.view_position.y;
+
+				// Compute sun forward vector.
+				const Vector3 forward = to_cartesian(node->transform.rotation);
+
+				// Negate to get the direction towards the sun.
+				skybox_ubo.sun_direction = -forward;
+
+				// Convert sun radius to radians.
+				skybox_ubo.sun_radius = to_radians(Degrees{node->transform.scale.x});
+
+				// Create draw command.
+				draw_command.pipeline = &renderer.skybox_pipeline;
+				push(frame.skybox_draw_commands, draw_command);
+			}
+			else
+			{
+				// TODO (Feature): normal directional lights are not implemented yet.
+			}
 		}
 		break;
 		}
 	}
 
 	// Wait before updating UBOs.
+
 	if (vkWaitForFences(context.logical_device, 1, &frame.fence, VK_TRUE, UINT64_MAX) != VK_SUCCESS)
 	{
 		BLK_ERROR("Failed to wait for frame fence\n");
 
 		return;
 	}
+
+	// Update camera UBO.
 
 	BLK_IF_NOT_SUCCESS(update_buffer(frame.camera_buffer, &camera_ubo, sizeof(Camera_UBO), 0))
 	{
@@ -491,9 +770,20 @@ blk::update_frame(const Scene_Graph& scene_graph, const Camera_View& camera_view
 		return;
 	}
 
+	// Update light UBO.
+
 	BLK_IF_NOT_SUCCESS(update_buffer(frame.light_buffer, &light_ubo, sizeof(Light_UBO), 0))
 	{
 		BLK_ERROR("Failed to update light UBO\n");
+
+		return;
+	}
+
+	// Update skybox UBO.
+
+	BLK_IF_NOT_SUCCESS(update_buffer(frame.skybox_buffer, &skybox_ubo, sizeof(Skybox_UBO), 0))
+	{
+		BLK_ERROR("Failed to update skybox UBO\n");
 
 		return;
 	}
@@ -660,11 +950,10 @@ blk::render_frame()
 	vkCmdBindIndexBuffer(frame.command_buffer, arena.index_buffer.device.buffer, 0, VK_INDEX_TYPE_UINT32);
 
 	// Bind frame descriptor sets.
-	// Camera and light data are the same for every object in frame.
 
 	const Array frame_descriptor_sets = {{
-		frame.camera_descriptor_set,
-		frame.light_descriptor_set,
+		renderer.global_descriptor_set,
+		frame.descriptor_set,
 	}};
 
 	vkCmdBindDescriptorSets(
@@ -678,7 +967,7 @@ blk::render_frame()
 		nullptr
 	);
 
-	// Iterate over frame draw commands and emit draw calls.
+	// Iterate over frame mesh draw commands and emit draw calls.
 
 	for (size_t mesh_draw_command_index = 0; mesh_draw_command_index < frame.mesh_draw_commands.count;
 		 ++mesh_draw_command_index)
@@ -725,48 +1014,45 @@ blk::render_frame()
 		);
 	}
 
-	for (size_t light_draw_command_index = 0; light_draw_command_index < frame.light_draw_commands.count;
-		 ++light_draw_command_index)
+	// Iterate over frame skybox draw commands and emit draw calls.
+
+	for (size_t skybox_draw_command_index = 0; skybox_draw_command_index < frame.skybox_draw_commands.count;
+		 ++skybox_draw_command_index)
 	{
-		const Draw_Command& light_draw_command = frame.light_draw_commands.buffer[light_draw_command_index];
+		const Draw_Command& skybox_draw_command = frame.skybox_draw_commands.buffer[skybox_draw_command_index];
 
 		// Bind pipeline.
 
 		// This should not fail unless something is wrong with the implementation.
-		BLK_CHECK(light_draw_command.pipeline);
-		vkCmdBindPipeline(frame.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, light_draw_command.pipeline->pipeline);
-
-		// Push `Mesh_Constants`. The light gizmo goes through the same vertex shader as a mesh, so it needs its model
-		// matrix at offset 0 just the same.
-
-		vkCmdPushConstants(
+		BLK_CHECK(skybox_draw_command.pipeline);
+		vkCmdBindPipeline(
 			frame.command_buffer,
-			light_draw_command.pipeline->layout,
-			VK_SHADER_STAGE_VERTEX_BIT,
+			VK_PIPELINE_BIND_POINT_GRAPHICS,
+			skybox_draw_command.pipeline->pipeline
+		);
+
+		// Bind the skybox descriptor sets.
+
+		const Array skybox_descriptor_sets = {{
+			renderer.global_descriptor_set,
+			frame.descriptor_set,
+		}};
+
+		vkCmdBindDescriptorSets(
+			frame.command_buffer,
+			VK_PIPELINE_BIND_POINT_GRAPHICS,
+			skybox_draw_command.pipeline->layout,
 			0,
-			sizeof(Mesh_Constants),
-			&light_draw_command.mesh_constants
+			skybox_descriptor_sets.capacity,
+			skybox_descriptor_sets.buffer,
+			0,
+			nullptr
 		);
 
-		// Push `Light_Constants`.
+		// The vertex shader builds a full screen triangle out of `SV_VertexID`, so there is no vertex or index buffer
+		// to read from and no push constants to set. The vertex and index buffers bound above are simply ignored.
 
-		vkCmdPushConstants(
-			frame.command_buffer,
-			light_draw_command.pipeline->layout,
-			VK_SHADER_STAGE_FRAGMENT_BIT,
-			sizeof(Mesh_Constants),
-			sizeof(Light_Constants),
-			&light_draw_command.light_constants
-		);
-
-		vkCmdDrawIndexed(
-			frame.command_buffer,
-			light_draw_command.mesh_device.index_count,
-			1,
-			light_draw_command.mesh_device.first_index,
-			static_cast<int32_t>(light_draw_command.mesh_device.first_vertex),
-			0
-		);
+		vkCmdDraw(frame.command_buffer, 3, 1, 0, 0);
 	}
 
 	// We draw the `Editor/` UI on top of the scene.
@@ -825,7 +1111,7 @@ blk::render_frame()
 	queue_submit_info.signalSemaphoreInfoCount = 1;
 	queue_submit_info.pSignalSemaphoreInfos = &signal_semaphore_submit_info;
 
-	if (vkQueueSubmit2(context.graphics_queue, 1, &queue_submit_info, frame.fence) != VK_SUCCESS)
+	if (vkQueueSubmit2(context.queue, 1, &queue_submit_info, frame.fence) != VK_SUCCESS)
 	{
 		BLK_ERROR("Failed to submit queue\n");
 
@@ -842,7 +1128,7 @@ blk::render_frame()
 	present_info.pSwapchains = &renderer.swapchain.swapchain;
 	present_info.pImageIndices = &image_index;
 
-	if (vkQueuePresentKHR(context.graphics_queue, &present_info) != VK_SUCCESS)
+	if (vkQueuePresentKHR(context.queue, &present_info) != VK_SUCCESS)
 	{
 		BLK_ERROR("Failed to present queue\n");
 
@@ -871,8 +1157,8 @@ blk::get_renderer_imgui_init_info()
 		.Instance = context.instance,
 		.PhysicalDevice = context.physical_device,
 		.Device = context.logical_device,
-		.QueueFamily = context.graphics_queue_family_index,
-		.Queue = context.graphics_queue,
+		.QueueFamily = context.queue_family_index,
+		.Queue = context.queue,
 		.DescriptorPool = VK_NULL_HANDLE,
 		.DescriptorPoolSize = IMGUI_IMPL_VULKAN_MINIMUM_SAMPLED_IMAGE_POOL_SIZE,
 		.MinImageCount = 2,

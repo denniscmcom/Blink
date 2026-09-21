@@ -18,6 +18,7 @@
 #include "Engine/Platform/Log.hpp"
 #include "Engine/Platform/Result.hpp"
 #include "Engine/Platform/Window_Internal.hpp"
+#include "Engine/Renderer/Renderer.hpp"
 #include "Engine/Renderer/Renderer_Internal.hpp"
 
 #include <Windows.h>
@@ -284,6 +285,10 @@ blk::update_editor(Editor_Context& context, const double delta_time)
 void
 blk::destroy_editor()
 {
+	// `ImGui_ImplVulkan_Shutdown` destroys the backend's own buffers, and the GPU is still executing the frames
+	// `render_frame` submitted, which read them.
+	wait_renderer_idle();
+
 	ImGui_ImplVulkan_Shutdown();
 	ImGui_ImplWin32_Shutdown();
 	ImGui::DestroyContext();

@@ -36,7 +36,6 @@ blk::transfer_texture(
 
 	if (!texture_host)
 	{
-		// TODO (Feature): We could use a default texture when one is missing (like a pink texture or something).
 		BLK_ERROR("Failed to get texture host data to transfer\n");
 
 		return Result::INVALID_ARGUMENTS;

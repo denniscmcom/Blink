@@ -3,30 +3,18 @@
 // Licensed under the Blink Engine Source Access License, see LICENSE.txt
 // ============================================================================
 
-#include "Shared.slang"
-
-struct VS_Main_Input
-{
-	float3 position;
-	float3 normal;
-	float3 tangent;
-	float3 bitangent;
-	float2 texture_coord;
-};
-
-[[vk::binding(0, 0)]]
-ConstantBuffer<Camera_UBO> camera_ubo;
-
-[[vk::push_constant]]
-ConstantBuffer<Mesh_Constants> mesh_constants;
+#include "Interface/Frame_Set.slang"
+#include "Interface/Push_Constants.slang"
+#include "Interface/Vertex_Input.slang"
+#include "Pass/Mesh.slang"
 
 [shader("vertex")]
-VS_Main_Output
-vs_main(VS_Main_Input input)
+VS_Mesh_Output
+vs_main(VS_Mesh_Input input)
 {
 	float4 fragment_position = mul(mesh_constants.model, float4(input.position, 1.0));
 
-	VS_Main_Output output = {};
+	VS_Mesh_Output output = {};
 	output.position = mul(camera_ubo.projection, mul(camera_ubo.view, fragment_position));
 	output.normal = mul(mesh_constants.normal_matrix, float4(input.normal, 0.0)).xyz;
 	output.tangent = mul(mesh_constants.model, float4(input.tangent, 0.0)).xyz;
@@ -36,5 +24,3 @@ vs_main(VS_Main_Input input)
 
 	return output;
 }
-
-

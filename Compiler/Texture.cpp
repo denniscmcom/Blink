@@ -14,6 +14,8 @@
 
 #include <stb_image.h>
 
+#include <stdint.h>
+
 namespace
 {
 /// PNG magic number.
@@ -39,14 +41,14 @@ blk::compiler::compile_texture(Serial& input_serial, Serial& output_serial)
 
 	// Verify PNG magic number.
 
-	uint8_t png_magic[8] = {};
+	uint8_t png_magic[sizeof(PNG_MAGIC)] = {};
 
 	BLK_IF_NOT_SUCCESS(read(input_serial, png_magic))
 	{
 		BLK_FATAL("Failed to read PNG magic number\n");
 	}
 
-	if (memcmp(png_magic, PNG_MAGIC, 8) != 0)
+	if (memcmp(png_magic, PNG_MAGIC, sizeof(PNG_MAGIC)) != 0)
 	{
 		BLK_FATAL("Invalid PNG magic number; file is corrupted\n");
 	}
