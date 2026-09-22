@@ -237,8 +237,8 @@ BLK_ENTRY()
 			}
 		}
 
-		blk::update_frame(game_context.world.scene_graph, camera_view);
-		blk::render_frame();
+		blk::update_frame(game_context.world.scene_graph, camera_view, game_context.world.settings);
+		blk::render_frame(game_context.world.settings);
 	}
 
 	// ============================================================================

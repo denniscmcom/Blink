@@ -29,10 +29,12 @@ struct Image
 };
 
 /// Creates an `image`.
+/// @param depth Number of depth slices. A `depth` of 1 creates a 2D image, greater than 1 creates a 3D one.
 Result create_image(
 	const Context& context,
 	uint32_t width,
 	uint32_t height,
+	uint32_t depth,
 	VkFormat format,
 	VkImageTiling tiling,
 	VkImageUsageFlags usage,

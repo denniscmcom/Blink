@@ -11,6 +11,7 @@
 
 namespace blk
 {
+struct World_Settings;
 struct Scene_Graph;
 enum class Result;
 
@@ -39,7 +40,7 @@ void wait_renderer_idle();
 /// Destroys the renderer.
 void destroy_renderer();
 /// Updates the frame to render next.
-void update_frame(const Scene_Graph& scene_graph, const Camera_View& camera_view);
+void update_frame(const Scene_Graph& scene_graph, const Camera_View& camera_view, const World_Settings& settings);
 /// Renders the frame.
-void render_frame();
+void render_frame(const World_Settings& settings);
 }  // namespace blk

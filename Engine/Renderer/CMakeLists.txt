@@ -26,6 +26,7 @@ target_sources(BlkEngine
 			Resource/Texture_Device.hpp
 			Helpers.hpp
 			Renderer_Internal.hpp
+			Skybox.hpp
 	PRIVATE
 		Lifetime/Buffer.cpp
 		Lifetime/Command.cpp
@@ -42,6 +43,7 @@ target_sources(BlkEngine
 		Resource/Texture_Device.cpp
 		Helpers.cpp
 		Renderer.cpp
+		Skybox.cpp
 )
 
 add_subdirectory(Shaders)

@@ -11,6 +11,7 @@
 #include "Engine/Core/Math/Vector.hpp"
 #include "Engine/Renderer/Lifetime/Buffer.hpp"
 #include "Engine/Renderer/Lifetime/Descriptor.hpp"
+#include "Engine/Renderer/Lifetime/Image.hpp"
 
 #include <stddef.h>
 #include <vulkan/vulkan.h>
@@ -120,6 +121,14 @@ struct Frame
 	Buffer light_buffer;
 	/// Skybox buffer to store `Skybox_UBO`.
 	Buffer skybox_buffer;
+	/// Transmittance LUT for the skybox.
+	Image skybox_transmittance_lut;
+	/// Multiscattering LUT for the skybox.
+	Image skybox_multiscattering_lut;
+	/// Sky-view LUT for the skybox.
+	Image skybox_sky_view_lut;
+	/// Aerial perspective LUT for the skybox.
+	Image skybox_aerial_lut;
 	/// The `Descriptor_Layouts::pool` the descriptor sets below were allocated from. We keep it so that `destroy_frame`
 	/// can return them to it.
 	VkDescriptorPool descriptor_pool = VK_NULL_HANDLE;

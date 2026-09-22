@@ -306,6 +306,25 @@ blk::draw_outliner(Editor_Context& context)
 
 		if (ImGui::BeginTabItem("World settings"))
 		{
+			if (ImGui::TreeNodeEx("Skybox", ImGuiTreeNodeFlags_DefaultOpen))
+			{
+				// Skybox settings.
+
+				ImGui::Checkbox(
+					"Transmittance",
+					&context.world_context.game_world->settings.enable_skybox_transmittance
+				);
+
+				ImGui::Checkbox(
+					"Multiscattering",
+					&context.world_context.game_world->settings.enable_skybox_multiscattering
+				);
+
+				ImGui::Checkbox("Sky-view", &context.world_context.game_world->settings.enable_skybox_sky_view);
+				ImGui::Checkbox("Aerial", &context.world_context.game_world->settings.enable_skybox_aerial);
+
+				ImGui::TreePop();
+			}
 
 			ImGui::EndTabItem();
 		}

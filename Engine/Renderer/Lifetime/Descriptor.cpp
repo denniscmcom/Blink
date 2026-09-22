@@ -30,23 +30,24 @@ blk::create_descriptor_layouts(const Context& context, Descriptor_Layouts& layou
 		},
 		VkDescriptorPoolSize{
 			.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-			// 3 textures (albedo, normal, ORM) * material count + skybox transmittance LUT.
-			.descriptorCount = 3 * MAX_MATERIAL_COUNT + 1,
+			// 3 textures (albedo, normal, ORM) * material count + (skybox transmittance LUT + skybox multiscattering
+			// LUT + skybox sky-view LUT + skybox aerial LUT) * frame.
+			.descriptorCount = 3 * MAX_MATERIAL_COUNT + 4 * MAX_FRAMES_IN_FLIGHT,
 		},
 		VkDescriptorPoolSize{
 			.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-			// Skybox transmittance LUT.
-			.descriptorCount = 1,
+			// (skybox transmittance LUT + skybox multiscattering LUT + skybox sky-view LUT + skybox aerial LUT) *
+			// frame.
+			.descriptorCount = 4 * MAX_FRAMES_IN_FLIGHT,
 		},
 	}};
 
 	VkDescriptorPoolCreateInfo descriptor_pool_create_info = {};
 	descriptor_pool_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	descriptor_pool_create_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-	// How many descriptor sets total we can allocate from this pool.
-	// 3 sets (camera UBO + light UBO + skybox UBO) * frame + 1 material UBO * material count + skybox transmittance LUT
-	// samples + skybox transmittance LUT storage.
-	descriptor_pool_create_info.maxSets = 3 * MAX_FRAMES_IN_FLIGHT + MAX_MATERIAL_COUNT + 2;
+	// How many descriptor sets total we can allocate from this pool. This counts sets, not the descriptors within them:
+	// 1 frame set * frame + 1 material set * material count + 1 global set.
+	descriptor_pool_create_info.maxSets = MAX_FRAMES_IN_FLIGHT + MAX_MATERIAL_COUNT + 1;
 	descriptor_pool_create_info.poolSizeCount = descriptor_pool_sizes.capacity;
 	descriptor_pool_create_info.pPoolSizes = descriptor_pool_sizes.buffer;
 
@@ -83,7 +84,63 @@ blk::create_descriptor_layouts(const Context& context, Descriptor_Layouts& layou
 			.binding = 2,
 			.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
 			.descriptorCount = 1,
-			.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+			.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT,
+		},
+		// Write skybox transmittance LUT.
+		VkDescriptorSetLayoutBinding{
+			.binding = 3,
+			.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+			.descriptorCount = 1,
+			.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+		},
+		// Sample skybox transmittance LUT.
+		VkDescriptorSetLayoutBinding{
+			.binding = 4,
+			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			.descriptorCount = 1,
+			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT,
+		},
+		// Write skybox multiscattering LUT.
+		VkDescriptorSetLayoutBinding{
+			.binding = 5,
+			.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+			.descriptorCount = 1,
+			.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+		},
+		// Sample skybox multiscattering LUT.
+		VkDescriptorSetLayoutBinding{
+			.binding = 6,
+			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			.descriptorCount = 1,
+			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT,
+		},
+		// Write skybox sky-view LUT.
+		VkDescriptorSetLayoutBinding{
+			.binding = 7,
+			.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+			.descriptorCount = 1,
+			.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+		},
+		// Sample skybox sky-view LUT.
+		VkDescriptorSetLayoutBinding{
+			.binding = 8,
+			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			.descriptorCount = 1,
+			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+		},
+		// Write skybox aerial LUT.
+		VkDescriptorSetLayoutBinding{
+			.binding = 9,
+			.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+			.descriptorCount = 1,
+			.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+		},
+		// Sample skybox aerial LUT.
+		VkDescriptorSetLayoutBinding{
+			.binding = 10,
+			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			.descriptorCount = 1,
+			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
 		},
 	}};
 
@@ -158,27 +215,14 @@ blk::create_descriptor_layouts(const Context& context, Descriptor_Layouts& layou
 
 	// Create global descriptor set layout.
 
-	constexpr Array global_bindings = {{
-		// To write the skybox transmittance LUT.
-		VkDescriptorSetLayoutBinding{
-			.binding = 0,
-			.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-			.descriptorCount = 1,
-			.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-		},
-		// Transmittance LUT.
-		VkDescriptorSetLayoutBinding{
-			.binding = 1,
-			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-			.descriptorCount = 1,
-			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-		},
-	}};
+	// Empty for now.
+	// constexpr Array<VkDescriptorSetLayoutBinding, 0> global_bindings = {{
+	// }};
 
 	VkDescriptorSetLayoutCreateInfo global_layout_info = {};
 	global_layout_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	global_layout_info.bindingCount = global_bindings.capacity;
-	global_layout_info.pBindings = global_bindings.buffer;
+	global_layout_info.bindingCount = 0;
+	global_layout_info.pBindings = nullptr;
 
 	VkDescriptorSetLayout global_layout = VK_NULL_HANDLE;
 

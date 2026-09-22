@@ -58,6 +58,9 @@ function(blk_add_shaders TARGET)
 endfunction()
 
 blk_add_shaders(BlkShaders
+	CS_Skybox_Aerial.slang|cs_main
+	CS_Skybox_Multiscattering.slang|cs_main
+	CS_Skybox_Sky_View.slang|cs_main
 	CS_Skybox_Transmittance.slang|cs_main
 	FS_Mesh.slang|fs_main
 	FS_Skybox.slang|fs_main

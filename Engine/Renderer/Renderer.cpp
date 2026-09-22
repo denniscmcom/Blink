@@ -28,12 +28,14 @@
 #include "Engine/Renderer/Resource/Arena.hpp"
 #include "Engine/Renderer/Resource/Material_Device.hpp"
 #include "Engine/Renderer/Resource/Mesh_Device.hpp"
+#include "Engine/Renderer/Skybox.hpp"
 #include "Engine/Resource/Mesh.hpp"
 #include "Engine/Scene/Graph.hpp"
 #include "Engine/Scene/Mesh_Instance.hpp"
 #include "Engine/Scene/Node.hpp"
 #include "Engine/Scene/Point_Light.hpp"
 #include "Engine/Scene/Transform.hpp"
+#include "Engine/World/World.hpp"
 
 #include <Windows.h>
 #include <vulkan/vulkan.h>
@@ -54,6 +56,10 @@ struct Renderer
 	blk::Pipeline skybox_pipeline;
 	/// Pipeline to compute the skybox transmittance LUT.
 	blk::Pipeline skybox_transmittance_pipeline;
+	/// Pipeline to compute the skybox multiscattering LUT.
+	blk::Pipeline skybox_multiscattering_pipeline;
+	/// Pipeline to compute the skybox sky-view LUT.
+	blk::Pipeline skybox_sky_view_pipeline;
 
 	/// Descriptor layouts.
 	blk::Descriptor_Layouts descriptor_layouts;
@@ -62,8 +68,6 @@ struct Renderer
 
 	/// Image for depth testing.
 	blk::Image depth_image;
-	/// Transmittance LUT for the skybox.
-	blk::Image skybox_transmittance_lut;
 
 	/// Frame data.
 	blk::Array<blk::Frame, blk::MAX_FRAMES_IN_FLIGHT> frames;
@@ -71,23 +75,11 @@ struct Renderer
 	uint32_t frame_index;
 };
 
-/// Width of the skybox transmittance LUT.
-constexpr uint32_t SKYBOX_TRANSMITTANCE_LUT_WIDTH = 256;
-/// Height of the skybox transmittance LUT.
-constexpr uint32_t SKYBOX_TRANSMITTANCE_LUT_HEIGHT = 64;
-
-/// Workgroup size of skybox transmittance. It has to match the `numthreads` declared in
-/// `Shaders/CS_Skybox_Transmittance.slang`.
-constexpr uint32_t SKYBOX_TRANSMITTANCE_WORKGROUP_SIZE = 8;
-
-// The dispatch below rounds down, so a LUT that is not a whole number of workgroups would leave texels unwritten.
-static_assert(SKYBOX_TRANSMITTANCE_LUT_WIDTH % SKYBOX_TRANSMITTANCE_WORKGROUP_SIZE == 0);
-static_assert(SKYBOX_TRANSMITTANCE_LUT_HEIGHT % SKYBOX_TRANSMITTANCE_WORKGROUP_SIZE == 0);
-
 blk::Allocator allocator = {};
 blk::Context context = {};
 blk::Arena arena = {};
 Renderer renderer = {};
+
 }  // namespace
 
 // TODO (Feature): `rect` is currently not used. Swapchain creation is using surface capabilities to get it's size.
@@ -166,13 +158,9 @@ blk::create_renderer(const Rect<unsigned>& /*rect*/)
 		renderer.descriptor_layouts.material_layout,
 	}};
 
-	const Array skybox_pipeline_layouts = {{
+	const Array frame_pipeline_layouts = {{
 		renderer.descriptor_layouts.global_layout,
 		renderer.descriptor_layouts.frame_layout,
-	}};
-
-	const Array skybox_transmittance_pipeline_layouts = {{
-		renderer.descriptor_layouts.global_layout,
 	}};
 
 	// Create depth image.
@@ -181,6 +169,7 @@ blk::create_renderer(const Rect<unsigned>& /*rect*/)
 			context,
 			renderer.swapchain.extent.width,
 			renderer.swapchain.extent.height,
+			1,
 			VK_FORMAT_D32_SFLOAT,
 			VK_IMAGE_TILING_OPTIMAL,
 			VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
@@ -191,29 +180,6 @@ blk::create_renderer(const Rect<unsigned>& /*rect*/)
 		result != Result::SUCCESS)
 	{
 		BLK_ERROR("Failed to create depth image\n");
-		destroy_renderer();
-
-		return result;
-	}
-
-	// Create skybox transmittance LUT.
-	// The format should match the `vk::image_format` of `transmittance_storage_image` in
-	// `Shaders/Interface/Global_Set.slang`.
-
-	if (const Result result = create_image(
-			context,
-			SKYBOX_TRANSMITTANCE_LUT_WIDTH,
-			SKYBOX_TRANSMITTANCE_LUT_HEIGHT,
-			VK_FORMAT_R16G16B16A16_SFLOAT,
-			VK_IMAGE_TILING_OPTIMAL,
-			VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-			VK_IMAGE_ASPECT_COLOR_BIT,
-			renderer.skybox_transmittance_lut
-		);
-		result != Result::SUCCESS)
-	{
-		BLK_ERROR("Failed to create skybox transmittance LUT image\n");
 		destroy_renderer();
 
 		return result;
@@ -239,45 +205,7 @@ blk::create_renderer(const Rect<unsigned>& /*rect*/)
 		return Result::DEVICE_ERROR;
 	}
 
-	// Write global descriptor set.
-
-	VkDescriptorImageInfo transmittance_storage_image_info = {};
-	transmittance_storage_image_info.imageView = renderer.skybox_transmittance_lut.view;
-	transmittance_storage_image_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-
-	VkDescriptorImageInfo transmittance_sampler_image_info = {};
-	transmittance_sampler_image_info.sampler = context.lut_sampler;
-	transmittance_sampler_image_info.imageView = renderer.skybox_transmittance_lut.view;
-	transmittance_sampler_image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-	const Array global_descriptor_writes = {{
-		VkWriteDescriptorSet{
-			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-			.dstSet = renderer.global_descriptor_set,
-			.dstBinding = 0,
-			.dstArrayElement = 0,
-			.descriptorCount = 1,
-			.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-			.pImageInfo = &transmittance_storage_image_info,
-		},
-		VkWriteDescriptorSet{
-			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-			.dstSet = renderer.global_descriptor_set,
-			.dstBinding = 1,
-			.dstArrayElement = 0,
-			.descriptorCount = 1,
-			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-			.pImageInfo = &transmittance_sampler_image_info,
-		},
-	}};
-
-	vkUpdateDescriptorSets(
-		context.logical_device,
-		global_descriptor_writes.capacity,
-		global_descriptor_writes.buffer,
-		0,
-		nullptr
-	);
+	// No descriptors writes because it is currently empty.
 
 	// Create shader modules;
 
@@ -286,6 +214,8 @@ blk::create_renderer(const Rect<unsigned>& /*rect*/)
 	VkShaderModule vs_skybox = VK_NULL_HANDLE;
 	VkShaderModule fs_skybox = VK_NULL_HANDLE;
 	VkShaderModule cs_skybox_transmittance = VK_NULL_HANDLE;
+	VkShaderModule cs_skybox_multiscattering = VK_NULL_HANDLE;
+	VkShaderModule cs_skybox_sky_view = VK_NULL_HANDLE;
 
 	if (const Result result = create_shader_module(context, "FS_Mesh", fs_mesh); result != Result::SUCCESS)
 	{
@@ -328,6 +258,24 @@ blk::create_renderer(const Rect<unsigned>& /*rect*/)
 		return result;
 	}
 
+	if (const Result result = create_shader_module(context, "CS_Skybox_Multiscattering", cs_skybox_multiscattering);
+		result != Result::SUCCESS)
+	{
+		BLK_ERROR("Failed to create `CS_Skybox_Multiscattering` shader module\n");
+		destroy_renderer();
+
+		return result;
+	}
+
+	if (const Result result = create_shader_module(context, "CS_Skybox_Sky_View", cs_skybox_sky_view);
+		result != Result::SUCCESS)
+	{
+		BLK_ERROR("Failed to create `CS_Skybox_Sky_View` shader module\n");
+		destroy_renderer();
+
+		return result;
+	}
+
 	// Initialize pipeline shader stage infos.
 
 	const VkPipelineShaderStageCreateInfo fs_mesh_stage_info =
@@ -340,6 +288,10 @@ blk::create_renderer(const Rect<unsigned>& /*rect*/)
 		get_pipeline_shader_stage_create_info(fs_skybox, VK_SHADER_STAGE_FRAGMENT_BIT, "fs_main");
 	const VkPipelineShaderStageCreateInfo cs_skybox_transmittance_stage_info =
 		get_pipeline_shader_stage_create_info(cs_skybox_transmittance, VK_SHADER_STAGE_COMPUTE_BIT, "cs_main");
+	const VkPipelineShaderStageCreateInfo cs_skybox_multiscattering_stage_info =
+		get_pipeline_shader_stage_create_info(cs_skybox_multiscattering, VK_SHADER_STAGE_COMPUTE_BIT, "cs_main");
+	const VkPipelineShaderStageCreateInfo cs_skybox_sky_view_stage_info =
+		get_pipeline_shader_stage_create_info(cs_skybox_sky_view, VK_SHADER_STAGE_COMPUTE_BIT, "cs_main");
 
 	const Array mesh_pipeline_shader_stages = {{
 		vs_mesh_stage_info,
@@ -404,7 +356,7 @@ blk::create_renderer(const Rect<unsigned>& /*rect*/)
 			context,
 			renderer.swapchain.surface_format,
 			renderer.depth_image.format,
-			to_array_view(skybox_pipeline_layouts),
+			to_array_view(frame_pipeline_layouts),
 			to_array_view(skybox_pipeline_shader_stages),
 			{},
 			{},
@@ -426,7 +378,7 @@ blk::create_renderer(const Rect<unsigned>& /*rect*/)
 
 	if (const Result result = create_compute_pipeline(
 			context,
-			to_array_view(skybox_transmittance_pipeline_layouts),
+			to_array_view(frame_pipeline_layouts),
 			cs_skybox_transmittance_stage_info,
 			{},
 			renderer.skybox_transmittance_pipeline
@@ -434,6 +386,40 @@ blk::create_renderer(const Rect<unsigned>& /*rect*/)
 		result != Result::SUCCESS)
 	{
 		BLK_ERROR("Failed to create skybox transmittance pipeline\n");
+		destroy_renderer();
+
+		return result;
+	}
+
+	// Create skybox multiscattering compute pipeline.
+
+	if (const Result result = create_compute_pipeline(
+			context,
+			to_array_view(frame_pipeline_layouts),
+			cs_skybox_multiscattering_stage_info,
+			{},
+			renderer.skybox_multiscattering_pipeline
+		);
+		result != Result::SUCCESS)
+	{
+		BLK_ERROR("Failed to create skybox multiscattering pipeline\n");
+		destroy_renderer();
+
+		return result;
+	}
+
+	// Create skybox sky-view compute pipeline.
+
+	if (const Result result = create_compute_pipeline(
+			context,
+			to_array_view(frame_pipeline_layouts),
+			cs_skybox_sky_view_stage_info,
+			{},
+			renderer.skybox_sky_view_pipeline
+		);
+		result != Result::SUCCESS)
+	{
+		BLK_ERROR("Failed to create skybox sky-view pipeline\n");
 		destroy_renderer();
 
 		return result;
@@ -469,56 +455,6 @@ blk::bake_renderer()
 	// Record commands.
 
 	BLK_SUCCESS_OR_ERROR_RETURN(begin_one_time_commands(command_buffer), "Failed to begin one time commands\n");
-
-	// Transition skybox transmittance image to write.
-	transition_image_layout(
-		command_buffer,
-		renderer.skybox_transmittance_lut.image,
-		VK_IMAGE_LAYOUT_UNDEFINED,
-		VK_IMAGE_LAYOUT_GENERAL,
-		{},
-		VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
-		VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
-		VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-		VK_IMAGE_ASPECT_COLOR_BIT
-	);
-
-	// Bind skybox transmittance pipeline.
-	vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, renderer.skybox_transmittance_pipeline.pipeline);
-
-	// Bind skybox transmittance descriptor set.
-	vkCmdBindDescriptorSets(
-		command_buffer,
-		VK_PIPELINE_BIND_POINT_COMPUTE,
-		renderer.skybox_transmittance_pipeline.layout,
-		0,
-		1,
-		&renderer.global_descriptor_set,
-		0,
-		nullptr
-	);
-
-	// Dispatch.
-	// One thread per texel.
-	vkCmdDispatch(
-		command_buffer,
-		SKYBOX_TRANSMITTANCE_LUT_WIDTH / SKYBOX_TRANSMITTANCE_WORKGROUP_SIZE,
-		SKYBOX_TRANSMITTANCE_LUT_HEIGHT / SKYBOX_TRANSMITTANCE_WORKGROUP_SIZE,
-		1
-	);
-
-	// The LUT is read-only from here on, so hand it to the skybox fragment shader.
-	transition_image_layout(
-		command_buffer,
-		renderer.skybox_transmittance_lut.image,
-		VK_IMAGE_LAYOUT_GENERAL,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
-		VK_ACCESS_2_SHADER_READ_BIT,
-		VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-		VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-		VK_IMAGE_ASPECT_COLOR_BIT
-	);
 
 	// Finish recording commands.
 	BLK_SUCCESS_OR_ERROR_RETURN(end_one_time_commands(context, command_buffer), "Failed to end one time commands\n");
@@ -557,8 +493,14 @@ blk::destroy_renderer()
 }
 
 void
-blk::update_frame(const Scene_Graph& scene_graph, const Camera_View& camera_view)
+blk::update_frame(const Scene_Graph& scene_graph, const Camera_View& camera_view, const World_Settings& settings)
 {
+	// Empty draw command of the current frame.
+
+	Frame& frame = renderer.frames.buffer[renderer.frame_index];
+	empty(frame.mesh_draw_commands);
+	empty(frame.skybox_draw_commands);
+
 	// Initialize `Camera_UBO`.
 
 	Camera_UBO camera_ubo = {};
@@ -577,12 +519,6 @@ blk::update_frame(const Scene_Graph& scene_graph, const Camera_View& camera_view
 	// We only can have one sun in the scene, so we use this variable to keep that invariant and report the possible
 	// error.
 	bool sun_exists = false;
-
-	// Empty draw command of the current frame.
-
-	Frame& frame = renderer.frames.buffer[renderer.frame_index];
-	empty(frame.mesh_draw_commands);
-	empty(frame.skybox_draw_commands);
 
 	// Now, we iterate over all the `Node`s in the scene and compute new draw commands.
 
@@ -798,7 +734,7 @@ blk::update_frame(const Scene_Graph& scene_graph, const Camera_View& camera_view
 }
 
 void
-blk::render_frame()
+blk::render_frame(const World_Settings& settings)
 {
 	// Get current frame.
 	const Frame& frame = renderer.frames.buffer[renderer.frame_index];
@@ -839,6 +775,214 @@ blk::render_frame()
 	if (vkBeginCommandBuffer(frame.command_buffer, &begin_info) != VK_SUCCESS)
 	{
 		BLK_ERROR("Failed to begin command buffer\n");
+	}
+
+	// Define frame descriptor sets.
+	const Array frame_descriptor_sets = {{
+		renderer.global_descriptor_set,
+		frame.descriptor_set,
+	}};
+
+	if (settings.enable_skybox_transmittance)
+	{
+		// Compute the skybox transmittance LUT.
+
+		// Transition skybox transmittance image to write.
+		transition_image_layout(
+			frame.command_buffer,
+			frame.skybox_transmittance_lut.image,
+			VK_IMAGE_LAYOUT_UNDEFINED,
+			VK_IMAGE_LAYOUT_GENERAL,
+			{},
+			VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
+			VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
+			VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+			VK_IMAGE_ASPECT_COLOR_BIT
+		);
+
+		// Bind skybox transmittance pipeline.
+		vkCmdBindPipeline(
+			frame.command_buffer,
+			VK_PIPELINE_BIND_POINT_COMPUTE,
+			renderer.skybox_transmittance_pipeline.pipeline
+		);
+
+		// Bind skybox transmittance descriptor set.
+		vkCmdBindDescriptorSets(
+			frame.command_buffer,
+			VK_PIPELINE_BIND_POINT_COMPUTE,
+			renderer.skybox_transmittance_pipeline.layout,
+			0,
+			frame_descriptor_sets.capacity,
+			frame_descriptor_sets.buffer,
+			0,
+			nullptr
+		);
+
+		// Dispatch.
+		// One thread per texel.
+		vkCmdDispatch(
+			frame.command_buffer,
+			SKYBOX_TRANSMITTANCE_LUT_WIDTH / SKYBOX_TRANSMITTANCE_WORKGROUP_SIZE,
+			SKYBOX_TRANSMITTANCE_LUT_HEIGHT / SKYBOX_TRANSMITTANCE_WORKGROUP_SIZE,
+			1
+		);
+
+		// Transition the LUT so that it can be sampled. The multiscattering and sky-view passes sample it from compute,
+		// `FS_Skybox.slang` samples it for the sun disk from the fragment stage.
+		transition_image_layout(
+			frame.command_buffer,
+			frame.skybox_transmittance_lut.image,
+			VK_IMAGE_LAYOUT_GENERAL,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
+			VK_ACCESS_2_SHADER_READ_BIT,
+			VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+			VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+			VK_IMAGE_ASPECT_COLOR_BIT
+		);
+	}
+	else
+	{
+		clear_skybox_lut(
+			frame.command_buffer,
+			frame.skybox_transmittance_lut.image,
+			VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT
+		);
+	}
+
+	if (settings.enable_skybox_multiscattering)
+	{
+		// Compute the skybox multiscattering LUT.
+		//
+		// It samples the transmittance LUT, so it runs after the pass above. It only depends on the atmosphere
+		// material, which does not change yet, so it could be baked once instead of rebuilt every frame.
+
+		// Transition skybox multiscattering image to write.
+		transition_image_layout(
+			frame.command_buffer,
+			frame.skybox_multiscattering_lut.image,
+			VK_IMAGE_LAYOUT_UNDEFINED,
+			VK_IMAGE_LAYOUT_GENERAL,
+			{},
+			VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
+			VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
+			VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+			VK_IMAGE_ASPECT_COLOR_BIT
+		);
+
+		// Bind skybox multiscattering pipeline.
+		vkCmdBindPipeline(
+			frame.command_buffer,
+			VK_PIPELINE_BIND_POINT_COMPUTE,
+			renderer.skybox_multiscattering_pipeline.pipeline
+		);
+
+		// Bind skybox multiscattering descriptor sets.
+		vkCmdBindDescriptorSets(
+			frame.command_buffer,
+			VK_PIPELINE_BIND_POINT_COMPUTE,
+			renderer.skybox_multiscattering_pipeline.layout,
+			0,
+			frame_descriptor_sets.capacity,
+			frame_descriptor_sets.buffer,
+			0,
+			nullptr
+		);
+
+		// Dispatch.
+		// One thread per texel.
+		vkCmdDispatch(
+			frame.command_buffer,
+			SKYBOX_MULTISCATTERING_LUT_WIDTH / SKYBOX_MULTISCATTERING_WORKGROUP_SIZE,
+			SKYBOX_MULTISCATTERING_LUT_HEIGHT / SKYBOX_MULTISCATTERING_WORKGROUP_SIZE,
+			1
+		);
+
+		// Transition the skybox multiscattering LUT so that the sky-view and aerial passes can sample it.
+		transition_image_layout(
+			frame.command_buffer,
+			frame.skybox_multiscattering_lut.image,
+			VK_IMAGE_LAYOUT_GENERAL,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
+			VK_ACCESS_2_SHADER_READ_BIT,
+			VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+			VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+			VK_IMAGE_ASPECT_COLOR_BIT
+		);
+	}
+	else
+	{
+		clear_skybox_lut(
+			frame.command_buffer,
+			frame.skybox_multiscattering_lut.image,
+			VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT
+		);
+	}
+
+	if (settings.enable_skybox_sky_view)
+	{
+		// Compute skybox sky-view LUT.
+
+		// Transition skybox transmittance image to write.
+		transition_image_layout(
+			frame.command_buffer,
+			frame.skybox_sky_view_lut.image,
+			VK_IMAGE_LAYOUT_UNDEFINED,
+			VK_IMAGE_LAYOUT_GENERAL,
+			{},
+			VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
+			VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
+			VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+			VK_IMAGE_ASPECT_COLOR_BIT
+		);
+
+		// Bind skybox sky-view pipeline.
+		vkCmdBindPipeline(
+			frame.command_buffer,
+			VK_PIPELINE_BIND_POINT_COMPUTE,
+			renderer.skybox_sky_view_pipeline.pipeline
+		);
+
+		// Bind skybox sky-view descriptor sets.
+
+		vkCmdBindDescriptorSets(
+			frame.command_buffer,
+			VK_PIPELINE_BIND_POINT_COMPUTE,
+			renderer.skybox_sky_view_pipeline.layout,
+			0,
+			frame_descriptor_sets.capacity,
+			frame_descriptor_sets.buffer,
+			0,
+			nullptr
+		);
+
+		// Dispatch.
+		// One thread per texel.
+		vkCmdDispatch(
+			frame.command_buffer,
+			SKYBOX_SKY_VIEW_LUT_WIDTH / SKYBOX_SKY_VIEW_WORKGROUP_SIZE,
+			SKYBOX_SKY_VIEW_LUT_HEIGHT / SKYBOX_SKY_VIEW_WORKGROUP_SIZE,
+			1
+		);
+
+		// Transition the skybox sky-view LUT so that it can be sampled.
+		transition_image_layout(
+			frame.command_buffer,
+			frame.skybox_sky_view_lut.image,
+			VK_IMAGE_LAYOUT_GENERAL,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
+			VK_ACCESS_2_SHADER_READ_BIT,
+			VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+			VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+			VK_IMAGE_ASPECT_COLOR_BIT
+		);
+	}
+	else
+	{
+		clear_skybox_lut(frame.command_buffer, frame.skybox_sky_view_lut.image, VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT);
 	}
 
 	// Transition current swapchain image to write.
@@ -950,11 +1094,6 @@ blk::render_frame()
 	vkCmdBindIndexBuffer(frame.command_buffer, arena.index_buffer.device.buffer, 0, VK_INDEX_TYPE_UINT32);
 
 	// Bind frame descriptor sets.
-
-	const Array frame_descriptor_sets = {{
-		renderer.global_descriptor_set,
-		frame.descriptor_set,
-	}};
 
 	vkCmdBindDescriptorSets(
 		frame.command_buffer,

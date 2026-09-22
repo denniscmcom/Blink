@@ -17,6 +17,7 @@ blk::create_image(
 	const Context& context,
 	uint32_t width,
 	uint32_t height,
+	uint32_t depth,
 	VkFormat format,
 	VkImageTiling tiling,
 	VkImageUsageFlags usage,
@@ -32,7 +33,11 @@ blk::create_image(
 	VkExtent3D extent = {};
 	extent.width = width;
 	extent.height = height;
-	extent.depth = 1;
+	extent.depth = depth;
+
+	// A 3D image is a volume, not an array of 2D slices: its slices live in `extent.depth` and its `arrayLayers` stays
+	// 1, so the subresource range below covers the whole volume in a single layer.
+	const bool is_volume = depth > 1;
 
 	VkImageCreateInfo image_create_info = {};
 	image_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -44,7 +49,7 @@ blk::create_image(
 	image_create_info.tiling = tiling;
 	image_create_info.usage = usage;
 	image_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	image_create_info.imageType = VK_IMAGE_TYPE_2D;
+	image_create_info.imageType = is_volume ? VK_IMAGE_TYPE_3D : VK_IMAGE_TYPE_2D;
 
 	VkImage vk_image = VK_NULL_HANDLE;
 
@@ -115,7 +120,7 @@ blk::create_image(
 	VkImageViewCreateInfo view_create_info = {};
 	view_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 	view_create_info.image = vk_image;
-	view_create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	view_create_info.viewType = is_volume ? VK_IMAGE_VIEW_TYPE_3D : VK_IMAGE_VIEW_TYPE_2D;
 	view_create_info.format = format;
 	view_create_info.subresourceRange = range;
 

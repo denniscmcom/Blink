@@ -44,6 +44,19 @@ struct Entity
 	size_t version = SIZE_MAX;
 };
 
+/// Global world settings.
+struct World_Settings
+{
+	/// Enable skybox transmittance rendering pass.
+	bool enable_skybox_transmittance = true;
+	/// Enable skybox multiscattering rendering pass.
+	bool enable_skybox_multiscattering = true;
+	/// Enable skybox sky-view rendering pass.
+	bool enable_skybox_sky_view = true;
+	/// Enable skybox aerial perspective pass.
+	bool enable_skybox_aerial = true;
+};
+
 /// A `World` – commonly named level or scene in other engines.
 /// @note Only one `World` could be loaded at a time.
 struct World
@@ -62,6 +75,8 @@ struct World
 	/// Associates a node handle of each `Node` in `scene_graph` with its `Entity` in one of the pool of entities
 	/// (`actors`, `cameras`).
 	Hash_Map<Pool_Handle<Node>, Entity> node_handle_to_entity;
+	/// Global settings.
+	World_Settings settings;
 	/// Pointer to allocator.
 	Allocator* allocator;
 };

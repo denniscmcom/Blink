@@ -14,6 +14,7 @@
 #include "Engine/Renderer/Lifetime/Descriptor.hpp"
 #include "Engine/Renderer/Lifetime/Draw_Command.hpp"
 #include "Engine/Renderer/Lifetime/Sync.hpp"
+#include "Engine/Renderer/Skybox.hpp"
 
 #include <vulkan/vulkan.h>
 
@@ -104,6 +105,122 @@ blk::create_frame(const Context& context, const Descriptor_Layouts& layouts, Fra
 
 	frame.skybox_buffer = skybox_buffer;
 
+	// The following images are created with `VK_IMAGE_USAGE_TRANSFER_DST_BIT` because of `render_frame`: when
+	// `World_Settings` disables the pass that fills this LUT, it clears the image instead of dispatching, so the
+	// shaders sampling it see black rather than whatever the last enabled frame left behind.
+
+	// Create skybox transmittance LUT.
+	// The format should match the `vk::image_format` of `skybox_transmittance_storage_image` in
+	// `Shaders/Interface/Frame_Set.slang`.
+
+	Image skybox_transmittance_lut = {};
+
+	if (const Result result = create_image(
+			context,
+			SKYBOX_TRANSMITTANCE_LUT_WIDTH,
+			SKYBOX_TRANSMITTANCE_LUT_HEIGHT,
+			1,
+			VK_FORMAT_R16G16B16A16_SFLOAT,
+			VK_IMAGE_TILING_OPTIMAL,
+			VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+			VK_IMAGE_ASPECT_COLOR_BIT,
+			skybox_transmittance_lut
+		);
+		result != Result::SUCCESS)
+	{
+		BLK_ERROR("Failed to create skybox transmittance LUT image\n");
+		destroy_frame(context, frame);
+
+		return result;
+	}
+
+	frame.skybox_transmittance_lut = skybox_transmittance_lut;
+
+	// Create skybox multiscattering LUT.
+	// The format should match the `vk::image_format` of `skybox_multiscattering_storage_image` in
+	// `Shaders/Interface/Frame_Set.slang`.
+
+	Image skybox_multiscattering_lut = {};
+
+	if (const Result result = create_image(
+			context,
+			SKYBOX_MULTISCATTERING_LUT_WIDTH,
+			SKYBOX_MULTISCATTERING_LUT_HEIGHT,
+			1,
+			VK_FORMAT_R16G16B16A16_SFLOAT,
+			VK_IMAGE_TILING_OPTIMAL,
+			VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+			VK_IMAGE_ASPECT_COLOR_BIT,
+			skybox_multiscattering_lut
+		);
+		result != Result::SUCCESS)
+	{
+		BLK_ERROR("Failed to create skybox multiscattering LUT image\n");
+		destroy_frame(context, frame);
+
+		return result;
+	}
+
+	frame.skybox_multiscattering_lut = skybox_multiscattering_lut;
+
+	// Create skybox sky-view LUT.
+	// The format should match the `vk::image_format` of `skybox_sky_view_storage_image` in
+	// `Shaders/Interface/Frame_Set.slang`.
+
+	Image skybox_sky_view_lut = {};
+
+	if (const Result result = create_image(
+			context,
+			SKYBOX_SKY_VIEW_LUT_WIDTH,
+			SKYBOX_SKY_VIEW_LUT_HEIGHT,
+			1,
+			VK_FORMAT_R16G16B16A16_SFLOAT,
+			VK_IMAGE_TILING_OPTIMAL,
+			VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+			VK_IMAGE_ASPECT_COLOR_BIT,
+			skybox_sky_view_lut
+		);
+		result != Result::SUCCESS)
+	{
+		BLK_ERROR("Failed to create skybox sky-view LUT image\n");
+		destroy_frame(context, frame);
+
+		return result;
+	}
+
+	frame.skybox_sky_view_lut = skybox_sky_view_lut;
+
+	// Create skybox aerial perspective LUT.
+	// The format should match the `vk::image_format` of `skybox_aerial_storage_image` in
+	// `Shaders/Interface/Frame_Set.slang`.
+
+	Image skybox_aerial_lut = {};
+
+	if (const Result result = create_image(
+			context,
+			SKYBOX_AERIAL_LUT_WIDTH,
+			SKYBOX_AERIAL_LUT_HEIGHT,
+			SKYBOX_AERIAL_LUT_DEPTH,
+			VK_FORMAT_R16G16B16A16_SFLOAT,
+			VK_IMAGE_TILING_OPTIMAL,
+			VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+			VK_IMAGE_ASPECT_COLOR_BIT,
+			skybox_aerial_lut
+		);
+		result != Result::SUCCESS)
+	{
+		BLK_ERROR("Failed to create skybox aerial LUT image\n");
+		destroy_frame(context, frame);
+
+		return result;
+	}
+
+	frame.skybox_aerial_lut = skybox_aerial_lut;
+
 	// Create synchronization primitives.
 
 	if (const Result result = create_semaphore(context, frame.semaphore); result != Result::SUCCESS)
@@ -168,8 +285,44 @@ blk::create_frame(const Context& context, const Descriptor_Layouts& layouts, Fra
 	skybox_descriptor_buffer_info.buffer = frame.skybox_buffer.buffer;
 	skybox_descriptor_buffer_info.range = frame.skybox_buffer.size;
 
-	const Array<VkWriteDescriptorSet, 3> descriptor_writes = {{
-		{
+	VkDescriptorImageInfo skybox_transmittance_storage_image_info = {};
+	skybox_transmittance_storage_image_info.imageView = frame.skybox_transmittance_lut.view;
+	skybox_transmittance_storage_image_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+	VkDescriptorImageInfo skybox_transmittance_sampler_image_info = {};
+	skybox_transmittance_sampler_image_info.sampler = context.lut_sampler;
+	skybox_transmittance_sampler_image_info.imageView = frame.skybox_transmittance_lut.view;
+	skybox_transmittance_sampler_image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	VkDescriptorImageInfo skybox_multiscattering_storage_image_info = {};
+	skybox_multiscattering_storage_image_info.imageView = frame.skybox_multiscattering_lut.view;
+	skybox_multiscattering_storage_image_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+	VkDescriptorImageInfo skybox_multiscattering_sampler_image_info = {};
+	skybox_multiscattering_sampler_image_info.sampler = context.lut_sampler;
+	skybox_multiscattering_sampler_image_info.imageView = frame.skybox_multiscattering_lut.view;
+	skybox_multiscattering_sampler_image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	VkDescriptorImageInfo skybox_sky_view_storage_image_info = {};
+	skybox_sky_view_storage_image_info.imageView = frame.skybox_sky_view_lut.view;
+	skybox_sky_view_storage_image_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+	VkDescriptorImageInfo skybox_sky_view_sampler_image_info = {};
+	skybox_sky_view_sampler_image_info.sampler = context.lut_sampler;
+	skybox_sky_view_sampler_image_info.imageView = frame.skybox_sky_view_lut.view;
+	skybox_sky_view_sampler_image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	VkDescriptorImageInfo skybox_aerial_storage_image_info = {};
+	skybox_aerial_storage_image_info.imageView = frame.skybox_aerial_lut.view;
+	skybox_aerial_storage_image_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+	VkDescriptorImageInfo skybox_aerial_sampler_image_info = {};
+	skybox_aerial_sampler_image_info.sampler = context.lut_sampler;
+	skybox_aerial_sampler_image_info.imageView = frame.skybox_aerial_lut.view;
+	skybox_aerial_sampler_image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	const Array descriptor_writes = {{
+		VkWriteDescriptorSet{
 			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
 			.dstSet = frame.descriptor_set,
 			.dstBinding = 0,
@@ -178,7 +331,7 @@ blk::create_frame(const Context& context, const Descriptor_Layouts& layouts, Fra
 			.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
 			.pBufferInfo = &camera_descriptor_buffer_info,
 		},
-		{
+		VkWriteDescriptorSet{
 			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
 			.dstSet = frame.descriptor_set,
 			.dstBinding = 1,
@@ -187,7 +340,7 @@ blk::create_frame(const Context& context, const Descriptor_Layouts& layouts, Fra
 			.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
 			.pBufferInfo = &light_descriptor_buffer_info,
 		},
-		{
+		VkWriteDescriptorSet{
 			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
 			.dstSet = frame.descriptor_set,
 			.dstBinding = 2,
@@ -195,6 +348,78 @@ blk::create_frame(const Context& context, const Descriptor_Layouts& layouts, Fra
 			.descriptorCount = 1,
 			.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
 			.pBufferInfo = &skybox_descriptor_buffer_info,
+		},
+		VkWriteDescriptorSet{
+			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+			.dstSet = frame.descriptor_set,
+			.dstBinding = 3,
+			.dstArrayElement = 0,
+			.descriptorCount = 1,
+			.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+			.pImageInfo = &skybox_transmittance_storage_image_info,
+		},
+		VkWriteDescriptorSet{
+			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+			.dstSet = frame.descriptor_set,
+			.dstBinding = 4,
+			.dstArrayElement = 0,
+			.descriptorCount = 1,
+			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			.pImageInfo = &skybox_transmittance_sampler_image_info,
+		},
+		VkWriteDescriptorSet{
+			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+			.dstSet = frame.descriptor_set,
+			.dstBinding = 5,
+			.dstArrayElement = 0,
+			.descriptorCount = 1,
+			.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+			.pImageInfo = &skybox_multiscattering_storage_image_info,
+		},
+		VkWriteDescriptorSet{
+			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+			.dstSet = frame.descriptor_set,
+			.dstBinding = 6,
+			.dstArrayElement = 0,
+			.descriptorCount = 1,
+			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			.pImageInfo = &skybox_multiscattering_sampler_image_info,
+		},
+		VkWriteDescriptorSet{
+			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+			.dstSet = frame.descriptor_set,
+			.dstBinding = 7,
+			.dstArrayElement = 0,
+			.descriptorCount = 1,
+			.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+			.pImageInfo = &skybox_sky_view_storage_image_info,
+		},
+		VkWriteDescriptorSet{
+			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+			.dstSet = frame.descriptor_set,
+			.dstBinding = 8,
+			.dstArrayElement = 0,
+			.descriptorCount = 1,
+			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			.pImageInfo = &skybox_sky_view_sampler_image_info,
+		},
+		VkWriteDescriptorSet{
+			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+			.dstSet = frame.descriptor_set,
+			.dstBinding = 9,
+			.dstArrayElement = 0,
+			.descriptorCount = 1,
+			.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+			.pImageInfo = &skybox_aerial_storage_image_info,
+		},
+		VkWriteDescriptorSet{
+			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+			.dstSet = frame.descriptor_set,
+			.dstBinding = 10,
+			.dstArrayElement = 0,
+			.descriptorCount = 1,
+			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			.pImageInfo = &skybox_aerial_sampler_image_info,
 		},
 	}};
 
@@ -245,6 +470,13 @@ blk::destroy_frame(const Context& context, Frame& frame)
 	destroy_buffer(context, frame.skybox_buffer);
 
 	destroy_command_buffer(context, context.frame_command_pool, frame.command_buffer);
+
+	// Destroy images.
+
+	destroy_image(context, frame.skybox_transmittance_lut);
+	destroy_image(context, frame.skybox_multiscattering_lut);
+	destroy_image(context, frame.skybox_sky_view_lut);
+	destroy_image(context, frame.skybox_aerial_lut);
 
 	// Destroy synchronization primitives.
 
