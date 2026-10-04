@@ -9,7 +9,6 @@
 #include "Engine/Platform/Application_Internal.hpp"
 #include "Engine/Platform/Assert.hpp"
 #include "Engine/Platform/Result.hpp"
-#include "Engine/Platform/Types.hpp"
 
 #include <Windows.h>
 
@@ -114,9 +113,9 @@ blk::hide_cursor()
 }
 
 blk::Result
-blk::set_cursor_position(const Rect<int>& position)
+blk::set_cursor_position(int x, int y)
 {
-	if (!SetCursorPos(position.x, position.y))
+	if (!SetCursorPos(x, y))
 	{
 		return Result::OS_ERROR;
 	}
@@ -125,18 +124,17 @@ blk::set_cursor_position(const Rect<int>& position)
 }
 
 blk::Result
-blk::get_cursor_position(Rect<int>& position)
+blk::get_cursor_position(int& x, int& y)
 {
-	position = {};
-	POINT point;
+	POINT point = {};
 
 	if (!GetCursorPos(&point))
 	{
 		return Result::OS_ERROR;
 	}
 
-	position.x = static_cast<int>(point.x);
-	position.y = static_cast<int>(point.y);
+	x = static_cast<int>(point.x);
+	y = static_cast<int>(point.y);
 
 	return Result::SUCCESS;
 }

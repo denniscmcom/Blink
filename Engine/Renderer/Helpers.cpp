@@ -159,7 +159,11 @@ blk::Array<VkVertexInputBindingDescription, 1>
 blk::get_vertex_uv_input_binding_descriptions()
 {
 	return {{
-		{.binding = 0, .stride = sizeof(Vertex_UV), .inputRate = VK_VERTEX_INPUT_RATE_VERTEX},
+		{
+			.binding = 0,
+			.stride = sizeof(Vertex_UV),
+			.inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
+		},
 	}};
 }
 
@@ -167,10 +171,60 @@ blk::Array<VkVertexInputAttributeDescription, 5>
 blk::get_vertex_uv_input_attribute_descriptions()
 {
 	return {{
-		{.location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(Vertex_UV, position)},
-		{.location = 1, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(Vertex_UV, normal)},
-		{.location = 2, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(Vertex_UV, tangent)},
-		{.location = 3, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(Vertex_UV, bitangent)},
-		{.location = 4, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(Vertex_UV, texture_coord)},
+		{
+			.location = 0,
+			.binding = 0,
+			.format = VK_FORMAT_R32G32B32_SFLOAT,
+			.offset = offsetof(Vertex_UV, position),
+		},
+		{
+			.location = 1,
+			.binding = 0,
+			.format = VK_FORMAT_R32G32B32_SFLOAT,
+			.offset = offsetof(Vertex_UV, normal),
+		},
+		{
+			.location = 2,
+			.binding = 0,
+			.format = VK_FORMAT_R32G32B32_SFLOAT,
+			.offset = offsetof(Vertex_UV, tangent),
+		},
+		{
+			.location = 3,
+			.binding = 0,
+			.format = VK_FORMAT_R32G32B32_SFLOAT,
+			.offset = offsetof(Vertex_UV, bitangent),
+		},
+		{
+			.location = 4,
+			.binding = 0,
+			.format = VK_FORMAT_R32G32_SFLOAT,
+			.offset = offsetof(Vertex_UV, texture_coord),
+		},
+	}};
+}
+
+blk::Array<VkVertexInputBindingDescription, 1>
+blk::get_vertex_spatial_input_binding_descriptions()
+{
+	return {{
+		{
+			.binding = 0,
+			.stride = sizeof(Vertex_Spatial),
+			.inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
+		},
+	}};
+}
+
+blk::Array<VkVertexInputAttributeDescription, 1>
+blk::get_vertex_spatial_input_attribute_descriptions()
+{
+	return {{
+		{
+			.location = 0,
+			.binding = 0,
+			.format = VK_FORMAT_R32G32B32_SFLOAT,
+			.offset = offsetof(Vertex_Spatial, position),
+		},
 	}};
 }

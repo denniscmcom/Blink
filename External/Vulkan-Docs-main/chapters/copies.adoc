@@ -1,0 +1,3708 @@
+// Copyright 2014-2026 The Khronos Group Inc.
+// Copyright (c) 2020 Qualcomm Technologies Incorporated
+// SPDX-License-Identifier: CC-BY-4.0
+
+[[copies]]
+= Copy Commands
+
+An application can: copy buffer and image data using several methods
+described in this chapter, depending on the type of data transfer.
+
+All copy commands are treated as "`transfer`" operations for the purposes of
+synchronization barriers.
+
+All copy commands that have a source format with an X component in its
+format description read undefined: values from those bits.
+
+All copy commands that have a destination format with an X component in its
+format description write undefined: values to those bits.
+
+
+ifdef::VK_KHR_device_address_commands[]
+[[copies-memory-ranges]]
+== Copying Data Between Memory Ranges
+
+[open,refpage='vkCmdCopyMemoryKHR',desc='Copy data between memory ranges',type='protos']
+--
+:refpage: vkCmdCopyMemoryKHR
+
+To copy data between memory ranges, call:
+
+include::{generated}/api/protos/vkCmdCopyMemoryKHR.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command will be
+    recorded.
+  * pname:pCopyMemoryInfo a pointer to a slink:VkCopyDeviceMemoryInfoKHR
+    structure describing the copies to perform.
+
+.Valid Usage
+****
+  * [[VUID-vkCmdCopyMemoryKHR-commandBuffer-13012]]
+    If pname:commandBuffer is an unprotected command buffer and
+    <<limits-protectedNoFault, pname:protectedNoFault>> is not supported,
+    the pname:srcCopyFlags member of all elements of
+    pname:pCopyMemoryInfo->pRegions must: not include
+    ename:VK_ADDRESS_COMMAND_PROTECTED_BIT_KHR
+  * [[VUID-vkCmdCopyMemoryKHR-commandBuffer-13013]]
+    If pname:commandBuffer is an unprotected command buffer and
+    <<limits-protectedNoFault, pname:protectedNoFault>> is not supported,
+    the pname:dstCopyFlags member of all elements of
+    pname:pCopyMemoryInfo->pRegions must: not include
+    ename:VK_ADDRESS_COMMAND_PROTECTED_BIT_KHR
+  * [[VUID-vkCmdCopyMemoryKHR-commandBuffer-13014]]
+    If pname:commandBuffer is a protected command buffer and
+    <<limits-protectedNoFault, pname:protectedNoFault>> is not supported,
+    the pname:dstCopyFlags member of all elements of
+    pname:pCopyMemoryInfo->pRegions must: include
+    ename:VK_ADDRESS_COMMAND_PROTECTED_BIT_KHR
+****
+
+include::{generated}/validity/protos/vkCmdCopyMemoryKHR.adoc[]
+--
+
+[open,refpage='VkCopyDeviceMemoryInfoKHR',desc='Structure specifying a buffer copy operation',type='structs']
+--
+:refpage: VkCopyDeviceMemoryInfoKHR
+
+The sname:VkCopyDeviceMemoryInfoKHR structure is defined as:
+
+include::{generated}/api/structs/VkCopyDeviceMemoryInfoKHR.adoc[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:regionCount is the number of copies to be performed.
+  * pname:pRegions is a pointer to an array of slink:VkDeviceMemoryCopyKHR
+    structures describing individual copy operations between two memory
+    ranges.
+
+.Valid Usage
+****
+  * [[VUID-VkCopyDeviceMemoryInfoKHR-srcRange-13015]]
+    The range of memory backing the address range defined by the
+    pname:srcRange member of any element of pname:pRegions must: not overlap
+    the memory backing the address range defined by the pname:srcRange or
+    pname:dstRange of any element of pname:pRegions
+****
+
+include::{generated}/validity/structs/VkCopyDeviceMemoryInfoKHR.adoc[]
+--
+
+[open,refpage='VkDeviceMemoryCopyKHR',desc='Structure specifying a memory range copy operation',type='structs']
+--
+:refpage: VkDeviceMemoryCopyKHR
+
+The sname:VkDeviceMemoryCopyKHR structure is defined as:
+
+include::{generated}/api/structs/VkDeviceMemoryCopyKHR.adoc[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:srcRange is a slink:VkDeviceAddressRangeKHR structure defining the
+    source memory to copy from.
+  * pname:srcFlags is a tlink:VkAddressCommandFlagsKHR value defining the
+    copy flags for the source address range.
+  * pname:dstRange is a slink:VkDeviceAddressRangeKHR structure defining the
+    destination memory to copy to.
+  * pname:dstFlags is a tlink:VkAddressCommandFlagsKHR value defining the
+    copy flags for the destination address range.
+
+This structure defines a copy operation where pname:srcRange.size bytes will
+be copied from pname:srcRange.address to pname:dstRange.address.
+
+.Valid Usage
+****
+:addressRange: srcRange
+:addressFlags: srcFlags
+include::{chapters}/commonvalidity/address_flags_common.adoc[]
+
+:addressRange: dstRange
+:addressFlags: dstFlags
+include::{chapters}/commonvalidity/address_flags_common.adoc[]
+  * [[VUID-VkDeviceMemoryCopyKHR-size-13016]]
+    The pname:size member of pname:dstRange must: be greater than or equal
+    to the pname:size member of pname:srcRange
+  * [[VUID-VkDeviceMemoryCopyKHR-srcRange-13017]]
+    The buffer from which pname:srcRange was queried must: have been created
+    with ename:VK_BUFFER_USAGE_TRANSFER_SRC_BIT
+  * [[VUID-VkDeviceMemoryCopyKHR-dstRange-13018]]
+    The buffer from which pname:dstRange was queried must: have been created
+    with ename:VK_BUFFER_USAGE_TRANSFER_DST_BIT
+****
+
+include::{generated}/validity/structs/VkDeviceMemoryCopyKHR.adoc[]
+--
+endif::VK_KHR_device_address_commands[]
+
+
+[[copies-buffers]]
+== Copying Data Between Buffers
+
+[open,refpage='vkCmdCopyBuffer',desc='Copy data between buffer regions',type='protos']
+--
+:refpage: vkCmdCopyBuffer
+
+To copy data between buffer objects, call:
+
+include::{generated}/api/protos/vkCmdCopyBuffer.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command will be
+    recorded.
+  * pname:srcBuffer is the source buffer.
+  * pname:dstBuffer is the destination buffer.
+  * pname:regionCount is the number of regions to copy.
+  * pname:pRegions is a pointer to an array of slink:VkBufferCopy structures
+    specifying the regions to copy.
+
+Each source region specified by pname:pRegions is copied from the source
+buffer to the destination region of the destination buffer.
+If any of the specified regions in pname:srcBuffer overlaps in memory with
+any of the specified regions in pname:dstBuffer, values read from those
+overlapping regions are undefined:.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/copy_buffer_command_buffer_common.adoc[]
+include::{chapters}/commonvalidity/copy_buffer_common.adoc[]
+****
+
+include::{generated}/validity/protos/vkCmdCopyBuffer.adoc[]
+--
+
+[open,refpage='VkBufferCopy',desc='Structure specifying a buffer copy operation',type='structs']
+--
+:refpage: VkBufferCopy
+
+The sname:VkBufferCopy structure is defined as:
+
+include::{generated}/api/structs/VkBufferCopy.adoc[]
+
+  * pname:srcOffset is the starting offset in bytes from the start of
+    pname:srcBuffer.
+  * pname:dstOffset is the starting offset in bytes from the start of
+    pname:dstBuffer.
+  * pname:size is the number of bytes to copy.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/buffer_copy_common.adoc[]
+****
+
+include::{generated}/validity/structs/VkBufferCopy.adoc[]
+--
+
+ifdef::VK_BASE_VERSION_1_3,VK_KHR_copy_commands2[]
+A more extensible version of the copy buffer command is defined below.
+
+[open,refpage='vkCmdCopyBuffer2',desc='Copy data between buffer regions',type='protos']
+--
+:refpage: vkCmdCopyBuffer2
+
+To copy data between buffer objects, call:
+
+ifdef::VK_BASE_VERSION_1_3[]
+include::{generated}/api/protos/vkCmdCopyBuffer2.adoc[]
+endif::VK_BASE_VERSION_1_3[]
+
+ifdef::VK_KHR_copy_commands2[]
+include::{generated}/api/protos/vkCmdCopyBuffer2KHR.adoc[]
+endif::VK_KHR_copy_commands2[]
+
+  * pname:commandBuffer is the command buffer into which the command will be
+    recorded.
+  * pname:pCopyBufferInfo is a pointer to a slink:VkCopyBufferInfo2
+    structure describing the copy parameters.
+
+Each source region specified by pname:pCopyBufferInfo->pRegions is copied
+from the source buffer to the destination region of the destination buffer.
+If any of the specified regions in pname:pCopyBufferInfo->srcBuffer overlaps
+in memory with any of the specified regions in
+pname:pCopyBufferInfo->dstBuffer, values read from those overlapping regions
+are undefined:.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/copy_buffer_command_buffer_common.adoc[]
+****
+
+include::{generated}/validity/protos/vkCmdCopyBuffer2.adoc[]
+--
+
+[open,refpage='VkCopyBufferInfo2',desc='Structure specifying parameters of a buffer copy command',type='structs']
+--
+:refpage: VkCopyBufferInfo2
+
+The sname:VkCopyBufferInfo2 structure is defined as:
+
+include::{generated}/api/structs/VkCopyBufferInfo2.adoc[]
+
+ifdef::VK_KHR_copy_commands2[]
+include::{generated}/api/structs/VkCopyBufferInfo2KHR.adoc[]
+endif::VK_KHR_copy_commands2[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:srcBuffer is the source buffer.
+  * pname:dstBuffer is the destination buffer.
+  * pname:regionCount is the number of regions to copy.
+  * pname:pRegions is a pointer to an array of slink:VkBufferCopy2
+    structures specifying the regions to copy.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/copy_buffer_common.adoc[]
+****
+
+include::{generated}/validity/structs/VkCopyBufferInfo2.adoc[]
+--
+
+[open,refpage='VkBufferCopy2',desc='Structure specifying a buffer copy operation',type='structs']
+--
+:refpage: VkBufferCopy2
+
+The sname:VkBufferCopy2 structure is defined as:
+
+include::{generated}/api/structs/VkBufferCopy2.adoc[]
+
+ifdef::VK_KHR_copy_commands2[]
+include::{generated}/api/structs/VkBufferCopy2KHR.adoc[]
+endif::VK_KHR_copy_commands2[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:srcOffset is the starting offset in bytes from the start of
+    pname:srcBuffer.
+  * pname:dstOffset is the starting offset in bytes from the start of
+    pname:dstBuffer.
+  * pname:size is the number of bytes to copy.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/buffer_copy_common.adoc[]
+****
+
+include::{generated}/validity/structs/VkBufferCopy2.adoc[]
+--
+endif::VK_BASE_VERSION_1_3,VK_KHR_copy_commands2[]
+
+
+[[copies-images]]
+== Copying Data Between Images
+
+[open,refpage='vkCmdCopyImage',desc='Copy data between images',type='protos']
+--
+:refpage: vkCmdCopyImage
+
+To copy data between image objects, call:
+
+include::{generated}/api/protos/vkCmdCopyImage.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command will be
+    recorded.
+  * pname:srcImage is the source image.
+  * pname:srcImageLayout is the current layout of the source image
+    subresource.
+  * pname:dstImage is the destination image.
+  * pname:dstImageLayout is the current layout of the destination image
+    subresource.
+  * pname:regionCount is the number of regions to copy.
+  * pname:pRegions is a pointer to an array of slink:VkImageCopy structures
+    specifying the regions to copy.
+
+Each source region specified by pname:pRegions is copied from the source
+image to the destination region of the destination image.
+If any of the specified regions in pname:srcImage overlaps in memory with
+any of the specified regions in pname:dstImage, values read from those
+overlapping regions are undefined:.
+If any region accesses a depth aspect in pname:dstImage
+ifdef::VK_EXT_depth_range_unrestricted[]
+and the `apiext:VK_EXT_depth_range_unrestricted` extension is not enabled,
+endif::VK_EXT_depth_range_unrestricted[]
+values copied from pname:srcImage outside of the range [eq]#[0,1]# will be
+written as undefined: values to the destination image.
+
+ifdef::VK_BASE_VERSION_1_1,VK_KHR_sampler_ycbcr_conversion[]
+<<formats-multiplanar, Multi-planar images>> can: only be copied on a
+per-plane basis, and the subresources used in each region when copying to or
+from such images must: specify only one plane, though different regions can:
+specify different planes.
+When copying planes of multi-planar images, the format considered is the
+<<formats-compatible-planes, compatible format for that plane>>, rather than
+the format of the multi-planar image.
+endif::VK_BASE_VERSION_1_1,VK_KHR_sampler_ycbcr_conversion[]
+
+If the format of the destination image has a different
+<<formats-compatibility-classes,block extent>> than the source image (e.g.
+one is a compressed format), the offset and extent for each of the regions
+specified is <<formats-size-compatibility, scaled according to the block
+extents of each format>> to match in size.
+Copy regions for each image must: be aligned to a multiple of the texel
+block extent in each dimension, except at the edges of the image, where
+region extents must: match the edge of the image.
+
+ifdef::VK_BASE_VERSION_1_1,VK_KHR_maintenance1[]
+Image data can: be copied between images with different image types.
+If one image is ename:VK_IMAGE_TYPE_3D and the other image is
+ename:VK_IMAGE_TYPE_2D with multiple layers, then each slice is copied to or
+from a different layer; pname:depth slices in the 3D image correspond to
+pname:layerCount layers in the 2D image, with an effective pname:depth of
+`1` used for the 2D image.
+ifndef::VK_BASE_VERSION_1_4,VK_KHR_maintenance5[]
+Other combinations of image types are disallowed.
+endif::VK_BASE_VERSION_1_4,VK_KHR_maintenance5[]
+ifdef::VK_BASE_VERSION_1_4,VK_KHR_maintenance5[]
+If the <<features-maintenance5,pname:maintenance5>> feature is enabled, all
+other combinations are allowed and function as if 1D images are 2D images
+with a height of 1.
+Otherwise, other combinations of image types are disallowed.
+endif::VK_BASE_VERSION_1_4,VK_KHR_maintenance5[]
+endif::VK_BASE_VERSION_1_1,VK_KHR_maintenance1[]
+
+.Valid Usage
+****
+:regionsparam: pname:pRegions
+include::{chapters}/commonvalidity/copy_image_command_buffer_common.adoc[]
+include::{chapters}/commonvalidity/copy_image_common.adoc[]
+
+:imageparam: srcImage
+:imagesubresource: srcSubresource
+include::{chapters}/commonvalidity/copy_anyimage_to_imageany_common.adoc[]
+
+:imageparam: dstImage
+:imagesubresource: dstSubresource
+include::{chapters}/commonvalidity/copy_anyimage_to_imageany_common.adoc[]
+****
+
+include::{generated}/validity/protos/vkCmdCopyImage.adoc[]
+--
+
+[open,refpage='VkImageCopy',desc='Structure specifying an image copy operation',type='structs']
+--
+:refpage: VkImageCopy
+
+The sname:VkImageCopy structure is defined as:
+
+include::{generated}/api/structs/VkImageCopy.adoc[]
+
+  * pname:srcSubresource and pname:dstSubresource are
+    slink:VkImageSubresourceLayers structures specifying the image
+    subresources of the images used for the source and destination image
+    data, respectively.
+  * pname:srcOffset and pname:dstOffset select the initial pname:x, pname:y,
+    and pname:z offsets in texels of the sub-regions of the source and
+    destination image data.
+  * pname:extent is the size in texels of the image to copy in pname:width,
+    pname:height and pname:depth.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/image_copy_common.adoc[]
+****
+
+include::{generated}/validity/structs/VkImageCopy.adoc[]
+--
+
+[open,refpage='VkImageSubresourceLayers',desc='Structure specifying an image subresource layers',type='structs']
+--
+The sname:VkImageSubresourceLayers structure is defined as:
+
+include::{generated}/api/structs/VkImageSubresourceLayers.adoc[]
+
+  * pname:aspectMask is a combination of elink:VkImageAspectFlagBits,
+    selecting the color, depth and/or stencil aspects to be copied.
+  * pname:mipLevel is the mipmap level to copy
+  * pname:baseArrayLayer and pname:layerCount are the starting layer and
+    number of layers to copy.
+
+.Valid Usage
+****
+  * [[VUID-VkImageSubresourceLayers-aspectMask-00167]]
+    If pname:aspectMask contains ename:VK_IMAGE_ASPECT_COLOR_BIT, it must:
+    not contain either of ename:VK_IMAGE_ASPECT_DEPTH_BIT or
+    ename:VK_IMAGE_ASPECT_STENCIL_BIT
+  * [[VUID-VkImageSubresourceLayers-aspectMask-00168]]
+    pname:aspectMask must: not contain ename:VK_IMAGE_ASPECT_METADATA_BIT
+ifdef::VK_EXT_image_drm_format_modifier[]
+  * [[VUID-VkImageSubresourceLayers-aspectMask-02247]]
+    pname:aspectMask must: not include
+    `VK_IMAGE_ASPECT_MEMORY_PLANE__{ibit}__BIT_EXT` for any index _i_
+endif::VK_EXT_image_drm_format_modifier[]
+  * [[VUID-VkImageSubresourceLayers-layerCount-09243]]
+    {empty}
+ifdef::VK_BASE_VERSION_1_4,VK_KHR_maintenance5[]
+    If the <<features-maintenance5, pname:maintenance5>> feature is not
+    enabled,
+endif::VK_BASE_VERSION_1_4,VK_KHR_maintenance5[]
+    pname:layerCount must: not be ename:VK_REMAINING_ARRAY_LAYERS
+  * [[VUID-VkImageSubresourceLayers-layerCount-01700]]
+    If pname:layerCount is not ename:VK_REMAINING_ARRAY_LAYERS, it must: be
+    greater than 0
+****
+
+include::{generated}/validity/structs/VkImageSubresourceLayers.adoc[]
+--
+
+ifdef::VK_BASE_VERSION_1_3,VK_KHR_copy_commands2[]
+A more extensible version of the copy image command is defined below.
+
+[open,refpage='vkCmdCopyImage2',desc='Copy data between images',type='protos']
+--
+:refpage: vkCmdCopyImage2
+
+To copy data between image objects, call:
+
+ifdef::VK_BASE_VERSION_1_3[]
+include::{generated}/api/protos/vkCmdCopyImage2.adoc[]
+endif::VK_BASE_VERSION_1_3[]
+
+ifdef::VK_KHR_copy_commands2[]
+include::{generated}/api/protos/vkCmdCopyImage2KHR.adoc[]
+endif::VK_KHR_copy_commands2[]
+
+  * pname:commandBuffer is the command buffer into which the command will be
+    recorded.
+  * pname:pCopyImageInfo is a pointer to a slink:VkCopyImageInfo2 structure
+    describing the copy parameters.
+
+This command is functionally identical to flink:vkCmdCopyImage, but includes
+extensible sub-structures that include pname:sType and pname:pNext
+parameters, allowing them to be more easily extended.
+
+.Valid Usage
+****
+:regionsparam: pname:pCopyImageInfo->pRegions
+include::{chapters}/commonvalidity/copy_image_command_buffer_common.adoc[]
+****
+
+include::{generated}/validity/protos/vkCmdCopyImage2.adoc[]
+--
+
+
+[open,refpage='VkCopyImageInfo2',desc='Structure specifying parameters of an image copy command',type='structs']
+--
+:refpage: VkCopyImageInfo2
+
+The sname:VkCopyImageInfo2 structure is defined as:
+
+include::{generated}/api/structs/VkCopyImageInfo2.adoc[]
+
+ifdef::VK_KHR_copy_commands2[]
+include::{generated}/api/structs/VkCopyImageInfo2KHR.adoc[]
+endif::VK_KHR_copy_commands2[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:srcImage is the source image.
+  * pname:srcImageLayout is the current layout of the source image
+    subresource.
+  * pname:dstImage is the destination image.
+  * pname:dstImageLayout is the current layout of the destination image
+    subresource.
+  * pname:regionCount is the number of regions to copy.
+  * pname:pRegions is a pointer to an array of slink:VkImageCopy2 structures
+    specifying the regions to copy.
+
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/copy_image_common.adoc[]
+
+:imageparam: srcImage
+:imagesubresource: srcSubresource
+include::{chapters}/commonvalidity/copy_anyimage_to_imageany_common.adoc[]
+
+:imageparam: dstImage
+:imagesubresource: dstSubresource
+include::{chapters}/commonvalidity/copy_anyimage_to_imageany_common.adoc[]
+****
+
+include::{generated}/validity/structs/VkCopyImageInfo2.adoc[]
+--
+
+[open,refpage='VkImageCopy2',desc='Structure specifying an image copy operation',type='structs']
+--
+:refpage: VkImageCopy2
+
+The sname:VkImageCopy2 structure is defined as:
+
+include::{generated}/api/structs/VkImageCopy2.adoc[]
+
+ifdef::VK_KHR_copy_commands2[]
+include::{generated}/api/structs/VkImageCopy2KHR.adoc[]
+endif::VK_KHR_copy_commands2[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:srcSubresource and pname:dstSubresource are
+    slink:VkImageSubresourceLayers structures specifying the image
+    subresources of the images used for the source and destination image
+    data, respectively.
+  * pname:srcOffset and pname:dstOffset select the initial pname:x, pname:y,
+    and pname:z offsets in texels of the sub-regions of the source and
+    destination image data.
+  * pname:extent is the size in texels of the image to copy in pname:width,
+    pname:height and pname:depth.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/image_copy_common.adoc[]
+****
+
+include::{generated}/validity/structs/VkImageCopy2.adoc[]
+--
+endif::VK_BASE_VERSION_1_3,VK_KHR_copy_commands2[]
+
+
+ifdef::VK_KHR_device_address_commands[]
+[[copies-memory-ranges-images]]
+== Copying Data Between Memory Ranges and Images
+
+[open,refpage='vkCmdCopyMemoryToImageKHR',desc='Copy data from memory ranges to an image',type='protos']
+--
+:refpage: vkCmdCopyMemoryToImageKHR
+
+To copy data from an image to memory ranges, call:
+
+include::{generated}/api/protos/vkCmdCopyMemoryToImageKHR.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command will be
+    recorded.
+  * pname:pCopyMemoryInfo a pointer to a
+    slink:VkCopyDeviceMemoryImageInfoKHR structure describing the copies to
+    perform.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/copy_image_device_memory_common.adoc[]
+  * [[VUID-vkCmdCopyMemoryToImageKHR-imageLayout-13019]]
+    The pname:imageLayout member of each element of
+    pname:pCopyMemoryInfo->pRegions must: be ename:VK_IMAGE_LAYOUT_GENERAL,
+ifdef::VK_KHR_shared_presentable_image[]
+    ename:VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR,
+endif::VK_KHR_shared_presentable_image[]
+    or ename:VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+  * [[VUID-vkCmdCopyMemoryToImageKHR-pCopyMemoryInfo-13020]]
+    pname:pCopyMemoryInfo->image must: have been created with
+    ename:VK_IMAGE_USAGE_TRANSFER_DST_BIT
+  * [[VUID-vkCmdCopyMemoryToImageKHR-commandBuffer-13021]]
+    If pname:commandBuffer is a protected command buffer and
+    <<limits-protectedNoFault, pname:protectedNoFault>> is not supported,
+    pname:pCopyMemoryInfo->image must: have been created with
+    ename:VK_IMAGE_CREATE_PROTECTED_BIT
+  * [[VUID-vkCmdCopyMemoryToImageKHR-None-13022]]
+    {empty}
+ifndef::VK_EXT_depth_range_unrestricted[For]
+ifdef::VK_EXT_depth_range_unrestricted[]
+    If apiext:VK_EXT_depth_range_unrestricted is not enabled, for
+endif::VK_EXT_depth_range_unrestricted[]
+    each element of pname:pCopyMemoryInfo->pRegions whose
+    pname:imageSubresource contains a depth aspect, each data element in its
+    pname:addressRange must: be in the range [eq]#[0,1]#
+  * [[VUID-vkCmdCopyMemoryToImageKHR-addressRange-13128]]
+    At least one buffer containing the total address range specified by the
+    pname:addressRange member of each element of
+    pname:pCopyMemoryInfo->pRegions must: have been created with
+    ename:VK_BUFFER_USAGE_TRANSFER_SRC_BIT
+****
+
+include::{generated}/validity/protos/vkCmdCopyMemoryToImageKHR.adoc[]
+--
+
+[open,refpage='vkCmdCopyImageToMemoryKHR',desc='Copy data from an image to memory ranges',type='protos']
+--
+:refpage: vkCmdCopyImageToMemoryKHR
+
+To copy data from an image to memory ranges, call:
+
+include::{generated}/api/protos/vkCmdCopyImageToMemoryKHR.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command will be
+    recorded.
+  * pname:pCopyMemoryInfo a pointer to a
+    slink:VkCopyDeviceMemoryImageInfoKHR structure describing the copies to
+    perform.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/copy_image_device_memory_common.adoc[]
+  * [[VUID-vkCmdCopyImageToMemoryKHR-imageLayout-13023]]
+    The pname:imageLayout member of each element of
+    pname:pCopyMemoryInfo->pRegions must: be ename:VK_IMAGE_LAYOUT_GENERAL,
+ifdef::VK_KHR_shared_presentable_image[]
+    ename:VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR,
+endif::VK_KHR_shared_presentable_image[]
+    or ename:VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
+  * [[VUID-vkCmdCopyImageToMemoryKHR-pCopyMemoryInfo-13024]]
+    pname:pCopyMemoryInfo->image must: have been created with
+    ename:VK_IMAGE_USAGE_TRANSFER_SRC_BIT
+  * [[VUID-vkCmdCopyImageToMemoryKHR-commandBuffer-13025]]
+    If pname:commandBuffer is a protected command buffer and
+    <<limits-protectedNoFault, pname:protectedNoFault>> is not supported,
+    the pname:addressCopyFlags member of all elements of
+    pname:pCopyMemoryInfo->pRegions must: include
+    ename:VK_ADDRESS_COMMAND_PROTECTED_BIT_KHR
+  * [[VUID-vkCmdCopyImageToMemoryKHR-addressRange-13129]]
+    At least one buffer containing the total address range specified by the
+    pname:addressRange member of each element of
+    pname:pCopyMemoryInfo->pRegions must: have been created with
+    ename:VK_BUFFER_USAGE_TRANSFER_DST_BIT
+****
+
+include::{generated}/validity/protos/vkCmdCopyImageToMemoryKHR.adoc[]
+--
+
+[open,refpage='VkCopyDeviceMemoryImageInfoKHR',desc='Structure specifying copy operations between an image and memory ranges',type='structs']
+--
+:refpage: VkCopyDeviceMemoryImageInfoKHR
+
+The sname:VkCopyDeviceMemoryImageInfoKHR structure is defined as:
+
+include::{generated}/api/structs/VkCopyDeviceMemoryImageInfoKHR.adoc[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:image is the base image accessed by the copy command.
+  * pname:regionCount is the number of copies to be performed.
+  * pname:pRegions is a pointer to an array of
+    slink:VkDeviceMemoryImageCopyKHR structures describing individual copy
+    operations between two memory ranges.
+
+:imageparam: image
+:imagesubresource: imageSubresource
+:imageoffset: imageOffset
+:imageextent: imageExtent
+:bufferrowlength: addressRowLength
+:bufferimageheight: addressImageHeight
+:regionsparam: pname:pRegions
+
+.Valid Usage
+****
+  * [[VUID-VkCopyDeviceMemoryImageInfoKHR-addressRange-13026]]
+    The range of memory backing the address range defined by the
+    pname:addressRange member of any element of pname:pRegions must: not
+    overlap the memory backing the address range defined by the
+    pname:addressRange of any other element of pname:pRegions
+  * [[VUID-VkCopyDeviceMemoryImageInfoKHR-addressRange-13027]]
+    The range of memory backing the address range defined by the
+    pname:addressRange member of any element of pname:pRegions must: not
+    overlap the memory backing any texels in pname:image defined by the
+    pname:imageSubresource, pname:imageOffset, and pname:imageExtent members
+    of any element of pname:pRegions
+  * [[VUID-VkCopyDeviceMemoryImageInfoKHR-imageLayout-13028]]
+    The pname:imageLayout member of each element of pname:pRegions must:
+    specify the layout of the image subresource specified for that element
+    of pname:pRegions at the time this command is executed on a
+    slink:VkDevice
+include::{chapters}/commonvalidity/copy_anyimage_to_imageany_common.adoc[]
+include::{chapters}/commonvalidity/copy_anyimage_to_imageany_single_sampled_common.adoc[]
+include::{chapters}/commonvalidity/copy_bufferimage_to_imagebuffer_common.adoc[]
+include::{chapters}/commonvalidity/copy_bufferimage_to_imagebuffer_not_both_image_common.adoc[]
+  * [[VUID-VkCopyDeviceMemoryImageInfoKHR-image-13029]]
+    If pname:image does not have either a depth/stencil format
+ifdef::VK_VERSION_1_1,VK_KHR_sampler_ycbcr_conversion[]
+    or a <<formats-requiring-sampler-ycbcr-conversion,multi-planar format>>,
+endif::VK_VERSION_1_1,VK_KHR_sampler_ycbcr_conversion[]
+    then for each element of pname:pRegions, pname:addressRange.address
+    must: be a multiple of the <<formats-compatibility-classes,texel block
+    size>>
+ifdef::VK_VERSION_1_1,VK_KHR_sampler_ycbcr_conversion[]
+  * [[VUID-VkCopyDeviceMemoryImageInfoKHR-image-13030]]
+    If pname:image has a
+    <<formats-requiring-sampler-ycbcr-conversion,multi-planar format>>, then
+    for each element of pname:pRegions, pname:addressRange.address must: be
+    a multiple of the element size of the compatible format for the format
+    and the pname:aspectMask of the pname:imageSubresource as defined in
+    <<formats-compatible-planes>>
+endif::VK_VERSION_1_1,VK_KHR_sampler_ycbcr_conversion[]
+  * [[VUID-VkCopyDeviceMemoryImageInfoKHR-image-13031]]
+    If pname:image has a depth/stencil format, the
+    pname:addressRange.address member of any element of pname:pRegions must:
+    be a multiple of `4`
+  * [[VUID-VkCopyDeviceMemoryImageInfoKHR-pRegions-13032]]
+    The image region specified by each element of pname:pRegions
+ifdef::VK_QCOM_rotated_copy_commands[]
+    that does not contain slink:VkCopyCommandTransformInfoQCOM in its
+    pname:pNext chain
+endif::VK_QCOM_rotated_copy_commands[]
+    must: be contained within the specified pname:imageSubresource of
+    pname:image
+ifdef::VK_QCOM_rotated_copy_commands[]
+  * [[VUID-VkCopyDeviceMemoryImageInfoKHR-pRegions-13033]]
+    If the image region specified by each element of pname:pRegions contains
+    slink:VkCopyCommandTransformInfoQCOM in its pname:pNext chain, the
+    <<copies-buffers-images-rotation-addressing, rotated image region>>
+    must: be contained within pname:image
+  * [[VUID-VkCopyDeviceMemoryImageInfoKHR-pRegions-13034]]
+    If any element of pname:pRegions contains
+    slink:VkCopyCommandTransformInfoQCOM in its pname:pNext chain, then
+    pname:image must: have a 1x1x1 <<formats-compatibility-classes,texel
+    block extent>>
+  * [[VUID-VkCopyDeviceMemoryImageInfoKHR-pRegions-13035]]
+    If any element of pname:pRegions contains
+    slink:VkCopyCommandTransformInfoQCOM in its pname:pNext chain, then
+    pname:image must: be of type ename:VK_IMAGE_TYPE_2D
+  * [[VUID-VkCopyDeviceMemoryImageInfoKHR-pRegions-13036]]
+    If any element of pname:pRegions contains
+    slink:VkCopyCommandTransformInfoQCOM in its pname:pNext chain, then
+    pname:image must: not have a
+    <<formats-requiring-sampler-ycbcr-conversion, multi-planar format>>
+endif::VK_QCOM_rotated_copy_commands[]
+****
+
+include::{generated}/validity/structs/VkCopyDeviceMemoryImageInfoKHR.adoc[]
+--
+
+[open,refpage='VkDeviceMemoryImageCopyKHR',desc='Structure specifying a copy operation between a memory range and texels in an image',type='structs']
+--
+:refpage: VkDeviceMemoryImageCopyKHR
+
+The sname:VkDeviceMemoryImageCopyKHR structure is defined as:
+
+include::{generated}/api/structs/VkDeviceMemoryImageCopyKHR.adoc[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:addressRange is a slink:VkDeviceAddressRangeKHR structure defining
+    the address range accessed by the copy operation.
+  * pname:addressFlags is a tlink:VkAddressCommandFlagsKHR value defining
+    the copy flags for the source address range.
+  * pname:addressRowLength specifies the total number of texels in the
+    address range representing a row of texels in the x dimension.
+    Each new row of pixels in the copy will be read at an offset increment
+    by this number of texels.
+  * pname:addressImageHeight specifies the total number of rows of texels in
+    the address range representing a 2D slice of texels in the x and y
+    dimensions.
+    Each new 2D slice of pixels in the copy will be read at an offset
+    increment by this number of rows of texels.
+  * pname:imageSubresource is a slink:VkImageSubresourceLayers used to
+    specify the specific image subresources of the image used for the source
+    or destination image data.
+  * pname:imageLayout is the elink:VkImageLayout of the image subresource
+    accessed by this copy.
+  * pname:imageOffset selects the initial pname:x, pname:y, pname:z offsets
+    in texels of the sub-region of the source or destination image data.
+  * pname:imageExtent is the size in texels of the image to copy in
+    pname:width, pname:height and pname:depth.
+
+This structure defines a copy operation where pname:srcRange.size bytes will
+be copied from pname:srcRange.address to pname:dstRange.address.
+
+:bufferrowlength: addressRowLength
+:bufferimageheight: addressImageHeight
+
+.Valid Usage
+****
+:addressRange: addressRange
+:addressFlags: addressFlags
+include::{chapters}/commonvalidity/address_flags_common.adoc[]
+  * [[VUID-VkDeviceMemoryImageCopyKHR-size-13037]]
+    The pname:size member of pname:addressRange must: be large enough to
+    contain all address locations that are accessed by this copy according
+    to <<copies-buffers-images-addressing,Buffer and Image Addressing>>
+include::{chapters}/commonvalidity/buffer_or_memory_image_copy_common.adoc[]
+****
+
+include::{generated}/validity/structs/VkDeviceMemoryImageCopyKHR.adoc[]
+--
+endif::VK_KHR_device_address_commands[]
+
+
+[[copies-buffers-images]]
+== Copying Data Between Buffers and Images
+
+Data can: be copied between buffers and images, enabling applications to
+load and store data between images and application-defined offsets in buffer
+memory.
+
+[[copies-buffers-images-addressing]]
+When copying between
+ifdef::VK_EXT_host_image_copy,VK_KHR_device_address_commands,VK_NV_copy_memory_indirect[an address or]
+a buffer and an image, texels in the image and bytes in memory are accessed
+as follows.
+
+Texels at each coordinate [eq]#(x,y,z,layer)# in the image subresource are
+accessed, where:
+
+  {empty}:: [eq]#x# is in the range [eq]#[pname:imageOffset.x,
+            pname:imageOffset.x {plus} pname:imageExtent.width)#,
+  {empty}:: [eq]#y# is in the range [eq]#[pname:imageOffset.y,
+            pname:imageOffset.y {plus} pname:imageExtent.height)#,
+  {empty}:: [eq]#z# is in the range [eq]#[pname:imageOffset.z,
+            pname:imageOffset.z {plus} pname:imageExtent.depth)#,
+  {empty}:: [eq]#layer# is in the range
+            [eq]#[pname:imageSubresource.baseArrayLayer,
+            pname:imageSubresource.baseArrayLayer {plus}
+            pname:imageSubresource.layerCount)#
+
+For each [eq]#(x,y,z,layer)# coordinate in the image, bytes in memory are
+accessed at offsets in the range [eq]#[texelOffset, texelOffset {plus}
+blockSize)#, where:
+
+  {empty}:: [eq]#texelOffset = baseAddress {plus} ({lfloor}(x -
+            imageOffset.x) / blockWidth{rfloor} {times} blockSize) {plus}
+            ({lfloor}(y - imageOffset.y) / blockHeight{rfloor} {times}
+            rowExtent) {plus} ({lfloor}(z - imageOffset.z) /
+            blockDepth{rfloor} {times} sliceExtent) {plus} ((layer -
+            pname:imageSubresource.baseArrayLayer) {times} layerExtent)#
+  {empty}:: [eq]#rowExtent = {lceil} max(pname:bufferRowLength,
+            pname:imageExtent.width) / blockWidth {rceil} {times} blockSize#
+  {empty}:: [eq]#sliceExtent = {lceil} max(pname:bufferImageHeight,
+            pname:imageExtent.height) / blockHeight {rceil} {times}
+            rowExtent#
+  {empty}:: [eq]#layerExtent = {lceil} pname:imageExtent.depth / blockDepth
+            {rceil} {times} sliceExtent#
+
+and where [eq]#blockSize#, [eq]#blockWidth#, [eq]#blockHeight#, and
+[eq]#blockDepth# are the <<formats-compatibility-classes,texel block size
+and extents>> of the image's format, and [eq]#baseAddress# is
+ifdef::VK_EXT_host_image_copy,VK_KHR_device_address_commands,VK_NV_copy_memory_indirect[]
+either the supplied address for the copy, or
+endif::VK_EXT_host_image_copy,VK_KHR_device_address_commands,VK_NV_copy_memory_indirect[]
+the address of the buffer plus any supplied pname:bufferOffset value.
+
+ifdef::VK_QCOM_rotated_copy_commands[]
+[[copies-buffers-images-rotation-addressing]]
+[float]
+=== Image Rotation Addressing
+
+If a rotation is specified by slink:VkCopyCommandTransformInfoQCOM, the 2D
+region of the image being addressed is rotated around the offset, and texels
+at each coordinate [eq]#(x',y',z',layer)# are accessed in the image
+subresource instead, where:
+
+  * If ename:VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR is specified, no rotation
+    is performed:
+      {empty}:: [eq]#x'# is in the same range as [eq]#x#
+      {empty}:: [eq]#y'# is in the same range as [eq]#y#
+  * If ename:VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR is specified
+      {empty}:: [eq]#x'# is in the range [eq]#[pname:imageOffset.x {minus}
+                pname:imageExtent.height, pname:imageOffset.x)#
+      {empty}:: [eq]#y'# is in the range [eq]#[pname:imageOffset.y,
+                pname:imageOffset.y {plus} pname:imageExtent.width)#
+  * If ename:VK_SURFACE_TRANSFORM_ROTATE_180_BIT_KHR is specified:
+      {empty}:: [eq]#x'# is in the range [eq]#[pname:imageOffset.x {minus}
+                pname:imageExtent.width, pname:imageOffset.x)#
+      {empty}:: [eq]#y'# is in the range [eq]#[pname:imageOffset.y {minus}
+                pname:imageExtent.height, pname:imageOffset.y)#
+  * If ename:VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR is specified:
+      {empty}:: [eq]#x'# is in the range [eq]#[pname:imageOffset.x,
+                pname:imageOffset.x {plus} pname:imageExtent.height)#
+      {empty}:: [eq]#y'# is in the range [eq]#[pname:imageOffset.y {minus}
+                pname:imageExtent.width, pname:imageOffset.y)#
+
+Buffer addressing calculations are unaffected by this rotation.
+endif::VK_QCOM_rotated_copy_commands[]
+
+[[copies-buffers-images-depth-stencil]]
+When copying between a buffer and the depth or stencil aspect of an image,
+data in the buffer is assumed to be laid out as separate planes rather than
+interleaved.
+Addressing calculations are thus performed for a different format than the
+base image, according to the aspect, as described in the following table:
+
+[[copies-depth-stencil-aspect-copy-table]]
+.Depth/Stencil Aspect Copy
+[width="95%",cols="1,1,1",options="header"]
+|====
+^| Base Format ^| Depth Aspect Format ^| Stencil Aspect Format
+^| ename:VK_FORMAT_D16_UNORM
+^| ename:VK_FORMAT_D16_UNORM
+^| -
+^| ename:VK_FORMAT_X8_D24_UNORM_PACK32
+^| ename:VK_FORMAT_X8_D24_UNORM_PACK32
+^| -
+^| ename:VK_FORMAT_D32_SFLOAT
+^| ename:VK_FORMAT_D32_SFLOAT
+^| -
+^| ename:VK_FORMAT_S8_UINT
+^| -
+^| ename:VK_FORMAT_S8_UINT
+^| ename:VK_FORMAT_D16_UNORM_S8_UINT
+^| ename:VK_FORMAT_D16_UNORM
+^| ename:VK_FORMAT_S8_UINT
+^| ename:VK_FORMAT_D24_UNORM_S8_UINT
+^| ename:VK_FORMAT_X8_D24_UNORM_PACK32
+^| ename:VK_FORMAT_S8_UINT
+^| ename:VK_FORMAT_D32_SFLOAT_S8_UINT
+^| ename:VK_FORMAT_D32_SFLOAT
+^| ename:VK_FORMAT_S8_UINT
+|====
+
+ifdef::VK_BASE_VERSION_1_1,VK_KHR_sampler_ycbcr_conversion[]
+[[copies-buffers-images-multi-planar]]
+When copying between a buffer and any plane of a <<formats-multiplanar,
+multi-planar image>>, addressing calculations are performed using the
+<<formats-compatible-planes, compatible format for that plane>>, rather than
+the format of the multi-planar image.
+endif::VK_BASE_VERSION_1_1,VK_KHR_sampler_ycbcr_conversion[]
+
+Each texel block is copied from one resource to the other according to the
+above addressing equations.
+
+
+[open,refpage='vkCmdCopyBufferToImage',desc='Copy data from a buffer into an image',type='protos']
+--
+:refpage: vkCmdCopyBufferToImage
+
+To copy data from a buffer object to an image object, call:
+
+include::{generated}/api/protos/vkCmdCopyBufferToImage.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command will be
+    recorded.
+  * pname:srcBuffer is the source buffer.
+  * pname:dstImage is the destination image.
+  * pname:dstImageLayout is the layout of the destination image subresources
+    for the copy.
+  * pname:regionCount is the number of regions to copy.
+  * pname:pRegions is a pointer to an array of slink:VkBufferImageCopy
+    structures specifying the regions to copy.
+
+Each source region specified by pname:pRegions is copied from the source
+buffer to the destination region of the destination image according to the
+<<copies-buffers-images-addressing,addressing calculations>> for each
+resource.
+If any of the specified regions in pname:srcBuffer overlaps in memory with
+any of the specified regions in pname:dstImage, values read from those
+overlapping regions are undefined:.
+If any region accesses a depth aspect in pname:dstImage
+ifdef::VK_EXT_depth_range_unrestricted[]
+and the `apiext:VK_EXT_depth_range_unrestricted` extension is not enabled,
+endif::VK_EXT_depth_range_unrestricted[]
+values copied from pname:srcBuffer outside of the range [eq]#[0,1]# will be
+written as undefined: values to the destination image.
+
+Copy regions for the image must: be aligned to a multiple of the texel block
+extent in each dimension, except at the edges of the image, where region
+extents must: match the edge of the image.
+
+:imageparam: dstImage
+:imagesubresource: imageSubresource
+:imageoffset: imageOffset
+:imageextent: imageExtent
+:bufferrowlength: bufferRowLength
+:bufferimageheight: bufferImageHeight
+:regionsparam: pname:pRegions
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/copy_anyimage_to_imageany_common.adoc[]
+include::{chapters}/commonvalidity/copy_anyimage_to_imageany_no_rotation_common.adoc[]
+include::{chapters}/commonvalidity/copy_anyimage_to_imageany_single_sampled_common.adoc[]
+include::{chapters}/commonvalidity/copy_buffer_to_image_command_buffer_common.adoc[]
+include::{chapters}/commonvalidity/copy_buffer_to_image_common.adoc[]
+include::{chapters}/commonvalidity/copy_bufferimage_to_imagebuffer_common.adoc[]
+include::{chapters}/commonvalidity/copy_bufferimage_to_imagebuffer_not_both_image_common.adoc[]
+include::{chapters}/commonvalidity/copy_bufferimage_to_imagebuffer_buffer_alignment_common.adoc[]
+****
+
+include::{generated}/validity/protos/vkCmdCopyBufferToImage.adoc[]
+--
+
+[open,refpage='vkCmdCopyImageToBuffer',desc='Copy image data into a buffer',type='protos']
+--
+:refpage: vkCmdCopyImageToBuffer
+
+To copy data from an image object to a buffer object, call:
+
+include::{generated}/api/protos/vkCmdCopyImageToBuffer.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command will be
+    recorded.
+  * pname:srcImage is the source image.
+  * pname:srcImageLayout is the layout of the source image subresources for
+    the copy.
+  * pname:dstBuffer is the destination buffer.
+  * pname:regionCount is the number of regions to copy.
+  * pname:pRegions is a pointer to an array of slink:VkBufferImageCopy
+    structures specifying the regions to copy.
+
+Each source region specified by pname:pRegions is copied from the source
+image to the destination region of the destination buffer according to the
+<<copies-buffers-images-addressing,addressing calculations>> for each
+resource.
+If any of the specified regions in pname:srcImage overlaps in memory with
+any of the specified regions in pname:dstBuffer, values read from those
+overlapping regions are undefined:.
+
+Copy regions for the image must: be aligned to a multiple of the texel block
+extent in each dimension, except at the edges of the image, where region
+extents must: match the edge of the image.
+
+:imageparam: srcImage
+:imagesubresource: imageSubresource
+:imageoffset: imageOffset
+:imageextent: imageExtent
+:bufferrowlength: bufferRowLength
+:bufferimageheight: bufferImageHeight
+:regionsparam: pname:pRegions
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/copy_anyimage_to_imageany_common.adoc[]
+include::{chapters}/commonvalidity/copy_anyimage_to_imageany_no_rotation_common.adoc[]
+include::{chapters}/commonvalidity/copy_anyimage_to_imageany_single_sampled_common.adoc[]
+include::{chapters}/commonvalidity/copy_image_to_buffer_command_buffer_common.adoc[]
+include::{chapters}/commonvalidity/copy_image_to_buffer_common.adoc[]
+include::{chapters}/commonvalidity/copy_bufferimage_to_imagebuffer_common.adoc[]
+include::{chapters}/commonvalidity/copy_bufferimage_to_imagebuffer_not_both_image_common.adoc[]
+include::{chapters}/commonvalidity/copy_bufferimage_to_imagebuffer_buffer_alignment_common.adoc[]
+****
+
+include::{generated}/validity/protos/vkCmdCopyImageToBuffer.adoc[]
+--
+
+[open,refpage='VkBufferImageCopy',desc='Structure specifying a buffer image copy operation',type='structs']
+--
+:refpage: VkBufferImageCopy
+
+For both flink:vkCmdCopyBufferToImage and flink:vkCmdCopyImageToBuffer, each
+element of pname:pRegions is a structure defined as:
+
+include::{generated}/api/structs/VkBufferImageCopy.adoc[]
+
+  * pname:bufferOffset is the offset in bytes from the start of the buffer
+    object where the image data is copied from or to.
+  * pname:bufferRowLength and pname:bufferImageHeight specify in texels a
+    subregion of a larger two- or three-dimensional image in buffer memory,
+    and control the addressing calculations.
+    If either of these values is zero, that aspect of the buffer memory is
+    considered to be tightly packed according to the pname:imageExtent.
+  * pname:imageSubresource is a slink:VkImageSubresourceLayers used to
+    specify the specific image subresources of the image used for the source
+    or destination image data.
+  * pname:imageOffset selects the initial pname:x, pname:y, pname:z offsets
+    in texels of the sub-region of the source or destination image data.
+  * pname:imageExtent is the size in texels of the image to copy in
+    pname:width, pname:height and pname:depth.
+
+:bufferrowlength: bufferRowLength
+:bufferimageheight: bufferImageHeight
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/buffer_or_memory_image_copy_common.adoc[]
+****
+
+include::{generated}/validity/structs/VkBufferImageCopy.adoc[]
+--
+
+ifdef::VK_BASE_VERSION_1_3,VK_KHR_copy_commands2[]
+More extensible versions of the commands to copy between buffers and images
+are defined below.
+
+[open,refpage='vkCmdCopyBufferToImage2',desc='Copy data from a buffer into an image',type='protos']
+--
+:refpage: vkCmdCopyBufferToImage2
+
+To copy data from a buffer object to an image object, call:
+
+ifdef::VK_BASE_VERSION_1_3[]
+include::{generated}/api/protos/vkCmdCopyBufferToImage2.adoc[]
+endif::VK_BASE_VERSION_1_3[]
+
+ifdef::VK_KHR_copy_commands2[]
+include::{generated}/api/protos/vkCmdCopyBufferToImage2KHR.adoc[]
+endif::VK_KHR_copy_commands2[]
+
+  * pname:commandBuffer is the command buffer into which the command will be
+    recorded.
+  * pname:pCopyBufferToImageInfo is a pointer to a
+    slink:VkCopyBufferToImageInfo2 structure describing the copy parameters.
+
+This command is functionally identical to flink:vkCmdCopyBufferToImage, but
+includes extensible sub-structures that include pname:sType and pname:pNext
+parameters, allowing them to be more easily extended.
+
+:regionsparam: pname:pCopyBufferToImageInfo->pRegions
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/copy_buffer_to_image_command_buffer_common.adoc[]
+****
+
+include::{generated}/validity/protos/vkCmdCopyBufferToImage2.adoc[]
+--
+
+[open,refpage='VkCopyBufferToImageInfo2',desc='Structure specifying parameters of a buffer to image copy command',type='structs']
+--
+:refpage: VkCopyBufferToImageInfo2
+
+The sname:VkCopyBufferToImageInfo2 structure is defined as:
+
+include::{generated}/api/structs/VkCopyBufferToImageInfo2.adoc[]
+
+ifdef::VK_KHR_copy_commands2[]
+include::{generated}/api/structs/VkCopyBufferToImageInfo2KHR.adoc[]
+endif::VK_KHR_copy_commands2[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:srcBuffer is the source buffer.
+  * pname:dstImage is the destination image.
+  * pname:dstImageLayout is the layout of the destination image subresources
+    for the copy.
+  * pname:regionCount is the number of regions to copy.
+  * pname:pRegions is a pointer to an array of slink:VkBufferImageCopy2
+    structures specifying the regions to copy.
+
+:imageparam: dstImage
+:imagesubresource: imageSubresource
+:imageoffset: imageOffset
+:imageextent: imageExtent
+:bufferrowlength: bufferRowLength
+:bufferimageheight: bufferImageHeight
+:regionsparam: pname:pRegions
+
+.Valid Usage
+****
+  * [[VUID-VkCopyBufferToImageInfo2-pRegions-04565]]
+    The image region specified by each element of pname:pRegions
+ifdef::VK_QCOM_rotated_copy_commands[]
+    that does not contain slink:VkCopyCommandTransformInfoQCOM in its
+    pname:pNext chain
+endif::VK_QCOM_rotated_copy_commands[]
+    must: be contained within the specified pname:imageSubresource of
+    pname:dstImage
+ifdef::VK_QCOM_rotated_copy_commands[]
+  * [[VUID-VkCopyBufferToImageInfo2KHR-pRegions-04554]]
+    If the image region specified by each element of pname:pRegions contains
+    slink:VkCopyCommandTransformInfoQCOM in its pname:pNext chain, the
+    <<copies-buffers-images-rotation-addressing, rotated destination
+    region>> must: be contained within pname:dstImage
+  * [[VUID-VkCopyBufferToImageInfo2KHR-pRegions-04555]]
+    If any element of pname:pRegions contains
+    slink:VkCopyCommandTransformInfoQCOM in its pname:pNext chain, then
+    pname:dstImage must: have a 1x1x1 <<formats-compatibility-classes,texel
+    block extent>>
+  * [[VUID-VkCopyBufferToImageInfo2KHR-pRegions-06203]]
+    If any element of pname:pRegions contains
+    slink:VkCopyCommandTransformInfoQCOM in its pname:pNext chain, then
+    pname:dstImage must: be of type ename:VK_IMAGE_TYPE_2D
+  * [[VUID-VkCopyBufferToImageInfo2KHR-pRegions-06204]]
+    If any element of pname:pRegions contains
+    slink:VkCopyCommandTransformInfoQCOM in its pname:pNext chain, then
+    pname:dstImage must: not have a <<formats-multiplanar, multi-planar
+    format>>
+endif::VK_QCOM_rotated_copy_commands[]
+include::{chapters}/commonvalidity/copy_buffer_to_image_common.adoc[]
+include::{chapters}/commonvalidity/copy_anyimage_to_imageany_common.adoc[]
+include::{chapters}/commonvalidity/copy_anyimage_to_imageany_single_sampled_common.adoc[]
+include::{chapters}/commonvalidity/copy_bufferimage_to_imagebuffer_common.adoc[]
+include::{chapters}/commonvalidity/copy_bufferimage_to_imagebuffer_not_both_image_common.adoc[]
+include::{chapters}/commonvalidity/copy_bufferimage_to_imagebuffer_buffer_alignment_common.adoc[]
+  * [[VUID-VkCopyBufferToImageInfo2-pRegions-06223]]
+    For each element of pname:pRegions not containing
+    sname:VkCopyCommandTransformInfoQCOM in its pname:pNext chain,
+    pname:imageOffset.x and [eq]#(pname:imageExtent.width {plus}
+    pname:imageOffset.x)# must: both be greater than or equal to `0` and
+    less than or equal to the width of the specified pname:imageSubresource
+    of pname:dstImage
+  * [[VUID-VkCopyBufferToImageInfo2-pRegions-06224]]
+    For each element of pname:pRegions not containing
+    sname:VkCopyCommandTransformInfoQCOM in its pname:pNext chain,
+    pname:imageOffset.y and [eq]#(pname:imageExtent.height {plus}
+    pname:imageOffset.y)# must: both be greater than or equal to `0` and
+    less than or equal to the height of the specified pname:imageSubresource
+    of pname:dstImage
+****
+
+include::{generated}/validity/structs/VkCopyBufferToImageInfo2.adoc[]
+--
+
+[open,refpage='vkCmdCopyImageToBuffer2',desc='Copy image data into a buffer',type='protos']
+--
+:refpage: vkCmdCopyImageToBuffer2
+
+To copy data from an image object to a buffer object, call:
+
+ifdef::VK_BASE_VERSION_1_3[]
+include::{generated}/api/protos/vkCmdCopyImageToBuffer2.adoc[]
+endif::VK_BASE_VERSION_1_3[]
+
+ifdef::VK_KHR_copy_commands2[]
+include::{generated}/api/protos/vkCmdCopyImageToBuffer2KHR.adoc[]
+endif::VK_KHR_copy_commands2[]
+
+  * pname:commandBuffer is the command buffer into which the command will be
+    recorded.
+  * pname:pCopyImageToBufferInfo is a pointer to a
+    slink:VkCopyImageToBufferInfo2 structure describing the copy parameters.
+
+This command is functionally identical to flink:vkCmdCopyImageToBuffer, but
+includes extensible sub-structures that include pname:sType and pname:pNext
+parameters, allowing them to be more easily extended.
+
+:regionsparam: pname:pCopyImageToBufferInfo->pRegions
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/copy_image_to_buffer_command_buffer_common.adoc[]
+****
+
+include::{generated}/validity/protos/vkCmdCopyImageToBuffer2.adoc[]
+--
+
+[open,refpage='VkCopyImageToBufferInfo2',desc='Structure specifying parameters of an image to buffer copy command',type='structs']
+--
+:refpage: VkCopyImageToBufferInfo2
+
+The sname:VkCopyImageToBufferInfo2 structure is defined as:
+
+include::{generated}/api/structs/VkCopyImageToBufferInfo2.adoc[]
+
+ifdef::VK_KHR_copy_commands2[]
+include::{generated}/api/structs/VkCopyImageToBufferInfo2KHR.adoc[]
+endif::VK_KHR_copy_commands2[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:srcImage is the source image.
+  * pname:srcImageLayout is the layout of the source image subresources for
+    the copy.
+  * pname:dstBuffer is the destination buffer.
+  * pname:regionCount is the number of regions to copy.
+  * pname:pRegions is a pointer to an array of slink:VkBufferImageCopy2
+    structures specifying the regions to copy.
+
+:imageparam: srcImage
+:imagesubresource: imageSubresource
+:imageoffset: imageOffset
+:imageextent: imageExtent
+:bufferrowlength: bufferRowLength
+:bufferimageheight: bufferImageHeight
+:regionsparam: pname:pRegions
+
+.Valid Usage
+****
+  * [[VUID-VkCopyImageToBufferInfo2-pRegions-04566]]
+    The image region specified by each element of pname:pRegions
+ifdef::VK_QCOM_rotated_copy_commands[]
+    that does not contain slink:VkCopyCommandTransformInfoQCOM in its
+    pname:pNext chain
+endif::VK_QCOM_rotated_copy_commands[]
+    must: be contained within the specified pname:imageSubresource of
+    pname:srcImage
+ifdef::VK_QCOM_rotated_copy_commands[]
+  * [[VUID-VkCopyImageToBufferInfo2KHR-pRegions-04557]]
+    If the image region specified by each element of pname:pRegions contains
+    slink:VkCopyCommandTransformInfoQCOM in its pname:pNext chain, the
+    <<copies-buffers-images-rotation-addressing, rotated source region>>
+    must: be contained within pname:srcImage
+  * [[VUID-VkCopyImageToBufferInfo2KHR-pRegions-04558]]
+    If any element of pname:pRegions contains
+    slink:VkCopyCommandTransformInfoQCOM in its pname:pNext chain, then
+    pname:srcImage must: have a 1x1x1 <<formats-compatibility-classes,texel
+    block extent>>
+  * [[VUID-VkCopyImageToBufferInfo2KHR-pRegions-06205]]
+    If any element of pname:pRegions contains
+    slink:VkCopyCommandTransformInfoQCOM in its pname:pNext chain, then
+    pname:srcImage must: be of type ename:VK_IMAGE_TYPE_2D
+  * [[VUID-VkCopyImageToBufferInfo2KHR-pRegions-06206]]
+    If any element of pname:pRegions contains
+    slink:VkCopyCommandTransformInfoQCOM in its pname:pNext chain, then
+    pname:srcImage must: not have a <<formats-multiplanar, multi-planar
+    format>>
+endif::VK_QCOM_rotated_copy_commands[]
+include::{chapters}/commonvalidity/copy_image_to_buffer_common.adoc[]
+include::{chapters}/commonvalidity/copy_anyimage_to_imageany_common.adoc[]
+include::{chapters}/commonvalidity/copy_anyimage_to_imageany_single_sampled_common.adoc[]
+include::{chapters}/commonvalidity/copy_bufferimage_to_imagebuffer_common.adoc[]
+include::{chapters}/commonvalidity/copy_bufferimage_to_imagebuffer_not_both_image_common.adoc[]
+include::{chapters}/commonvalidity/copy_bufferimage_to_imagebuffer_buffer_alignment_common.adoc[]
+  * [[VUID-VkCopyImageToBufferInfo2-imageOffset-00197]]
+    For each element of pname:pRegions not containing
+    sname:VkCopyCommandTransformInfoQCOM in its pname:pNext chain,
+    pname:imageOffset.x and [eq]#(pname:imageExtent.width {plus}
+    pname:imageOffset.x)# must: both be greater than or equal to `0` and
+    less than or equal to the width of the specified pname:imageSubresource
+    of pname:srcImage
+  * [[VUID-VkCopyImageToBufferInfo2-imageOffset-00198]]
+    For each element of pname:pRegions not containing
+    sname:VkCopyCommandTransformInfoQCOM in its pname:pNext chain,
+    pname:imageOffset.y and [eq]#(pname:imageExtent.height {plus}
+    pname:imageOffset.y)# must: both be greater than or equal to `0` and
+    less than or equal to the height of the specified pname:imageSubresource
+    of pname:srcImage
+****
+
+include::{generated}/validity/structs/VkCopyImageToBufferInfo2.adoc[]
+--
+
+[open,refpage='VkBufferImageCopy2',desc='Structure specifying a buffer image copy operation',type='structs']
+--
+:refpage: VkBufferImageCopy2
+
+For both flink:vkCmdCopyBufferToImage2 and flink:vkCmdCopyImageToBuffer2,
+each element of pname:pRegions is a structure defined as:
+
+include::{generated}/api/structs/VkBufferImageCopy2.adoc[]
+
+ifdef::VK_KHR_copy_commands2[]
+include::{generated}/api/structs/VkBufferImageCopy2KHR.adoc[]
+endif::VK_KHR_copy_commands2[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:bufferOffset is the offset in bytes from the start of the buffer
+    object where the image data is copied from or to.
+  * pname:bufferRowLength and pname:bufferImageHeight specify in texels a
+    subregion of a larger two- or three-dimensional image in buffer memory,
+    and control the addressing calculations.
+    If either of these values is zero, that aspect of the buffer memory is
+    considered to be tightly packed according to the pname:imageExtent.
+  * pname:imageSubresource is a slink:VkImageSubresourceLayers used to
+    specify the specific image subresources of the image used for the source
+    or destination image data.
+  * pname:imageOffset selects the initial pname:x, pname:y, pname:z offsets
+    in texels of the sub-region of the source or destination image data.
+  * pname:imageExtent is the size in texels of the image to copy in
+    pname:width, pname:height and pname:depth.
+
+This structure is functionally identical to slink:VkBufferImageCopy, but
+adds pname:sType and pname:pNext parameters, allowing it to be more easily
+extended.
+
+:bufferrowlength: bufferRowLength
+:bufferimageheight: bufferImageHeight
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/buffer_or_memory_image_copy_common.adoc[]
+****
+
+include::{generated}/validity/structs/VkBufferImageCopy2.adoc[]
+--
+endif::VK_BASE_VERSION_1_3,VK_KHR_copy_commands2[]
+
+ifdef::VK_QCOM_rotated_copy_commands[]
+[open,refpage='VkCopyCommandTransformInfoQCOM',desc='Structure describing transform parameters of rotated copy command',type='structs']
+--
+The sname:VkCopyCommandTransformInfoQCOM structure is defined as:
+
+include::{generated}/api/structs/VkCopyCommandTransformInfoQCOM.adoc[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:transform is a elink:VkSurfaceTransformFlagBitsKHR value
+    describing the transform to be applied.
+
+Including this structure in the pname:pNext chain of
+slink:VkBufferImageCopy2 defines a rotation to be performed when copying
+between an image and a buffer.
+Including this structure in the pname:pNext chain of slink:VkBlitImageInfo2
+defines a rotation to be performed when blitting between two images.
+If this structure is not specified in either case, the implementation
+behaves as if it was specified with a pname:transform equal to
+ename:VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR.
+
+Specifying a transform for a copy between an image and a buffer
+<<copies-buffers-images-rotation-addressing, rotates the region accessed in
+the image around the offset>>.
+Specifying a transform for a blit performs a similar transform as described
+in <<copies-images-scaling-rotation, Image Blits with Scaling and
+Rotation>>.
+
+Rotations other than ename:VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR can: only
+be specified for single-plane 2D images with a 1x1x1
+<<formats-compatibility-classes,texel block extent>>.
+
+.Valid Usage
+****
+  * [[VUID-VkCopyCommandTransformInfoQCOM-transform-04560]]
+    pname:transform must: be ename:VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
+    ename:VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR,
+    ename:VK_SURFACE_TRANSFORM_ROTATE_180_BIT_KHR, or
+    ename:VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR
+****
+
+include::{generated}/validity/structs/VkCopyCommandTransformInfoQCOM.adoc[]
+--
+endif::VK_QCOM_rotated_copy_commands[]
+
+
+ifdef::VK_BASE_VERSION_1_4,VK_EXT_host_image_copy[]
+The following commands can be used to copy between host memory and images.
+Bytes in host memory and texels in images are accessed as specified in
+<<copies-buffers-images,Copying Data Between Buffers and Images>>, with
+buffers replaced with host memory.
+
+[NOTE]
+====
+Copies to and from an image on the host are not internally synchronized.
+Simultaneous access (involving writes) to overlapping image memory on the
+host constitutes a <<memory-model-access-data-race,data race>>.
+====
+
+[open,refpage='vkCopyMemoryToImage',desc='Copy data from host memory into an image',type='protos']
+--
+:refpage: vkCopyMemoryToImage
+
+To copy data from host memory to an image object, call:
+
+ifdef::VK_BASE_VERSION_1_4[]
+include::{generated}/api/protos/vkCopyMemoryToImage.adoc[]
+endif::VK_BASE_VERSION_1_4[]
+
+ifdef::VK_EXT_host_image_copy[]
+include::{generated}/api/protos/vkCopyMemoryToImageEXT.adoc[]
+endif::VK_EXT_host_image_copy[]
+
+  * pname:device is the device which owns
+    pname:pCopyMemoryToImageInfo->dstImage.
+  * pname:pCopyMemoryToImageInfo is a pointer to a
+    slink:VkCopyMemoryToImageInfo structure describing the copy parameters.
+
+This command is functionally similar to flink:vkCmdCopyBufferToImage2,
+except it is executed on the host and reads from host memory instead of a
+buffer.
+The memory of pname:pCopyMemoryToImageInfo->dstImage is accessed by the host
+as if <<memory-coherent, coherent>>.
+
+[NOTE]
+====
+Because queue submissions <<synchronization-submission-host-writes,
+automatically make host memory visible to the device>>, there would not be a
+need for a memory barrier before using the results of this copy operation on
+the device.
+====
+
+include::{generated}/validity/protos/vkCopyMemoryToImage.adoc[]
+--
+
+[open,refpage='VkCopyMemoryToImageInfo',desc='Structure specifying parameters of host memory to image copy command',type='structs']
+--
+:refpage: VkCopyMemoryToImageInfo
+:imageparam: dstImage
+:imagesubresource: imageSubresource
+:imageoffset: imageOffset
+:imageextent: imageExtent
+:bufferrowlength: memoryRowLength
+:bufferimageheight: memoryImageHeight
+
+The sname:VkCopyMemoryToImageInfo structure is defined as:
+
+include::{generated}/api/structs/VkCopyMemoryToImageInfo.adoc[]
+
+ifdef::VK_EXT_host_image_copy[]
+include::{generated}/api/structs/VkCopyMemoryToImageInfoEXT.adoc[]
+endif::VK_EXT_host_image_copy[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:flags is a bitmask of elink:VkHostImageCopyFlagBits values
+    describing additional copy parameters.
+  * pname:dstImage is the destination image.
+  * pname:dstImageLayout is the layout of the destination image subresources
+    for the copy.
+  * pname:regionCount is the number of regions to copy.
+  * pname:pRegions is a pointer to an array of slink:VkMemoryToImageCopy
+    structures specifying the regions to copy.
+
+fname:vkCopyMemoryToImage does not check whether the device memory
+associated with pname:dstImage is currently in use before performing the
+copy.
+The application must: guarantee that any previously submitted command that
+reads from or writes to the copy regions has completed before the host
+performs the copy.
+
+Copy regions for the image must: be aligned to a multiple of the texel block
+extent in each dimension, except at the edges of the image, where region
+extents must: match the edge of the image.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/copy_memoryimage_to_imagememory_common.adoc[]
+include::{chapters}/commonvalidity/copy_anyimage_to_imageany_common.adoc[]
+include::{chapters}/commonvalidity/copy_anyimage_to_imageany_no_rotation_common.adoc[]
+include::{chapters}/commonvalidity/copy_anyimage_to_imageany_single_sampled_common.adoc[]
+include::{chapters}/commonvalidity/copy_bufferimage_to_imagebuffer_common.adoc[]
+include::{chapters}/commonvalidity/copy_bufferimage_to_imagebuffer_not_both_image_common.adoc[]
+  * [[VUID-VkCopyMemoryToImageInfo-dstImageLayout-09059]]
+    pname:dstImageLayout must: specify the current layout of the image
+    subresources of pname:dstImage specified in pname:pRegions
+  * [[VUID-VkCopyMemoryToImageInfo-dstImageLayout-09060]]
+    pname:dstImageLayout must: be one of the image layouts returned in
+    slink:VkPhysicalDeviceHostImageCopyProperties::pname:pCopyDstLayouts
+  * [[VUID-VkCopyMemoryToImageInfo-flags-09393]]
+    If pname:flags includes ename:VK_HOST_IMAGE_COPY_MEMCPY_BIT, for each
+    region in pname:pRegions, pname:memoryRowLength and
+    pname:memoryImageHeight must: both be 0
+****
+
+include::{generated}/validity/structs/VkCopyMemoryToImageInfo.adoc[]
+--
+
+[open,refpage='VkMemoryToImageCopy',desc='Structure specifying a host memory to image copy operation',type='structs']
+--
+:refpage: VkMemoryToImageCopy
+:bufferrowlength: memoryRowLength
+:bufferimageheight: memoryImageHeight
+
+Each element of slink:VkCopyMemoryToImageInfo::pname:pRegions is a structure
+defined as:
+
+include::{generated}/api/structs/VkMemoryToImageCopy.adoc[]
+
+ifdef::VK_EXT_host_image_copy[]
+include::{generated}/api/structs/VkMemoryToImageCopyEXT.adoc[]
+endif::VK_EXT_host_image_copy[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:pHostPointer is the host memory address which is the source of the
+    copy.
+  * pname:memoryRowLength and pname:memoryImageHeight specify in texels a
+    subregion of a larger two- or three-dimensional image in host memory,
+    and control the addressing calculations.
+    If either of these values is zero, that aspect of the host memory is
+    considered to be tightly packed according to the pname:imageExtent.
+  * pname:imageSubresource is a slink:VkImageSubresourceLayers used to
+    specify the specific image subresources of the image used for the source
+    or destination image data.
+  * pname:imageOffset selects the initial pname:x, pname:y, pname:z offsets
+    in texels of the sub-region of the destination image data.
+  * pname:imageExtent is the size in texels of the image to copy in
+    pname:width, pname:height and pname:depth.
+
+This structure is functionally similar to slink:VkBufferImageCopy2, except
+it defines host memory as the source of copy instead of a buffer.
+In particular, the same data packing rules and restrictions as that
+structure apply here as well.
+
+.Valid Usage
+****
+  * [[VUID-VkMemoryToImageCopy-pHostPointer-09061]]
+    pname:pHostPointer must: point to memory that is large enough to contain
+    all memory locations that are accessed according to
+    <<copies-buffers-images-addressing,Buffer and Image Addressing>>, for
+    each element of pname:pRegions
+  * [[VUID-VkMemoryToImageCopy-pRegions-09062]]
+    The union of all source regions, and the union of all destination
+    regions, specified by the elements of pname:pRegions, must: not overlap
+    in memory
+include::{chapters}/commonvalidity/buffer_or_memory_image_copy_common.adoc[]
+****
+
+include::{generated}/validity/structs/VkMemoryToImageCopy.adoc[]
+--
+
+[open,refpage='vkCopyImageToMemory',desc='Copy image data into host memory',type='protos']
+--
+:refpage: vkCopyImageToMemory
+
+To copy data from an image object to host memory, call:
+
+ifdef::VK_BASE_VERSION_1_4[]
+include::{generated}/api/protos/vkCopyImageToMemory.adoc[]
+endif::VK_BASE_VERSION_1_4[]
+
+ifdef::VK_EXT_host_image_copy[]
+include::{generated}/api/protos/vkCopyImageToMemoryEXT.adoc[]
+endif::VK_EXT_host_image_copy[]
+
+  * pname:device is the device which owns
+    pname:pCopyImageToMemoryInfo->srcImage.
+  * pname:pCopyImageToMemoryInfo is a pointer to a
+    slink:VkCopyImageToMemoryInfo structure describing the copy parameters.
+
+This command is functionally similar to flink:vkCmdCopyImageToBuffer2,
+except it is executed on the host and writes to host memory instead of a
+buffer.
+The memory of pname:pCopyImageToMemoryInfo->srcImage is accessed by the host
+as if <<memory-coherent, coherent>>.
+
+[NOTE]
+====
+If the device has written to the image memory, it is not automatically made
+available to the host.
+Before this copy command can be called, a memory barrier for this image
+must: have been issued on the device with the second
+<<synchronization-dependencies-scopes, synchronization scope>> including
+ename:VK_PIPELINE_STAGE_HOST_BIT and ename:VK_ACCESS_HOST_READ_BIT.
+====
+
+include::{generated}/validity/protos/vkCopyImageToMemory.adoc[]
+--
+
+[open,refpage='VkCopyImageToMemoryInfo',desc='Structure specifying parameters of an image to host memory copy command',type='structs']
+--
+:refpage: VkCopyImageToMemoryInfo
+:imageparam: srcImage
+:imagesubresource: imageSubresource
+:imageoffset: imageOffset
+:imageextent: imageExtent
+:bufferrowlength: memoryRowLength
+:bufferimageheight: memoryImageHeight
+
+The sname:VkCopyImageToMemoryInfo structure is defined as:
+
+include::{generated}/api/structs/VkCopyImageToMemoryInfo.adoc[]
+
+ifdef::VK_EXT_host_image_copy[]
+include::{generated}/api/structs/VkCopyImageToMemoryInfoEXT.adoc[]
+endif::VK_EXT_host_image_copy[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:flags is a bitmask of elink:VkHostImageCopyFlagBits values
+    describing additional copy parameters.
+  * pname:srcImage is the source image.
+  * pname:srcImageLayout is the layout of the source image subresources for
+    the copy.
+  * pname:regionCount is the number of regions to copy.
+  * pname:pRegions is a pointer to an array of slink:VkImageToMemoryCopy
+    structures specifying the regions to copy.
+
+fname:vkCopyImageToMemory does not check whether the device memory
+associated with pname:srcImage is currently in use before performing the
+copy.
+The application must: guarantee that any previously submitted command that
+writes to the copy regions has completed before the host performs the copy.
+
+Copy regions for the image must: be aligned to a multiple of the texel block
+extent in each dimension, except at the edges of the image, where region
+extents must: match the edge of the image.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/copy_memoryimage_to_imagememory_common.adoc[]
+include::{chapters}/commonvalidity/copy_anyimage_to_imageany_common.adoc[]
+include::{chapters}/commonvalidity/copy_anyimage_to_imageany_no_rotation_common.adoc[]
+include::{chapters}/commonvalidity/copy_anyimage_to_imageany_single_sampled_common.adoc[]
+include::{chapters}/commonvalidity/copy_bufferimage_to_imagebuffer_common.adoc[]
+include::{chapters}/commonvalidity/copy_bufferimage_to_imagebuffer_not_both_image_common.adoc[]
+  * [[VUID-VkCopyImageToMemoryInfo-srcImageLayout-09064]]
+    pname:srcImageLayout must: specify the current layout of the image
+    subresources of pname:srcImage specified in pname:pRegions
+  * [[VUID-VkCopyImageToMemoryInfo-srcImageLayout-09065]]
+    pname:srcImageLayout must: be one of the image layouts returned in
+    slink:VkPhysicalDeviceHostImageCopyProperties::pname:pCopySrcLayouts
+  * [[VUID-VkCopyImageToMemoryInfo-flags-09394]]
+    If pname:flags includes ename:VK_HOST_IMAGE_COPY_MEMCPY_BIT, for each
+    region in pname:pRegions, pname:memoryRowLength and
+    pname:memoryImageHeight must: both be 0
+****
+
+include::{generated}/validity/structs/VkCopyImageToMemoryInfo.adoc[]
+--
+
+[open,refpage='VkImageToMemoryCopy',desc='Structure specifying an image to host memory copy operation',type='structs']
+--
+:refpage: VkImageToMemoryCopy
+:bufferrowlength: memoryRowLength
+:bufferimageheight: memoryImageHeight
+
+Each element of slink:VkCopyImageToMemoryInfo::pname:pRegions is a structure
+defined as:
+
+include::{generated}/api/structs/VkImageToMemoryCopy.adoc[]
+
+ifdef::VK_EXT_host_image_copy[]
+include::{generated}/api/structs/VkImageToMemoryCopyEXT.adoc[]
+endif::VK_EXT_host_image_copy[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:pHostPointer is the host memory address which is the destination
+    of the copy.
+  * pname:memoryRowLength and pname:memoryImageHeight specify in texels a
+    subregion of a larger two- or three-dimensional image in host memory,
+    and control the addressing calculations.
+    If either of these values is zero, that aspect of the host memory is
+    considered to be tightly packed according to the pname:imageExtent.
+  * pname:imageSubresource is a slink:VkImageSubresourceLayers used to
+    specify the specific image subresources of the image used for the source
+    or destination image data.
+  * pname:imageOffset selects the initial pname:x, pname:y, pname:z offsets
+    in texels of the sub-region of the source image data.
+  * pname:imageExtent is the size in texels of the image to copy in
+    pname:width, pname:height and pname:depth.
+
+This structure is functionally similar to slink:VkBufferImageCopy2, except
+it defines host memory as the target of copy instead of a buffer.
+In particular, the same data packing rules and restrictions as that
+structure apply here as well.
+
+.Valid Usage
+****
+  * [[VUID-VkImageToMemoryCopy-pHostPointer-09066]]
+    pname:pHostPointer must: point to memory that is large enough to contain
+    all memory locations that are accessed according to
+    <<copies-buffers-images-addressing,Buffer and Image Addressing>>, for
+    each element of pname:pRegions
+  * [[VUID-VkImageToMemoryCopy-pRegions-09067]]
+    The union of all source regions, and the union of all destination
+    regions, specified by the elements of pname:pRegions, must: not overlap
+    in memory
+include::{chapters}/commonvalidity/buffer_or_memory_image_copy_common.adoc[]
+****
+
+include::{generated}/validity/structs/VkImageToMemoryCopy.adoc[]
+--
+
+[open,refpage='VkHostImageCopyFlagBits',desc='Bitmask specifying additional copy parameters',type='enums']
+--
+Bits which can: be set in slink:VkCopyMemoryToImageInfo::pname:flags,
+slink:VkCopyImageToMemoryInfo::pname:flags, and
+slink:VkCopyImageToImageInfo::pname:flags, specifying additional copy
+parameters are:
+
+include::{generated}/api/enums/VkHostImageCopyFlagBits.adoc[]
+
+ifdef::VK_EXT_host_image_copy[]
+include::{generated}/api/enums/VkHostImageCopyFlagBitsEXT.adoc[]
+endif::VK_EXT_host_image_copy[]
+
+  * ename:VK_HOST_IMAGE_COPY_MEMCPY_BIT specifies that no memory layout
+    swizzling is to be applied during data copy.
+    For copies between memory and images, this flag indicates that image
+    data in host memory is swizzled in exactly the same way as the image
+    data on the device.
+    Using this flag indicates that the implementations may: use a simple
+    memory copy to transfer the data between the host memory and the device
+    memory.
+    The format of the swizzled data in host memory is platform dependent and
+    is not defined in this specification.
+--
+
+[open,refpage='VkHostImageCopyFlags',desc='Bitmask of VkHostImageCopyFlagBits',type='flags']
+--
+include::{generated}/api/flags/VkHostImageCopyFlags.adoc[]
+
+ifdef::VK_EXT_host_image_copy[]
+include::{generated}/api/flags/VkHostImageCopyFlagsEXT.adoc[]
+endif::VK_EXT_host_image_copy[]
+
+tname:VkHostImageCopyFlags is a bitmask type for setting a mask of zero or
+more elink:VkHostImageCopyFlagBits.
+--
+[open,refpage='vkCopyImageToImage',desc='Copy image data using the host',type='protos']
+--
+:refpage: vkCopyImageToImage
+
+To copy data from an image object to another image object using the host,
+call:
+
+ifdef::VK_BASE_VERSION_1_4[]
+include::{generated}/api/protos/vkCopyImageToImage.adoc[]
+endif::VK_BASE_VERSION_1_4[]
+
+ifdef::VK_EXT_host_image_copy[]
+include::{generated}/api/protos/vkCopyImageToImageEXT.adoc[]
+endif::VK_EXT_host_image_copy[]
+
+  * pname:device is the device which owns
+    pname:pCopyImageToImageInfo->srcImage and
+    pname:pCopyImageToImageInfo->dstImage.
+  * pname:pCopyImageToImageInfo is a pointer to a
+    slink:VkCopyImageToImageInfo structure describing the copy parameters.
+
+This command is functionally similar to flink:vkCmdCopyImage2, except it is
+executed on the host.
+The memory of pname:pCopyImageToImageInfo->srcImage and
+pname:pCopyImageToImageInfo->dstImage is accessed by the host as if
+<<memory-coherent, coherent>>.
+
+[NOTE]
+====
+If the device has written to the memory of
+pname:pCopyImageToImageInfo->srcImage, it is not automatically made
+available to the host.
+Before this copy command can be called, a memory barrier for this image
+must: have been issued on the device with the second
+<<synchronization-dependencies-scopes, synchronization scope>> including
+ename:VK_PIPELINE_STAGE_HOST_BIT and ename:VK_ACCESS_HOST_READ_BIT.
+
+Because queue submissions <<synchronization-submission-host-writes,
+automatically make host memory visible to the device>>, there would not be a
+need for a memory barrier before using the results of this copy operation in
+pname:pCopyMemoryToImageInfo->dstImage on the device.
+====
+
+include::{generated}/validity/protos/vkCopyImageToImage.adoc[]
+--
+
+[open,refpage='VkCopyImageToImageInfo',desc='Structure specifying parameters of an image to image host copy command',type='structs']
+--
+:refpage: VkCopyImageToImageInfo
+
+The sname:VkCopyImageToImageInfo structure is defined as:
+
+include::{generated}/api/structs/VkCopyImageToImageInfo.adoc[]
+
+ifdef::VK_EXT_host_image_copy[]
+include::{generated}/api/structs/VkCopyImageToImageInfoEXT.adoc[]
+endif::VK_EXT_host_image_copy[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:flags is a bitmask of elink:VkHostImageCopyFlagBits values
+    describing additional copy parameters.
+  * pname:srcImage is the source image.
+  * pname:srcImageLayout is the layout of the source image subresources for
+    the copy.
+  * pname:dstImage is the destination image.
+  * pname:dstImageLayout is the layout of the destination image subresources
+    for the copy.
+  * pname:regionCount is the number of regions to copy.
+  * pname:pRegions is a pointer to an array of slink:VkImageCopy2 structures
+    specifying the regions to copy.
+
+fname:vkCopyImageToImage does not check whether the device memory associated
+with pname:srcImage or pname:dstImage is currently in use before performing
+the copy.
+The application must: guarantee that any previously submitted command that
+writes to the copy regions has completed before the host performs the copy.
+
+.Valid Usage
+****
+  * [[VUID-VkCopyImageToImageInfo-srcImage-09069]]
+    pname:srcImage and pname:dstImage must: have been created with identical
+    image creation parameters
+
+:imageparam: srcImage
+:imagesubresource: srcSubresource
+:imageoffset: srcOffset
+:imageextent: extent
+include::{chapters}/commonvalidity/copy_memoryimage_to_imagememory_common.adoc[]
+include::{chapters}/commonvalidity/copy_anyimage_to_imageany_common.adoc[]
+include::{chapters}/commonvalidity/copy_anyimage_to_imageany_no_rotation_common.adoc[]
+include::{chapters}/commonvalidity/copy_bufferimage_to_imagebuffer_common.adoc[]
+
+:imageparam: dstImage
+:imagesubresource: dstSubresource
+:imageoffset: dstOffset
+:imageextent: extent
+include::{chapters}/commonvalidity/copy_memoryimage_to_imagememory_common.adoc[]
+include::{chapters}/commonvalidity/copy_anyimage_to_imageany_common.adoc[]
+include::{chapters}/commonvalidity/copy_anyimage_to_imageany_no_rotation_common.adoc[]
+include::{chapters}/commonvalidity/copy_bufferimage_to_imagebuffer_common.adoc[]
+  * [[VUID-VkCopyImageToImageInfo-srcImageLayout-09070]]
+    pname:srcImageLayout must: specify the current layout of the image
+    subresources of pname:srcImage specified in pname:pRegions
+  * [[VUID-VkCopyImageToImageInfo-dstImageLayout-09071]]
+    pname:dstImageLayout must: specify the current layout of the image
+    subresources of pname:dstImage specified in pname:pRegions
+  * [[VUID-VkCopyImageToImageInfo-srcImageLayout-09072]]
+    pname:srcImageLayout must: be one of the image layouts returned in
+    slink:VkPhysicalDeviceHostImageCopyProperties::pname:pCopySrcLayouts
+  * [[VUID-VkCopyImageToImageInfo-dstImageLayout-09073]]
+    pname:dstImageLayout must: be one of the image layouts returned in
+    slink:VkPhysicalDeviceHostImageCopyProperties::pname:pCopyDstLayouts
+****
+
+include::{generated}/validity/structs/VkCopyImageToImageInfo.adoc[]
+--
+endif::VK_BASE_VERSION_1_4,VK_EXT_host_image_copy[]
+
+
+ifdef::VK_NV_copy_memory_indirect,VK_KHR_copy_memory_indirect[]
+[[indirect-copies]]
+== Indirect Copies
+
+An application can use indirect copies when the copy parameters are not
+known during the command buffer creation time.
+
+[open,refpage='vkCmdCopyMemoryIndirectKHR',desc='Copy data between memory regions',type='protos']
+--
+To copy data between two memory regions by specifying copy parameters
+indirectly in memory, call:
+
+include::{generated}/api/protos/vkCmdCopyMemoryIndirectKHR.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command will be
+    recorded.
+  * pname:pCopyMemoryIndirectInfo is a pointer to a
+    slink:VkCopyMemoryIndirectInfoKHR structure containing the copy
+    parameters, including the number of copies to execute and a strided
+    array of slink:VkCopyMemoryIndirectCommandKHR structures.
+
+Each region specified in the memory referenced by
+pname:pCopyMemoryIndirectInfo->copyAddressRange is copied from the source
+region to the specified destination region.
+The results are undefined: if any of the source and destination regions
+overlap in memory.
+
+.Valid Usage
+****
+  * [[VUID-vkCmdCopyMemoryIndirectKHR-indirectMemoryCopy-10935]]
+    The <<features-indirectMemoryCopy, pname:indirectMemoryCopy>> feature
+    must: be enabled
+  * [[VUID-vkCmdCopyMemoryIndirectKHR-commandBuffer-10936]]
+    The slink:VkCommandPool that pname:commandBuffer was allocated from
+    must: support at least one of the queue types specified in
+    slink:VkPhysicalDeviceCopyMemoryIndirectPropertiesKHR::pname:supportedQueues
+  * [[VUID-vkCmdCopyMemoryIndirectKHR-commandBuffer-10937]]
+    pname:commandBuffer must not be a protected command buffer
+****
+
+include::{generated}/validity/protos/vkCmdCopyMemoryIndirectKHR.adoc[]
+--
+
+[open,refpage='VkCopyMemoryIndirectInfoKHR',desc='Parameters describing indirect copy parameters',type='structs']
+--
+:refpage: VkCopyMemoryIndirectInfoKHR
+
+The slink:VkCopyMemoryIndirectInfoKHR structure is defined as:
+
+include::{generated}/api/structs/VkCopyMemoryIndirectInfoKHR.adoc[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:srcCopyFlags is a tlink:VkAddressCopyFlagsKHR value defining the
+    copy flags for the source address range.
+  * pname:dstCopyFlags is a tlink:VkAddressCopyFlagsKHR value defining the
+    copy flags for the destination address range.
+  * pname:copyCount is the number of copies to execute, and can: be zero.
+  * pname:copyAddressRange is a memory region specifying the copy
+    parameters.
+    It is laid out as an array of slink:VkCopyMemoryIndirectCommandKHR
+    structures.
+
+.Valid Usage
+****
+  * [[VUID-VkCopyMemoryIndirectInfoKHR-srcCopyFlags-10938]]
+    If pname:srcCopyFlags contains ename:VK_ADDRESS_COPY_SPARSE_BIT_KHR, the
+    source memory regions accessed must: be <<sparsememory, bound to
+    memory>>
+  * [[VUID-VkCopyMemoryIndirectInfoKHR-dstCopyFlags-10939]]
+    If pname:dstCopyFlags contains ename:VK_ADDRESS_COPY_SPARSE_BIT_KHR, the
+    destination memory regions accessed must: be <<sparsememory, bound to
+    memory>>
+  * [[VUID-VkCopyMemoryIndirectInfoKHR-srcCopyFlags-10940]]
+    pname:srcCopyFlags must: not contain
+    ename:VK_ADDRESS_COPY_PROTECTED_BIT_KHR
+  * [[VUID-VkCopyMemoryIndirectInfoKHR-dstCopyFlags-10941]]
+    pname:dstCopyFlags must: not contain
+    ename:VK_ADDRESS_COPY_PROTECTED_BIT_KHR
+  * [[VUID-VkCopyMemoryIndirectInfoKHR-copyAddressRange-10942]]
+    pname:copyAddressRange.address must: be 4 byte aligned
+  * [[VUID-VkCopyMemoryIndirectInfoKHR-copyAddressRange-10943]]
+    pname:copyAddressRange.stride must: be a multiple of `4` and must: be
+    greater than or equal to sizeof(slink:VkCopyMemoryIndirectCommandKHR)
+  * [[VUID-VkCopyMemoryIndirectInfoKHR-copyCount-10944]]
+    pname:copyCount must: be less than or equal to
+    [eq]#pname:copyAddressRange.size / pname:copyAddressRange.stride#
+  * [[VUID-VkCopyMemoryIndirectInfoKHR-copyAddressRange-10945]]
+    Any of the source or destination memory regions specified in
+    pname:copyAddressRange must: not overlap with any of the specified
+    destination memory regions
+  * [[VUID-VkCopyMemoryIndirectInfoKHR-copyAddressRange-12210]]
+    pname:copyAddressRange must: be a device address range allocated to the
+    application from a buffer created with the
+    ename:VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT usage flag set
+****
+
+include::{generated}/validity/structs/VkCopyMemoryIndirectInfoKHR.adoc[]
+--
+
+[open,refpage='VkCopyMemoryIndirectCommandKHR',desc='Structure specifying indirect memory region copy operation',type='structs']
+--
+:refpage: VkCopyMemoryIndirectCommandKHR
+
+The structure describing source and destination memory regions,
+sname:VkCopyMemoryIndirectCommandKHR is defined as:
+
+include::{generated}/api/structs/VkCopyMemoryIndirectCommandKHR.adoc[]
+
+ifdef::VK_NV_copy_memory_indirect[]
+include::{generated}/api/structs/VkCopyMemoryIndirectCommandNV.adoc[]
+endif::VK_NV_copy_memory_indirect[]
+
+  * pname:srcAddress is the starting address of the source device memory to
+    copy from.
+  * pname:dstAddress is the starting address of the destination device
+    memory to copy to.
+  * pname:size is the size of the copy in bytes.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/indirect_memory_copy_common.adoc[]
+  * [[VUID-VkCopyMemoryIndirectCommandKHR-srcAddress-12211]]
+    The range of memory defined by pname:srcAddress and pname:size must: be
+    a device address range allocated to the application from a buffer
+    created with the ename:VK_BUFFER_USAGE_TRANSFER_SRC_BIT usage flag set
+  * [[VUID-VkCopyMemoryIndirectCommandKHR-dstAddress-12212]]
+    The range of memory defined by pname:dstAddress and pname:size must: be
+    a device address range allocated to the application from a buffer
+    created with the ename:VK_BUFFER_USAGE_TRANSFER_DST_BIT usage flag set
+****
+
+include::{generated}/validity/structs/VkCopyMemoryIndirectCommandKHR.adoc[]
+--
+
+[open,refpage='VkAddressCopyFlagBitsKHR',desc='Bitmask specifying address copy parameters',type='enums']
+--
+Bits which can: be set in a tlink:VkAddressCopyFlagsKHR mask are:
+
+include::{generated}/api/enums/VkAddressCopyFlagBitsKHR.adoc[]
+
+  * ename:VK_ADDRESS_COPY_DEVICE_LOCAL_BIT_KHR specifies that the address
+    range is expected to be resident in device local memory.
+    Specifying this value is optional, but may: lead to improved performance
+    if set accurately.
+  * ename:VK_ADDRESS_COPY_PROTECTED_BIT_KHR specifies that the address range
+    is allocated from protected memory.
+  * ename:VK_ADDRESS_COPY_SPARSE_BIT_KHR specifies that the address range
+    may not be fully bound to physical memory when accessed.
+--
+
+[open,refpage='VkAddressCopyFlagsKHR',desc='Bitmask of VkAddressCopyFlagBitsKHR',type='flags']
+--
+include::{generated}/api/flags/VkAddressCopyFlagsKHR.adoc[]
+
+tname:VkAddressCopyFlagsKHR is a bitmask type for setting a mask of zero or
+more elink:VkAddressCopyFlagBitsKHR.
+--
+
+ifdef::VK_NV_copy_memory_indirect[]
+[open,refpage='vkCmdCopyMemoryIndirectNV',desc='Copy data between memory regions',type='protos']
+--
+To copy data between two memory regions by specifying copy parameters
+indirectly in memory, call:
+
+include::{generated}/api/protos/vkCmdCopyMemoryIndirectNV.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command will be
+    recorded.
+  * pname:copyBufferAddress is the memory address specifying the copy
+    parameters.
+    It is laid out as an array of slink:VkCopyMemoryIndirectCommandNV
+    structures.
+  * pname:copyCount is the number of copies to execute, and can: be zero.
+  * pname:stride is the stride in bytes between successive sets of copy
+    parameters.
+
+Each region read from pname:copyBufferAddress is copied from the source
+region to the specified destination region.
+The results are undefined: if any of the source and destination regions
+overlap in memory.
+
+.Valid Usage
+****
+  * [[VUID-vkCmdCopyMemoryIndirectNV-None-07653]]
+    The <<features-indirectCopy, pname:indirectCopy>> feature must: be
+    enabled
+  * [[VUID-vkCmdCopyMemoryIndirectNV-copyBufferAddress-07654]]
+    pname:copyBufferAddress must: be 4 byte aligned
+  * [[VUID-vkCmdCopyMemoryIndirectNV-stride-07655]]
+    pname:stride must: be a multiple of `4` and must: be greater than or
+    equal to sizeof(slink:VkCopyMemoryIndirectCommandNV)
+  * [[VUID-vkCmdCopyMemoryIndirectNV-commandBuffer-07656]]
+    The slink:VkCommandPool that pname:commandBuffer was allocated from
+    must: support at least one of the queue types specified in
+    slink:VkPhysicalDeviceCopyMemoryIndirectPropertiesKHR::pname:supportedQueues
+  * [[VUID-vkCmdCopyMemoryIndirectNV-copyBufferAddress-10946]]
+    Any of the source or destination memory regions specified in
+    pname:copyBufferAddress must: not overlap with any of the specified
+    destination memory regions
+****
+
+include::{generated}/validity/protos/vkCmdCopyMemoryIndirectNV.adoc[]
+--
+endif::VK_NV_copy_memory_indirect[]
+
+[open,refpage='vkCmdCopyMemoryToImageIndirectKHR',desc='Copy data from a memory region to an image object',type='protos']
+--
+:refpage: vkCmdCopyMemoryToImageIndirectKHR
+
+To copy data from a memory region to an image object by specifying copy
+parameters in memory, call:
+
+include::{generated}/api/protos/vkCmdCopyMemoryToImageIndirectKHR.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command will be
+    recorded.
+  * pname:pCopyMemoryToImageIndirectInfo is a pointer to a
+    slink:VkCopyMemoryToImageIndirectInfoKHR structure which contains the
+    copy parameters, including the number of copies to execute and a strided
+    array of slink:VkCopyMemoryToImageIndirectCommandKHR structures.
+
+Each region specified in the memory referenced by
+pname:pCopyMemoryToImageIndirectInfo->copyAddressRange is copied from the
+source region to an image region in the destination image.
+If the destination image is of type ename:VK_IMAGE_TYPE_3D, the starting
+slice and number of slices to copy are specified in
+pname:pImageSubresources->baseArrayLayer and
+pname:pImageSubresources->layerCount respectively as pname:imageOffset and
+pname:imageExtent from slink:VkCopyMemoryToImageIndirectCommandKHR are only
+available at device execution time.
+The results are undefined: if any of the source and destination regions
+overlap in memory.
+
+:imageparam: dstImage
+
+.Valid Usage
+****
+  * [[VUID-vkCmdCopyMemoryToImageIndirectKHR-indirectMemoryToImageCopy-10947]]
+    The <<features-indirectMemoryToImageCopy,
+    pname:indirectMemoryToImageCopy>> feature must: be enabled
+  * [[VUID-vkCmdCopyMemoryToImageIndirectKHR-commandBuffer-10948]]
+    The slink:VkCommandPool that pname:commandBuffer was allocated from
+    must: support at least one of the queue types specified in
+    slink:VkPhysicalDeviceCopyMemoryIndirectPropertiesKHR::pname:supportedQueues
+  * [[VUID-vkCmdCopyMemoryToImageIndirectKHR-commandBuffer-10949]]
+    pname:commandBuffer must not be a protected command buffer
+****
+
+include::{generated}/validity/protos/vkCmdCopyMemoryToImageIndirectKHR.adoc[]
+--
+
+[open,refpage='VkCopyMemoryToImageIndirectInfoKHR',desc='Parameters describing indirect image copy parameters',type='structs']
+--
+:refpage: VkCopyMemoryToImageIndirectInfoKHR
+
+The slink:VkCopyMemoryToImageIndirectInfoKHR structure is defined as:
+
+include::{generated}/api/structs/VkCopyMemoryToImageIndirectInfoKHR.adoc[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:srcCopyFlags is a tlink:VkAddressCopyFlagsKHR value defining the
+    copy flags for the source address range.
+  * pname:copyCount is the number of copies to execute, and can: be zero.
+  * pname:copyAddressRange is a memory region specifying the copy
+    parameters.
+    It is laid out as an array of
+    slink:VkCopyMemoryToImageIndirectCommandKHR structures.
+  * pname:dstImage is the destination image.
+  * pname:dstImageLayout is the layout of the destination image subresources
+    for the copy.
+  * pname:pImageSubresources is a pointer to an array of pname:copyCount
+    slink:VkImageSubresourceLayers structures, specifying the image
+    subresources of the destination image data for the copy operation.
+
+:imageparam: dstImage
+:copyparam: copyAddressRange
+
+.Valid Usage
+****
+  * [[VUID-VkCopyMemoryToImageIndirectInfoKHR-srcCopyFlags-10950]]
+    If pname:srcCopyFlags contains ename:VK_ADDRESS_COPY_SPARSE_BIT_KHR, the
+    source memory regions accessed must: be <<sparsememory, bound to
+    memory>>
+  * [[VUID-VkCopyMemoryToImageIndirectInfoKHR-copyCount-10951]]
+    pname:copyCount must: be less than or equal to
+    [eq]#pname:copyAddressRange.size / pname:copyAddressRange.stride#
+  * [[VUID-VkCopyMemoryToImageIndirectInfoKHR-copyAddressRange-10952]]
+    pname:copyAddressRange.address must: be 4 byte aligned
+  * [[VUID-VkCopyMemoryToImageIndirectInfoKHR-copyAddressRange-10953]]
+    pname:copyAddressRange.stride must: be a multiple of `4` and must: be
+    greater than or equal to
+    sizeof(slink:VkCopyMemoryToImageIndirectCommandKHR)
+  * [[VUID-VkCopyMemoryToImageIndirectInfoKHR-dstImage-10955]]
+    The format features of pname:dstImage must: contain
+    ename:VK_FORMAT_FEATURE_2_COPY_IMAGE_INDIRECT_DST_BIT_KHR
+  * [[VUID-VkCopyMemoryToImageIndirectInfoKHR-copyAddressRange-12213]]
+    pname:copyAddressRange must: be a device address range allocated to the
+    application from a buffer created with the
+    ename:VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT usage flag set
+include::{chapters}/commonvalidity/indirect_memory_to_image_copy_common.adoc[]
+****
+
+include::{generated}/validity/structs/VkCopyMemoryToImageIndirectInfoKHR.adoc[]
+--
+
+[open,refpage='VkCopyMemoryToImageIndirectCommandKHR',desc='Structure specifying indirect memory region to image copy operation',type='structs']
+--
+:refpage: VkCopyMemoryToImageIndirectCommandKHR
+
+The structure describing source and destination memory regions,
+sname:VkCopyMemoryToImageIndirectCommandKHR is defined as:
+
+include::{generated}/api/structs/VkCopyMemoryToImageIndirectCommandKHR.adoc[]
+
+ifdef::VK_NV_copy_memory_indirect[]
+include::{generated}/api/structs/VkCopyMemoryToImageIndirectCommandNV.adoc[]
+endif::VK_NV_copy_memory_indirect[]
+
+  * pname:srcAddress is the starting address of the source device memory to
+    copy from.
+  * pname:bufferRowLength and pname:bufferImageHeight specify in texels a
+    subregion of a larger two- or three-dimensional image in buffer memory,
+    and control the addressing calculations.
+    If either of these values is zero, that aspect of the buffer memory is
+    considered to be tightly packed according to the pname:imageExtent.
+  * pname:imageSubresource is a slink:VkImageSubresourceLayers structure
+    used to specify the specific image subresources of the image used for
+    the destination image data, which must: match the value specified in
+    corresponding index of the
+    pname:pCopyMemoryToImageIndirectInfo->pImageSubresources array of
+    flink:vkCmdCopyMemoryToImageIndirectKHR during command recording.
+  * pname:imageOffset selects the initial pname:x, pname:y, pname:z offsets
+    in texels of the sub-region of the destination image data.
+  * pname:imageExtent is the size in texels of the destination image in
+    pname:width, pname:height and pname:depth.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/indirect_memory_to_image_command_common.adoc[]
+  * [[VUID-VkCopyMemoryToImageIndirectCommandKHR-srcAddress-12214]]
+    pname:srcAddress must: be a device address allocated to the application
+    from a buffer created with the ename:VK_BUFFER_USAGE_TRANSFER_SRC_BIT
+    usage flag set
+****
+
+include::{generated}/validity/structs/VkCopyMemoryToImageIndirectCommandKHR.adoc[]
+--
+
+ifdef::VK_NV_copy_memory_indirect[]
+[open,refpage='vkCmdCopyMemoryToImageIndirectNV',desc='Copy data from a memory region to an image object',type='protos']
+--
+:refpage: vkCmdCopyMemoryToImageIndirectNV
+
+To copy data from a memory region to an image object by specifying copy
+parameters in memory, call:
+
+include::{generated}/api/protos/vkCmdCopyMemoryToImageIndirectNV.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command will be
+    recorded.
+  * pname:copyBufferAddress is the address specifying the copy parameters
+    which are laid out in memory as an array of
+    slink:VkCopyMemoryToImageIndirectCommandNV structures.
+  * pname:copyCount is the number of copies to execute, and can: be zero.
+  * pname:stride is the byte stride between successive sets of copy
+    parameters.
+  * pname:dstImage is the destination image.
+  * pname:dstImageLayout is the layout of the destination image subresources
+    for the copy.
+  * pname:pImageSubresources is a pointer to an array of pname:copyCount
+    slink:VkImageSubresourceLayers structures, specifying the image
+    subresources of the destination image data for the copy operation.
+
+Each region in pname:copyBufferAddress is copied from the source memory
+region to an image region in the destination image.
+If the destination image is of type ename:VK_IMAGE_TYPE_3D, the starting
+slice and number of slices to copy are specified in
+pname:pImageSubresources->baseArrayLayer and
+pname:pImageSubresources->layerCount respectively.
+
+:imageparam: dstImage
+:copyparam: copyBufferAddress
+
+.Valid Usage
+****
+  * [[VUID-vkCmdCopyMemoryToImageIndirectNV-None-07660]]
+    The <<features-indirectCopy, pname:indirectCopy>> feature must: be
+    enabled
+  * [[VUID-vkCmdCopyMemoryToImageIndirectNV-offset-07676]]
+    pname:copyBufferAddress must: be 4 byte aligned
+  * [[VUID-vkCmdCopyMemoryToImageIndirectNV-stride-07677]]
+    pname:stride must: be a multiple of `4` and must: be greater than or
+    equal to sizeof(slink:VkCopyMemoryToImageIndirectCommandNV)
+  * [[VUID-vkCmdCopyMemoryToImageIndirectNV-commandBuffer-10956]]
+    The slink:VkCommandPool that pname:commandBuffer was allocated from
+    must: support at least one of the queue types specified in
+    slink:VkPhysicalDeviceCopyMemoryIndirectPropertiesKHR::pname:supportedQueues
+include::{chapters}/commonvalidity/indirect_memory_to_image_copy_common.adoc[]
+****
+
+include::{generated}/validity/protos/vkCmdCopyMemoryToImageIndirectNV.adoc[]
+--
+endif::VK_NV_copy_memory_indirect[]
+endif::VK_NV_copy_memory_indirect,VK_KHR_copy_memory_indirect[]
+
+
+ifdef::VK_GRAPHICS_VERSION_1_0[]
+[[copies-imagescaling]]
+== Image Copies With Scaling
+
+[open,refpage='vkCmdBlitImage',desc='Copy regions of an image, potentially performing format conversion,',type='protos']
+--
+:refpage: vkCmdBlitImage
+
+To copy regions of a source image into a destination image, potentially
+performing format conversion, arbitrary scaling, and filtering, call:
+
+include::{generated}/api/protos/vkCmdBlitImage.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command will be
+    recorded.
+  * pname:srcImage is the source image.
+  * pname:srcImageLayout is the layout of the source image subresources for
+    the blit.
+  * pname:dstImage is the destination image.
+  * pname:dstImageLayout is the layout of the destination image subresources
+    for the blit.
+  * pname:regionCount is the number of regions to blit.
+  * pname:pRegions is a pointer to an array of slink:VkImageBlit structures
+    specifying the regions to blit.
+  * pname:filter is a elink:VkFilter specifying the filter to apply if the
+    blits require scaling.
+
+fname:vkCmdBlitImage must: not be used for multisampled source or
+destination images.
+Use flink:vkCmdResolveImage for this purpose.
+
+As the sizes of the source and destination extents can: differ in any
+dimension, texels in the source extent are scaled and filtered to the
+destination extent.
+Scaling occurs via the following operations:
+
+  * For each destination texel, the integer coordinate of that texel is
+    converted to an unnormalized texture coordinate, using the effective
+    inverse of the equations described in
+    <<textures-unnormalized-to-integer, unnormalized to integer
+    conversion>>:
+  {empty}:: [eq]#u~base~ = i {plus} {onehalf}#
+  {empty}:: [eq]#v~base~ = j {plus} {onehalf}#
+  {empty}:: [eq]#w~base~ = k {plus} {onehalf}#
+  * These base coordinates are then offset by the first destination offset:
+  {empty}:: [eq]#u~offset~ = u~base~ - x~dst0~#
+  {empty}:: [eq]#v~offset~ = v~base~ - y~dst0~#
+  {empty}:: [eq]#w~offset~ = w~base~ - z~dst0~#
+  {empty}:: [eq]#a~offset~ = a - pname:baseArrayCount~dst~#
+  * The scale is determined from the source and destination regions, and
+    applied to the offset coordinates:
+  {empty}:: [eq]#scale~u~ = (x~src1~ - x~src0~) / (x~dst1~ - x~dst0~)#
+  {empty}:: [eq]#scale~v~ = (y~src1~ - y~src0~) / (y~dst1~ - y~dst0~)#
+  {empty}:: [eq]#scale~w~ = (z~src1~ - z~src0~) / (z~dst1~ - z~dst0~)#
+  {empty}:: [eq]#u~scaled~ = u~offset~ {times} scale~u~#
+  {empty}:: [eq]#v~scaled~ = v~offset~ {times} scale~v~#
+  {empty}:: [eq]#w~scaled~ = w~offset~ {times} scale~w~#
+  * Finally the source offset is added to the scaled coordinates, to
+    determine the final unnormalized coordinates used to sample from
+    pname:srcImage:
+  {empty}:: [eq]#u = u~scaled~ {plus} x~src0~#
+  {empty}:: [eq]#v = v~scaled~ {plus} y~src0~#
+  {empty}:: [eq]#w = w~scaled~ {plus} z~src0~#
+  {empty}:: [eq]#q = pname:mipLevel#
+  {empty}:: [eq]#a = a~offset~ {plus} pname:baseArrayCount~src~#
+
+These coordinates are used to sample from the source image, as described in
+<<textures, Image Operations chapter>>, with the filter mode equal to that
+of pname:filter, a mipmap mode of ename:VK_SAMPLER_MIPMAP_MODE_NEAREST and
+an address mode of ename:VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE.
+Implementations must: clamp at the edge of the source image, and may:
+additionally clamp to the edge of the source region.
+
+[NOTE]
+====
+Due to allowable rounding errors in the generation of the source texture
+coordinates, it is not always possible to guarantee exactly which source
+texels will be sampled for a given blit.
+As rounding errors are implementation-dependent, the exact results of a
+blitting operation are also implementation-dependent.
+====
+
+Blits are done layer by layer starting with the pname:baseArrayLayer member
+of pname:srcSubresource for the source and pname:dstSubresource for the
+destination.
+pname:layerCount layers are blitted to the destination image.
+
+When blitting 3D textures, slices in the destination region bounded by
+pname:dstOffsets[0].z and pname:dstOffsets[1].z are sampled from slices in
+the source region bounded by pname:srcOffsets[0].z and
+pname:srcOffsets[1].z.
+If the pname:filter parameter is ename:VK_FILTER_LINEAR then the value
+sampled from the source image is taken by doing linear filtering using the
+interpolated *z* coordinate represented by *w* in the previous equations.
+If the pname:filter parameter is ename:VK_FILTER_NEAREST then the value
+sampled from the source image is taken from the single nearest slice, with
+an implementation-dependent arithmetic rounding mode.
+
+The following filtering and conversion rules apply:
+
+  * Integer formats can: only be converted to other integer formats with the
+    same signedness.
+  * No format conversion is supported between depth/stencil images.
+    The formats must: match.
+  * Format conversions on unorm, snorm, scaled and packed float formats of
+    the copied aspect of the image are performed by first converting the
+    pixels to float values.
+  * For sRGB source formats, nonlinear RGB values are converted to linear
+    representation prior to filtering.
+  * After filtering, the float values are first clamped and then cast to the
+    destination image format.
+    In case of sRGB destination format, linear RGB values are converted to
+    nonlinear representation before writing the pixel to the image.
+
+Signed and unsigned integers are converted by first clamping to the
+representable range of the destination format, then casting the value.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/blit_image_command_buffer_common.adoc[]
+include::{chapters}/commonvalidity/blit_image_common.adoc[]
+****
+
+include::{generated}/validity/protos/vkCmdBlitImage.adoc[]
+--
+
+[open,refpage='VkImageBlit',desc='Structure specifying an image blit operation',type='structs']
+--
+:refpage: VkImageBlit
+
+The sname:VkImageBlit structure is defined as:
+
+include::{generated}/api/structs/VkImageBlit.adoc[]
+
+  * pname:srcSubresource is the subresource to blit from.
+  * pname:srcOffsets is a pointer to an array of two slink:VkOffset3D
+    structures specifying the bounds of the source region within
+    pname:srcSubresource.
+  * pname:dstSubresource is the subresource to blit into.
+  * pname:dstOffsets is a pointer to an array of two slink:VkOffset3D
+    structures specifying the bounds of the destination region within
+    pname:dstSubresource.
+
+For each element of the pname:pRegions array, a blit operation is performed
+for the specified source and destination regions.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/image_blit_common.adoc[]
+****
+
+include::{generated}/validity/structs/VkImageBlit.adoc[]
+--
+
+ifdef::VK_GRAPHICS_VERSION_1_3,VK_KHR_copy_commands2[]
+A more extensible version of the blit image command is defined below.
+
+[open,refpage='vkCmdBlitImage2',desc='Copy regions of an image, potentially performing format conversion,',type='protos']
+--
+:refpage: vkCmdBlitImage2
+
+To copy regions of a source image into a destination image, potentially
+performing format conversion, arbitrary scaling, and filtering, call:
+
+ifdef::VK_GRAPHICS_VERSION_1_3[]
+include::{generated}/api/protos/vkCmdBlitImage2.adoc[]
+endif::VK_GRAPHICS_VERSION_1_3[]
+
+ifdef::VK_KHR_copy_commands2[]
+include::{generated}/api/protos/vkCmdBlitImage2KHR.adoc[]
+endif::VK_KHR_copy_commands2[]
+
+  * pname:commandBuffer is the command buffer into which the command will be
+    recorded.
+  * pname:pBlitImageInfo is a pointer to a slink:VkBlitImageInfo2 structure
+    describing the blit parameters.
+
+This command is functionally identical to flink:vkCmdBlitImage, but includes
+extensible sub-structures that include pname:sType and pname:pNext
+parameters, allowing them to be more easily extended.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/blit_image_command_buffer_common.adoc[]
+****
+
+include::{generated}/validity/protos/vkCmdBlitImage2.adoc[]
+--
+
+[open,refpage='VkBlitImageInfo2',desc='Structure specifying parameters of blit image command',type='structs']
+--
+:refpage: VkBlitImageInfo2
+
+The sname:VkBlitImageInfo2 structure is defined as:
+
+include::{generated}/api/structs/VkBlitImageInfo2.adoc[]
+
+ifdef::VK_KHR_copy_commands2[]
+include::{generated}/api/structs/VkBlitImageInfo2KHR.adoc[]
+endif::VK_KHR_copy_commands2[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:srcImage is the source image.
+  * pname:srcImageLayout is the layout of the source image subresources for
+    the blit.
+  * pname:dstImage is the destination image.
+  * pname:dstImageLayout is the layout of the destination image subresources
+    for the blit.
+  * pname:regionCount is the number of regions to blit.
+  * pname:pRegions is a pointer to an array of slink:VkImageBlit2 structures
+    specifying the regions to blit.
+  * pname:filter is a elink:VkFilter specifying the filter to apply if the
+    blits require scaling.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/blit_image_common.adoc[]
+ifdef::VK_QCOM_rotated_copy_commands[]
+  * [[VUID-VkBlitImageInfo2-pRegions-04561]]
+    If any element of pname:pRegions contains
+    slink:VkCopyCommandTransformInfoQCOM in its pname:pNext chain, then
+    pname:srcImage and pname:dstImage must: not be block-compressed images
+  * [[VUID-VkBlitImageInfo2KHR-pRegions-06207]]
+    If any element of pname:pRegions contains
+    slink:VkCopyCommandTransformInfoQCOM in its pname:pNext chain, then
+    pname:srcImage must: be of type ename:VK_IMAGE_TYPE_2D
+  * [[VUID-VkBlitImageInfo2KHR-pRegions-06208]]
+    If any element of pname:pRegions contains
+    slink:VkCopyCommandTransformInfoQCOM in its pname:pNext chain, then
+    pname:srcImage must: not have a <<formats-multiplanar, multi-planar
+    format>>
+endif::VK_QCOM_rotated_copy_commands[]
+ifdef::VK_QCOM_filter_cubic_weights[]
+  * [[VUID-VkBlitImageInfo2-filter-09204]]
+    If pname:filter is ename:VK_FILTER_CUBIC_EXT and if the
+    <<features-selectableCubicWeights,selectableCubicWeights>> feature is
+    not enabled then the cubic weights must: be
+    ename:VK_CUBIC_FILTER_WEIGHTS_CATMULL_ROM_QCOM
+endif::VK_QCOM_filter_cubic_weights[]
+****
+
+include::{generated}/validity/structs/VkBlitImageInfo2.adoc[]
+--
+
+ifdef::VK_QCOM_filter_cubic_weights[]
+
+If pname:filter is ename:VK_FILTER_CUBIC_EXT and if the pname:pNext chain of
+slink:VkBlitImageInfo2 includes a sname:VkBlitImageCubicWeightsInfoQCOM
+structure, then that structure specifies cubic weights are used in the blit.
+If that structure is not present, then cubic weights are considered to be
+ename:VK_CUBIC_FILTER_WEIGHTS_CATMULL_ROM_QCOM.
+
+[open,refpage='VkBlitImageCubicWeightsInfoQCOM',desc='Structure specifying image blit cubic weight info',type='structs',xrefs='VkImageBlit2KHR']
+--
+:refpage: VkBlitImageCubicWeightsInfoQCOM
+
+The sname:VkBlitImageCubicWeightsInfoQCOM structure is defined as:
+
+include::{generated}/api/structs/VkBlitImageCubicWeightsInfoQCOM.adoc[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:cubicWeights is a elink:VkCubicFilterWeightsQCOM value controlling
+    cubic filter weights for the blit.
+
+include::{generated}/validity/structs/VkBlitImageCubicWeightsInfoQCOM.adoc[]
+--
+
+endif::VK_QCOM_filter_cubic_weights[]
+
+
+[open,refpage='VkImageBlit2',desc='Structure specifying an image blit operation',type='structs']
+--
+:refpage: VkImageBlit2
+
+The sname:VkImageBlit2 structure is defined as:
+
+include::{generated}/api/structs/VkImageBlit2.adoc[]
+
+ifdef::VK_KHR_copy_commands2[]
+include::{generated}/api/structs/VkImageBlit2KHR.adoc[]
+endif::VK_KHR_copy_commands2[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:srcSubresource is the subresource to blit from.
+  * pname:srcOffsets is a pointer to an array of two slink:VkOffset3D
+    structures specifying the bounds of the source region within
+    pname:srcSubresource.
+  * pname:dstSubresource is the subresource to blit into.
+  * pname:dstOffsets is a pointer to an array of two slink:VkOffset3D
+    structures specifying the bounds of the destination region within
+    pname:dstSubresource.
+
+For each element of the pname:pRegions array, a blit operation is performed
+for the specified source and destination regions.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/image_blit_common.adoc[]
+****
+
+include::{generated}/validity/structs/VkImageBlit2.adoc[]
+--
+
+ifdef::VK_QCOM_rotated_copy_commands[]
+For flink:vkCmdBlitImage2, each region copied can include a rotation.
+To specify a rotated region, add slink:VkCopyCommandTransformInfoQCOM to the
+pname:pNext chain of slink:VkImageBlit2.
+For each region with a rotation specified,
+<<copies-images-scaling-rotation,Image Blits with Scaling and Rotation>>
+specifies how coordinates are rotated prior to sampling from the source
+image.
+When rotation is specified, the source and destination images must: each be
+2D images, have a 1x1x1 <<formats-compatibility-classes,texel block
+extent>>, and only one plane.
+endif::VK_QCOM_rotated_copy_commands[]
+endif::VK_GRAPHICS_VERSION_1_3,VK_KHR_copy_commands2[]
+
+
+ifdef::VK_QCOM_rotated_copy_commands[]
+[[copies-images-scaling-rotation]]
+=== Image Blits With Scaling and Rotation
+
+When slink:VkCopyCommandTransformInfoQCOM is in the pname:pNext chain of
+slink:VkImageBlit2, the specified region is rotated during the blit.
+The following description of rotated addressing replaces the description in
+flink:vkCmdBlitImage.
+
+The following code computes rotation of normalized coordinates.
+
+[source,c]
+----
+// rotation of normalized coordinates
+VkOffset2D RotateNormUV(VkOffset2D in, VkSurfaceTransformFlagBitsKHR flags)
+{
+    VkOffset2D output;
+    switch (flags)
+    {
+        case VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR:
+            out.x = in.x;
+            out.y = in.y;
+            break;
+        case VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR:
+            out.x = in.y;
+            out.y = 1.0 - in.x;
+            break;
+        case VK_SURFACE_TRANSFORM_ROTATE_180_BIT_KHR:
+            out.x = 1.0 - in.x;
+            out.y = 1.0 - in.y;
+            break;
+        case VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR:
+            out.x = 1.0 - in.y;
+            out.y = in.x;
+            break;
+    }
+    return out;
+}
+----
+
+  * For each destination texel, the integer coordinate of that texel is
+    converted to an unnormalized texture coordinate, using the effective
+    inverse of the equations described in
+    <<textures-unnormalized-to-integer, unnormalized to integer
+    conversion>>:
+  {empty}:: [eq]#u~base~ = i {plus} {onehalf}#
+  {empty}:: [eq]#v~base~ = j {plus} {onehalf}#
+  {empty}:: [eq]#w~base~ = k {plus} {onehalf}#
+  * These base coordinates are then offset by the first destination offset:
+  {empty}:: [eq]#u~offset~ = u~base~ - x~dst0~#
+  {empty}:: [eq]#v~offset~ = v~base~ - y~dst0~#
+  {empty}:: [eq]#w~offset~ = w~base~ - z~dst0~#
+  {empty}:: [eq]#a~offset~ = a - pname:baseArrayCount~dst~#
+
+  * The UV destination coordinates are scaled by the destination region,
+    rotated, and scaled by the source region.
+  {empty}:: [eq]#u~dest_scaled~ = u~offset~ / (x~dst1~ - x~dst0~)#
+  {empty}:: [eq]#v~dest_scaled~ = v~offset~ / (y~dst1~ - y~dst0~)#
+  {empty}:: [eq]#(u~src_scaled~, v~src_scaled~) =
+            code:RotateNormUV(u~dest_scaled~, v~dest_scaled~,
+            pname:transform)#
+  {empty}:: [eq]#u~scaled~ = u~src_scaled~ {times} (x~Src1~ - x~Src0~)#
+  {empty}:: [eq]#v~scaled~ = v~src_scaled~ {times} (y~Src1~ - y~Src0~)#
+
+  * The W coordinate is unaffected by rotation.
+    The scale is determined from the ratio of source and destination
+    regions, and applied to the offset coordinate:
+  {empty}:: [eq]#scale~w~ = (z~Src1~ - z~Src0~) / (z~dst1~ - z~dst0~)#
+  {empty}:: [eq]#w~scaled~ = w~offset~ {times} scale~w~#
+
+
+  * Finally the source offset is added to the scaled source coordinates, to
+    determine the final unnormalized coordinates used to sample from
+    pname:srcImage:
+  {empty}:: [eq]#u = u~scaled~ {plus} x~Src0~#
+  {empty}:: [eq]#v = v~scaled~ {plus} y~Src0~#
+  {empty}:: [eq]#w = w~scaled~ {plus} z~Src0~#
+  {empty}:: [eq]#q = pname:mipLevel#
+  {empty}:: [eq]#a = a~offset~ {plus} pname:baseArrayCount~src~#
+
+These coordinates are used to sample from the source image as described for
+<<textures, Image Operations>>, with the filter mode equal to that of
+pname:filter; a mipmap mode of ename:VK_SAMPLER_MIPMAP_MODE_NEAREST; and an
+address mode of ename:VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE.
+Implementations must: clamp at the edge of the source image, and may:
+additionally clamp to the edge of the source region.
+endif::VK_QCOM_rotated_copy_commands[]
+
+
+[[copies-resolve]]
+== Resolving Multisample Images
+
+[open,refpage='vkCmdResolveImage',desc='Resolve regions of an image',type='protos']
+--
+:refpage: vkCmdResolveImage
+
+To resolve a multisample color image to a non-multisample color image, call:
+
+include::{generated}/api/protos/vkCmdResolveImage.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command will be
+    recorded.
+  * pname:srcImage is the source image.
+  * pname:srcImageLayout is the layout of the source image subresources for
+    the resolve.
+  * pname:dstImage is the destination image.
+  * pname:dstImageLayout is the layout of the destination image subresources
+    for the resolve.
+  * pname:regionCount is the number of regions to resolve.
+  * pname:pRegions is a pointer to an array of slink:VkImageResolve
+    structures specifying the regions to resolve.
+
+During the resolve the samples corresponding to each pixel location in the
+source are converted to a single sample before being written to the
+destination.
+
+If the source format is a floating-point or normalized type, the resolve
+mode is chosen as implementation-dependent behavior.
+If the resolve mode requires to calculate the result from multiple samples,
+such as by computing an average or weighted average of the samples, the
+values for each pixel are resolved with implementation-defined numerical
+precision.
+
+If the <<formats-numericformat, numeric format>> of pname:srcImage uses sRGB
+encoding and the resolve mode requires the implementation to convert the
+samples to floating-point to perform the calculations, the implementation
+should: convert samples from nonlinear to linear before resolving the
+samples as described in the "`sRGB EOTF`" section of the
+<<data-format,Khronos Data Format Specification>>.
+In this case, the implementation must: convert the linear averaged value to
+nonlinear before writing the resolved result to pname:dstImage.
+ifdef::VK_KHR_maintenance10[]
+If the <<features-maintenance10,pname:maintenance10>> feature is enabled,
+whether a nonlinear to linear conversion happens for sRGB encoded resolve is
+controlled by
+<<limits-resolveSrgbFormatAppliesTransferFunction,pname:resolveSrgbFormatAppliesTransferFunction>>.
+endif::VK_KHR_maintenance10[]
+
+If the source format is an integer type, a single sample's value is selected
+for each pixel.
+
+pname:srcOffset and pname:dstOffset select the initial pname:x, pname:y, and
+pname:z offsets in texels of the sub-regions of the source and destination
+image data.
+pname:extent is the size in texels of the source image to resolve in
+pname:width, pname:height and pname:depth.
+Each element of pname:pRegions must: be a region that is contained within
+its corresponding image.
+
+Resolves are done layer by layer starting with pname:baseArrayLayer member
+of pname:srcSubresource for the source and pname:dstSubresource for the
+destination.
+pname:layerCount layers are resolved to the destination image.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/resolve_image_command_buffer_common.adoc[]
+include::{chapters}/commonvalidity/resolve_image_common.adoc[]
+****
+
+include::{generated}/validity/protos/vkCmdResolveImage.adoc[]
+--
+
+[open,refpage='VkImageResolve',desc='Structure specifying an image resolve operation',type='structs']
+--
+:refpage: VkImageResolve
+
+The sname:VkImageResolve structure is defined as:
+
+include::{generated}/api/structs/VkImageResolve.adoc[]
+
+  * pname:srcSubresource and pname:dstSubresource are
+    slink:VkImageSubresourceLayers structures specifying the image
+    subresources of the images used for the source and destination image
+    data, respectively.
+    Resolve of depth/stencil images is not supported.
+ifdef::VK_KHR_maintenance10[]
+    slink:VkImageResolve2 can: support resolve of depth/stencil images with
+    <<features-maintenance10,pname:maintenance10>> instead.
+endif::VK_KHR_maintenance10[]
+  * pname:srcOffset and pname:dstOffset select the initial pname:x, pname:y,
+    and pname:z offsets in texels of the sub-regions of the source and
+    destination image data.
+  * pname:extent is the size in texels of the source image to resolve in
+    pname:width, pname:height and pname:depth.
+
+.Valid Usage
+****
+  * [[VUID-VkImageResolve-aspectMask-10981]]
+    The pname:aspectMask member of pname:srcSubresource and
+    pname:dstSubresource must: only contain ename:VK_IMAGE_ASPECT_COLOR_BIT
+include::{chapters}/commonvalidity/image_resolve_common.adoc[]
+****
+
+include::{generated}/validity/structs/VkImageResolve.adoc[]
+--
+
+ifdef::VK_GRAPHICS_VERSION_1_3,VK_KHR_copy_commands2[]
+
+A more extensible version of the resolve image command is defined below.
+
+[open,refpage='vkCmdResolveImage2',desc='Resolve regions of an image',type='protos']
+--
+:refpage: vkCmdResolveImage2
+
+To resolve a multisample image to a non-multisample image, call:
+
+ifdef::VK_GRAPHICS_VERSION_1_3[]
+include::{generated}/api/protos/vkCmdResolveImage2.adoc[]
+endif::VK_GRAPHICS_VERSION_1_3[]
+
+ifdef::VK_KHR_copy_commands2[]
+include::{generated}/api/protos/vkCmdResolveImage2KHR.adoc[]
+endif::VK_KHR_copy_commands2[]
+
+  * pname:commandBuffer is the command buffer into which the command will be
+    recorded.
+  * pname:pResolveImageInfo is a pointer to a slink:VkResolveImageInfo2
+    structure describing the resolve parameters.
+
+This command is functionally identical to flink:vkCmdResolveImage, but
+includes extensible sub-structures that include pname:sType and pname:pNext
+parameters, allowing them to be more easily extended.
+
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/resolve_image_command_buffer_common.adoc[]
+****
+
+include::{generated}/validity/protos/vkCmdResolveImage2.adoc[]
+--
+
+[open,refpage='VkResolveImageInfo2',desc='Structure specifying parameters of resolve image command',type='structs']
+--
+:refpage: VkResolveImageInfo2
+
+The sname:VkResolveImageInfo2 structure is defined as:
+
+include::{generated}/api/structs/VkResolveImageInfo2.adoc[]
+
+ifdef::VK_KHR_copy_commands2[]
+include::{generated}/api/structs/VkResolveImageInfo2KHR.adoc[]
+endif::VK_KHR_copy_commands2[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:srcImage is the source image.
+  * pname:srcImageLayout is the layout of the source image subresources for
+    the resolve.
+  * pname:dstImage is the destination image.
+  * pname:dstImageLayout is the layout of the destination image subresources
+    for the resolve.
+  * pname:regionCount is the number of regions to resolve.
+  * pname:pRegions is a pointer to an array of slink:VkImageResolve2
+    structures specifying the regions to resolve.
+
+ifdef::VK_KHR_maintenance10[]
+If the source format is a floating-point or normalized type, the resolve
+mode is chosen as implementation-dependent behavior, unless
+slink:VkResolveImageModeInfoKHR is included in the pname:pNext chain, in
+which case it is defined by
+slink:VkResolveImageModeInfoKHR::pname:resolveMode.
+If the resolve mode requires to calculate the result from multiple samples,
+such as by computing an average or weighted average of the samples, the
+values for each pixel are resolved with implementation-defined numerical
+precision.
+
+If the <<formats-numericformat, numeric format>> of pname:srcImage uses sRGB
+encoding and the resolve mode requires the implementation to convert the
+samples to floating-point to perform the calculations, the implementation
+should: convert samples from nonlinear to linear before resolving the
+samples as described in the "`sRGB EOTF`" section of the
+<<data-format,Khronos Data Format Specification>>.
+In this case, the implementation must: convert the linear averaged value to
+nonlinear before writing the resolved result to pname:dstImage.
+If the <<features-maintenance10,pname:maintenance10>> feature is enabled,
+whether a nonlinear to linear conversion happens for sRGB encoded resolve is
+controlled by
+<<limits-resolveSrgbFormatAppliesTransferFunction,pname:resolveSrgbFormatAppliesTransferFunction>>.
+If slink:VkResolveImageModeInfoKHR is included in the pname:pNext chain,
+this default behavior can: be overridden with
+ename:VK_RESOLVE_IMAGE_SKIP_TRANSFER_FUNCTION_BIT_KHR or
+ename:VK_RESOLVE_IMAGE_ENABLE_TRANSFER_FUNCTION_BIT_KHR flags.
+
+If the source format is an integer type, a single sample's value is selected
+for each pixel, unless slink:VkResolveImageModeInfoKHR is included in the
+pname:pNext chain, in which case it is defined by
+slink:VkResolveImageModeInfoKHR::pname:resolveMode or
+slink:VkResolveImageModeInfoKHR::pname:stencilResolveMode depending on which
+aspect is being resolved.
+endif::VK_KHR_maintenance10[]
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/resolve_image_common.adoc[]
+ifdef::VK_KHR_maintenance10[]
+  * [[VUID-VkResolveImageInfo2-pNext-10982]]
+    If slink:VkResolveImageModeInfoKHR is included in the pname:pNext chain,
+    pname:flags includes
+    ename:VK_RESOLVE_IMAGE_SKIP_TRANSFER_FUNCTION_BIT_KHR or
+    ename:VK_RESOLVE_IMAGE_ENABLE_TRANSFER_FUNCTION_BIT_KHR, then the format
+    of pname:srcImage and pname:dstImage must: use sRGB encoding
+  * [[VUID-VkResolveImageInfo2-srcImage-10983]]
+    If pname:srcImage has a color format and slink:VkResolveImageModeInfoKHR
+    is included in the pname:pNext chain, its pname:resolveMode must: not be
+    ename:VK_RESOLVE_MODE_NONE
+  * [[VUID-VkResolveImageInfo2-srcImage-10984]]
+    If pname:srcImage has a non-integer color format, and
+    slink:VkResolveImageModeInfoKHR is included in the pname:pNext chain,
+    its pname:resolveMode must: be ename:VK_RESOLVE_MODE_AVERAGE_BIT
+  * [[VUID-VkResolveImageInfo2-srcImage-10985]]
+    If pname:srcImage has an integer color format, and
+    slink:VkResolveImageModeInfoKHR is included in the pname:pNext chain,
+    its pname:resolveMode must: be ename:VK_RESOLVE_MODE_SAMPLE_ZERO_BIT
+ifdef::VK_VERSION_1_2,VK_KHR_depth_stencil_resolve[]
+  * [[VUID-VkResolveImageInfo2-srcImage-10986]]
+    If pname:srcImage has a depth-stencil format,
+    slink:VkResolveImageModeInfoKHR must: be included in the pname:pNext
+    chain
+  * [[VUID-VkResolveImageInfo2-srcImage-10987]]
+    If pname:srcImage has a depth-stencil format, and a depth aspect is
+    referenced by pname:pRegions,
+    slink:VkResolveImageModeInfoKHR::pname:resolveMode must: not be
+    ename:VK_RESOLVE_MODE_NONE
+  * [[VUID-VkResolveImageInfo2-srcImage-10988]]
+    If pname:srcImage has a depth-stencil format, and a stencil aspect is
+    referenced by pname:pRegions,
+    slink:VkResolveImageModeInfoKHR::pname:stencilResolveMode must: not be
+    ename:VK_RESOLVE_MODE_NONE
+  * [[VUID-VkResolveImageInfo2-srcImage-10989]]
+    If pname:srcImage has a depth-stencil format, and a depth aspect is
+    referenced by pname:pRegions,
+    slink:VkResolveImageModeInfoKHR::pname:resolveMode must: be one of the
+    bits set in
+    slink:VkPhysicalDeviceDepthStencilResolveProperties::pname:supportedDepthResolveModes
+  * [[VUID-VkResolveImageInfo2-srcImage-10990]]
+    If pname:srcImage has a depth-stencil format, and a stencil aspect is
+    referenced by pname:pRegions,
+    slink:VkResolveImageModeInfoKHR::pname:stencilResolveMode must: be one
+    of the bits set in
+    slink:VkPhysicalDeviceDepthStencilResolveProperties::pname:supportedStencilResolveModes
+  * [[VUID-VkResolveImageInfo2-srcImage-10991]]
+    If pname:srcImage has a depth-stencil format, and both a depth aspect
+    and stencil aspect is referenced by pname:pRegions, and
+    slink:VkPhysicalDeviceDepthStencilResolveProperties::pname:indepdendentResolve
+    is ename:VK_FALSE, slink:VkResolveImageModeInfoKHR::pname:resolveMode
+    must: be equal to
+    slink:VkResolveImageModeInfoKHR::pname:stencilResolveMode
+  * [[VUID-VkResolveImageInfo2-srcImage-10992]]
+    If pname:srcImage has a depth-stencil format containing both a depth
+    aspect and stencil aspect, and
+    slink:VkPhysicalDeviceDepthStencilResolveProperties::pname:indepdendentResolveNone
+    is ename:VK_FALSE, every element of pname:pRegions must: contain both
+    depth and stencil aspects
+endif::VK_VERSION_1_2,VK_KHR_depth_stencil_resolve[]
+endif::VK_KHR_maintenance10[]
+****
+
+include::{generated}/validity/structs/VkResolveImageInfo2.adoc[]
+--
+
+[open,refpage='VkImageResolve2',desc='Structure specifying an image resolve operation',type='structs']
+--
+:refpage: VkImageResolve2
+
+The sname:VkImageResolve2 structure is defined as:
+
+include::{generated}/api/structs/VkImageResolve2.adoc[]
+
+ifdef::VK_KHR_copy_commands2[]
+include::{generated}/api/structs/VkImageResolve2KHR.adoc[]
+endif::VK_KHR_copy_commands2[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:srcSubresource and pname:dstSubresource are
+    slink:VkImageSubresourceLayers structures specifying the image
+    subresources of the images used for the source and destination image
+    data, respectively.
+ifndef::VK_KHR_maintenance10[]
+    Resolve of depth/stencil images is not supported.
+endif::VK_KHR_maintenance10[]
+  * pname:srcOffset and pname:dstOffset select the initial pname:x, pname:y,
+    and pname:z offsets in texels of the sub-regions of the source and
+    destination image data.
+  * pname:extent is the size in texels of the source image to resolve in
+    pname:width, pname:height and pname:depth.
+
+.Valid Usage
+****
+  * [[VUID-VkImageResolve2-aspectMask-10993]]
+    The pname:aspectMask member of pname:srcSubresource and
+    pname:dstSubresource must: only contain
+ifdef::VK_KHR_maintenance10[]
+    ename:VK_IMAGE_ASPECT_DEPTH_BIT, ename:VK_IMAGE_ASPECT_STENCIL_BIT, or
+endif::VK_KHR_maintenance10[]
+    ename:VK_IMAGE_ASPECT_COLOR_BIT
+ifdef::VK_KHR_maintenance10[]
+  * [[VUID-VkImageResolve2-maintenance10-10994]]
+    If <<features-maintenance10,pname:maintenance10>> feature is not
+    enabled, pname:srcSubresource and pname:dstSubresource must: not contain
+    ename:VK_IMAGE_ASPECT_DEPTH_BIT or ename:VK_IMAGE_ASPECT_STENCIL_BIT
+endif::VK_KHR_maintenance10[]
+include::{chapters}/commonvalidity/image_resolve_common.adoc[]
+****
+
+include::{generated}/validity/structs/VkImageResolve2.adoc[]
+--
+
+ifdef::VK_KHR_maintenance10[]
+[open,refpage='VkResolveImageModeInfoKHR',desc='Structure specifying additional control for VkResolveImageInfo2',type='structs']
+--
+:refpage: VkResolveImageModeInfoKHR
+
+The sname:VkResolveImageModeInfoKHR structure is defined as:
+
+include::{generated}/api/structs/VkResolveImageModeInfoKHR.adoc[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:flags is a bitmask of elink:VkResolveImageFlagBitsKHR.
+  * pname:resolveMode is a elink:VkResolveModeFlagBits value defining how
+    pname:srcImage will be resolved into pname:dstImage when resolving
+    non-stencil values.
+  * pname:stencilResolveMode is a elink:VkResolveModeFlagBits value defining
+    how pname:srcImage will be resolved into pname:dstImage when resolving
+    stencil values.
+
+.Valid Usage
+****
+  * [[VUID-VkResolveImageModeInfoKHR-flags-10995]]
+    If pname:flags includes
+    ename:VK_RESOLVE_IMAGE_SKIP_TRANSFER_FUNCTION_BIT_KHR, pname:flags must:
+    not include ename:VK_RESOLVE_IMAGE_ENABLE_TRANSFER_FUNCTION_BIT_KHR
+  * [[VUID-VkResolveImageModeInfoKHR-flags-10996]]
+    If pname:flags includes
+    ename:VK_RESOLVE_IMAGE_SKIP_TRANSFER_FUNCTION_BIT_KHR or
+    ename:VK_RESOLVE_IMAGE_ENABLE_TRANSFER_FUNCTION_BIT_KHR,
+    <<limits-resolveSrgbFormatSupportsTransferFunctionControl,pname:resolveSrgbFormatSupportsTransferFunctionControl>>
+    must: be ename:VK_TRUE
+  * [[VUID-VkResolveImageModeInfoKHR-flags-10997]]
+    If pname:flags includes
+    ename:VK_RESOLVE_IMAGE_SKIP_TRANSFER_FUNCTION_BIT_KHR or
+    ename:VK_RESOLVE_IMAGE_ENABLE_TRANSFER_FUNCTION_BIT_KHR,
+    pname:resolveMode must: be equal to ename:VK_RESOLVE_MODE_AVERAGE_BIT
+****
+
+include::{generated}/validity/structs/VkResolveImageModeInfoKHR.adoc[]
+--
+
+[open,refpage='VkResolveImageFlagBitsKHR',desc='Bitmask specifying additional properties of a resolve image operation',type='enums']
+--
+Bits which can: be set in slink:VkResolveImageModeInfoKHR::pname:flags,
+describing additional properties of a resolve operation, are:
+
+include::{generated}/api/enums/VkResolveImageFlagBitsKHR.adoc[]
+
+  * ename:VK_RESOLVE_IMAGE_SKIP_TRANSFER_FUNCTION_BIT_KHR specifies that
+    resolve operations happening to an sRGB encoded image must: not convert
+    samples from nonlinear to linear before averaging.
+  * ename:VK_RESOLVE_IMAGE_ENABLE_TRANSFER_FUNCTION_BIT_KHR specifies that
+    resolve operations happening to an sRGB encoded image must: convert
+    samples from nonlinear to linear before averaging.
+--
+
+[open,refpage='VkResolveImageFlagsKHR',desc='Bitmask of VkResolveImageFlagBitsKHR',type='flags']
+--
+include::{generated}/api/flags/VkResolveImageFlagsKHR.adoc[]
+
+tname:VkResolveImageFlagsKHR is a bitmask type for setting a mask of zero or
+more elink:VkResolveImageFlagBitsKHR.
+--
+endif::VK_KHR_maintenance10[]
+endif::VK_GRAPHICS_VERSION_1_3,VK_KHR_copy_commands2[]
+endif::VK_GRAPHICS_VERSION_1_0[]
+
+
+ifdef::VK_KHR_object_refresh[]
+[[copies-object_refreshes]]
+== Object Refreshes
+
+Safety critical applications may: need to contend with single event upsets
+(SEUs).
+For a Vulkan object explicitly backed by device memory, such as a
+sname:VkImage or sname:VkBuffer, an application can: bind its backing memory
+to a SEU-safe heap with the ename:VK_MEMORY_HEAP_SEU_SAFE_BIT bit set.
+Alternatively, an application can: also periodically reload the non-SEU-safe
+device memory contents from a known SEU-safe portion of host memory, or
+otherwise periodically regenerate or refresh the contents of non-SEU-safe
+device memory.
+
+However, an implementation may: store implementation-specific internal
+object data in non-SEU-safe memory, and Base Vulkan provides no method to
+determine which object types this applies to or how to refresh their data.
+An application can: query the list of object types that have implementation
+internal object data stored in non-SEU-safe memory using
+flink:vkGetPhysicalDeviceRefreshableObjectTypesKHR, and can: instruct the
+implementation to refresh the internal data of specific objects from a
+backup in SEU-safe memory using the fname:vkCmdRefreshObjectsKHR command.
+
+[open,refpage='vkCmdRefreshObjectsKHR',desc='Execute a pipelined refresh of a list of objects',type='protos']
+--
+To refresh a list of objects as a pipelined operation, call:
+
+include::{generated}/api/protos/vkCmdRefreshObjectsKHR.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command will be
+    recorded.
+  * pname:pRefreshObjects is a pointer to a slink:VkRefreshObjectListKHR
+    structure specifying the list of objects to refresh.
+
+The access scope for object refreshes falls under the
+ename:VK_ACCESS_TRANSFER_WRITE_BIT, and the pipeline stages for identifying
+the synchronization scope must: include
+ename:VK_PIPELINE_STAGE_TRANSFER_BIT.
+
+[NOTE]
+====
+If an implementation does not store a supplied object's internal data in
+SEU-susceptible memory, it may: ignore the refresh command for that object.
+====
+
+include::{generated}/validity/protos/vkCmdRefreshObjectsKHR.adoc[]
+--
+
+[open,refpage='VkRefreshObjectListKHR',desc='Structure specifying a list of objects to refresh',type='structs']
+--
+The sname:VkRefreshObjectListKHR structure is defined as:
+
+include::{generated}/api/structs/VkRefreshObjectListKHR.adoc[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:objectCount is the number of objects to refresh.
+  * pname:pObjects is a pointer to an array of slink:VkRefreshObjectKHR
+    structures, defining the objects to refresh.
+
+include::{generated}/validity/structs/VkRefreshObjectListKHR.adoc[]
+--
+
+[open,refpage='VkRefreshObjectKHR',desc='Structure specifying an object to refresh',type='structs']
+--
+The sname:VkRefreshObjectKHR structure is defined as:
+
+include::{generated}/api/structs/VkRefreshObjectKHR.adoc[]
+
+  * pname:objectType is a elink:VkObjectType specifying the type of the
+    object to refresh.
+  * pname:objectHandle is the object to refresh.
+  * pname:flags is a bitmask of tlink:VkRefreshObjectFlagsKHR.
+
+.Valid Usage
+****
+  * [[VUID-VkRefreshObjectKHR-objectHandle-05069]]
+    pname:objectHandle must: be a valid Vulkan handle of the type associated
+    with pname:objectType as defined in the <<debugging-object-types,
+    VkObjectType and Vulkan Handle Relationship>> table
+  * [[VUID-VkRefreshObjectKHR-objectType-05070]]
+    pname:objectType must: not be ename:VK_OBJECT_TYPE_UNKNOWN
+****
+
+include::{generated}/validity/structs/VkRefreshObjectKHR.adoc[]
+--
+
+[open,refpage='VkRefreshObjectFlagBitsKHR',desc='Reserved for future use',type='enums',xrefs='VkRefreshObjectKHR']
+--
+include::{generated}/api/enums/VkRefreshObjectFlagBitsKHR.adoc[]
+--
+
+[open,refpage='VkRefreshObjectFlagsKHR',desc='Reserved for future use',type='flags',xrefs='VkRefreshObjectKHR']
+--
+include::{generated}/api/flags/VkRefreshObjectFlagsKHR.adoc[]
+
+tlink:VkRefreshObjectFlagsKHR is a bitmask type for setting a mask, but is
+currently reserved for future use.
+--
+endif::VK_KHR_object_refresh[]
+
+
+ifdef::VK_AMD_buffer_marker[]
+[[copies-buffer-markers]]
+== Buffer Markers
+
+_Buffer marker write commands_ are as follows:
+
+ifdef::VK_KHR_device_address_commands[]
+[open,refpage='VkMemoryMarkerInfoAMD',desc='Memory marker write info',type='structs']
+--
+:refpage: VkMemoryMarkerInfoAMD
+
+sname:VkMemoryMarkerInfoAMD is defined as:
+
+include::{generated}/api/structs/VkMemoryMarkerInfoAMD.adoc[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:stage specifies the pipeline stage whose completion triggers the
+    marker write.
+  * pname:dstRange is the slink:VkDeviceAddressRangeKHR where the marker
+    will be written.
+  * pname:dstFlags is a tlink:VkAddressCommandFlagsKHR value defining the
+    copy flags for the destination address range.
+  * pname:marker is the 32-bit value of the marker.
+
+.Valid Usage
+****
+:addressRange: dstRange
+:addressFlags: dstFlags
+:stageMaskName: stage
+include::{chapters}/commonvalidity/address_flags_common.adoc[]
+include::{chapters}/commonvalidity/stage_mask_2_common.adoc[]
+  * [[VUID-VkMemoryMarkerInfoAMD-stage-13038]]
+    pname:stage must: include only a single pipeline stage
+  * [[VUID-VkMemoryMarkerInfoAMD-dstRange-13039]]
+    The buffer from which pname:dstRange was queried must: have been created
+    with ename:VK_BUFFER_USAGE_TRANSFER_DST_BIT usage flag
+  * [[VUID-VkMemoryMarkerInfoAMD-dstRange-13040]]
+    pname:dstRange.address must: be a multiple of 4
+  * [[VUID-VkMemoryMarkerInfoAMD-dstRange-13041]]
+    pname:dstRange.size must: be greater than or equal to 4
+****
+
+include::{generated}/validity/structs/VkMemoryMarkerInfoAMD.adoc[]
+--
+
+[open,refpage='vkCmdWriteMarkerToMemoryAMD',desc='Execute a pipelined write of a marker value into a memory range',type='protos']
+--
+:refpage: vkCmdWriteMarkerToMemoryAMD
+
+To write a 32-bit marker value into memory as a pipelined operation, call:
+
+include::{generated}/api/protos/vkCmdWriteMarkerToMemoryAMD.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command will be
+    recorded.
+  * pname:pInfo specifies a pointer to an slink:VkMemoryMarkerInfoAMD
+    structure defining parameters of this command.
+
+When fname:vkCmdWriteMarkerToMemoryAMD is submitted to a queue, it defines
+an execution dependency between prior operations and writing the marker
+value, as well as a memory dependency from earlier
+<<copies-buffer-markers,buffer marker write commands>>.
+
+The first <<synchronization-dependencies-scopes, synchronization scope>>
+includes operations performed by operations that occur earlier in
+<<synchronization-submission-order,submission order>> in the pipeline stage
+identified by pname:pInfo->stage.
+It additionally includes other <<copies-buffer-markers,buffer marker write
+commands>> that occur earlier in <<synchronization-submission-order,
+submission order>> that specified either the same pname:pInfo->stage or a
+stage that is <<synchronization-pipeline-stages-order,logically earlier>>.
+
+The second <<synchronization-dependencies-scopes, synchronization scope>>
+includes only the buffer marker write.
+
+The first <<synchronization-dependencies-access-scopes, access scope>>
+includes only accesses performed by other <<copies-buffer-markers,buffer
+marker write commands>>.
+
+The second <<synchronization-dependencies-access-scopes, access scope>> is
+empty.
+
+The access scope for buffer marker writes falls under the
+ename:VK_ACCESS_TRANSFER_WRITE_BIT flag, and is performed by either
+pname:pInfo->stage or ename:VK_PIPELINE_STAGE_TRANSFER_BIT.
+<<synchronization, Synchronization commands>> should specify this access
+flag and both pipeline stages when defining dependencies with this command.
+
+[NOTE]
+====
+Similar to fname:vkCmdWriteTimestamp2, if an implementation is unable to
+write a marker at any specific pipeline stage, it may: instead do so at any
+logically later stage.
+====
+
+[NOTE]
+====
+Implementations may: only support a limited number of pipelined marker write
+operations in flight at a given time.
+Thus an excessive number of marker write operations may: degrade command
+execution performance.
+====
+
+.Valid Usage
+****
+  * [[VUID-vkCmdWriteMarkerToMemoryAMD-synchronization2-13042]]
+    The <<features-synchronization2, pname:synchronization2>> feature must:
+    be enabled
+  * [[VUID-vkCmdWriteMarkerToMemoryAMD-pInfo-13043]]
+    pname:pInfo->stage must: include only stages that are valid for the
+    queue family that was used to create the command pool that
+    pname:commandBuffer was allocated from
+  * [[VUID-vkCmdWriteMarkerToMemoryAMD-commandBuffer-13044]]
+    If pname:commandBuffer is an unprotected command buffer and
+    <<limits-protectedNoFault, pname:protectedNoFault>> is not supported,
+    pname:pInfo->dstFlags must: not include
+    ename:VK_ADDRESS_COMMAND_PROTECTED_BIT_KHR
+  * [[VUID-vkCmdWriteMarkerToMemoryAMD-commandBuffer-13045]]
+    If pname:commandBuffer is a protected command buffer and
+    <<limits-protectedNoFault, pname:protectedNoFault>> is not supported,
+    pname:pInfo->dstFlags must: include
+    ename:VK_ADDRESS_COMMAND_PROTECTED_BIT_KHR
+  * [[VUID-vkCmdWriteMarkerToMemoryAMD-pInfo-13046]]
+    If pname:pInfo->dstFlags includes
+    ename:VK_ADDRESS_COMMAND_PROTECTED_BIT_KHR, the buffer from which
+    pname:pInfo->dstRange was queried must: have been created with
+    ename:VK_BUFFER_CREATE_PROTECTED_BIT
+  * [[VUID-vkCmdWriteMarkerToMemoryAMD-pInfo-13047]]
+    If pname:pInfo->dstFlags does not include
+    ename:VK_ADDRESS_COMMAND_PROTECTED_BIT_KHR, the buffer from which
+    pname:pInfo->dstRange was queried must: have been created without
+    ename:VK_BUFFER_CREATE_PROTECTED_BIT
+****
+
+include::{generated}/validity/protos/vkCmdWriteMarkerToMemoryAMD.adoc[]
+--
+endif::VK_KHR_device_address_commands[]
+
+
+ifdef::VK_BASE_VERSION_1_3,VK_KHR_synchronization2[]
+[open,refpage='vkCmdWriteBufferMarker2AMD',desc='Execute a pipelined write of a marker value into a buffer',type='protos']
+--
+:refpage: vkCmdWriteBufferMarker2AMD
+
+To write a 32-bit marker value into a buffer as a pipelined operation, call:
+
+include::{generated}/api/protos/vkCmdWriteBufferMarker2AMD.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command will be
+    recorded.
+  * pname:stage specifies the pipeline stage whose completion triggers the
+    marker write.
+  * pname:dstBuffer is the buffer where the marker will be written.
+  * pname:dstOffset is the byte offset into the buffer where the marker will
+    be written.
+  * pname:marker is the 32-bit value of the marker.
+
+When fname:vkCmdWriteBufferMarker2AMD is submitted to a queue, it defines an
+execution dependency between prior operations and writing the marker value,
+as well as a memory dependency from earlier <<copies-buffer-markers,buffer
+marker write commands>>.
+
+The first <<synchronization-dependencies-scopes, synchronization scope>>
+includes operations performed by operations that occur earlier in
+<<synchronization-submission-order,submission order>> in the pipeline stage
+identified by pname:pipelineStage.
+It additionally includes other <<copies-buffer-markers,buffer marker write
+commands>> that occur earlier in <<synchronization-submission-order,
+submission order>> that specified either the same pname:pipelineStage or a
+stage that is <<synchronization-pipeline-stages-order,logically earlier>>.
+
+The second <<synchronization-dependencies-scopes, synchronization scope>>
+includes only the buffer marker write.
+
+The first <<synchronization-dependencies-access-scopes, access scope>>
+includes only accesses performed by other <<copies-buffer-markers,buffer
+marker write commands>>.
+
+The second <<synchronization-dependencies-access-scopes, access scope>> is
+empty.
+
+The access scope for buffer marker writes falls under the
+ename:VK_ACCESS_TRANSFER_WRITE_BIT flag, and is performed by either
+pname:pipelineStage or ename:VK_PIPELINE_STAGE_TRANSFER_BIT.
+<<synchronization, Synchronization commands>> should specify this access
+flag and both pipeline stages when defining dependencies with this command.
+
+[NOTE]
+====
+Similar to fname:vkCmdWriteTimestamp2, if an implementation is unable to
+write a marker at any specific pipeline stage, it may: instead do so at any
+logically later stage.
+====
+
+[NOTE]
+====
+Implementations may: only support a limited number of pipelined marker write
+operations in flight at a given time.
+Thus an excessive number of marker write operations may: degrade command
+execution performance.
+====
+
+.Valid Usage
+****
+:stageMaskName: stage
+include::{chapters}/commonvalidity/stage_mask_2_common.adoc[]
+  * [[VUID-vkCmdWriteBufferMarker2AMD-synchronization2-03893]]
+    The <<features-synchronization2, pname:synchronization2>> feature must:
+    be enabled
+  * [[VUID-vkCmdWriteBufferMarker2AMD-stage-03894]]
+    pname:stage must: include only a single pipeline stage
+  * [[VUID-vkCmdWriteBufferMarker2AMD-stage-03895]]
+    pname:stage must: include only stages that are valid for the queue
+    family that was used to create the command pool that pname:commandBuffer
+    was allocated from
+  * [[VUID-vkCmdWriteBufferMarker2AMD-dstOffset-03896]]
+    pname:dstOffset must: be less than or equal to the size of
+    pname:dstBuffer minus `4`
+  * [[VUID-vkCmdWriteBufferMarker2AMD-dstBuffer-03897]]
+    pname:dstBuffer must: have been created with the
+    ename:VK_BUFFER_USAGE_TRANSFER_DST_BIT usage flag set
+  * [[VUID-vkCmdWriteBufferMarker2AMD-dstBuffer-03898]]
+    If pname:dstBuffer is non-sparse then it must: be bound completely and
+    contiguously to a single sname:VkDeviceMemory object
+  * [[VUID-vkCmdWriteBufferMarker2AMD-dstOffset-03899]]
+    pname:dstOffset must: be a multiple of `4`
+****
+
+include::{generated}/validity/protos/vkCmdWriteBufferMarker2AMD.adoc[]
+--
+endif::VK_BASE_VERSION_1_3,VK_KHR_synchronization2[]
+
+[open,refpage='vkCmdWriteBufferMarkerAMD',desc='Execute a pipelined write of a marker value into a buffer',type='protos']
+--
+:refpage: vkCmdWriteBufferMarkerAMD
+
+To write a 32-bit marker value into a buffer as a pipelined operation, call:
+
+include::{generated}/api/protos/vkCmdWriteBufferMarkerAMD.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command will be
+    recorded.
+  * pname:pipelineStage is a elink:VkPipelineStageFlagBits value specifying
+    the pipeline stage whose completion triggers the marker write.
+  * pname:dstBuffer is the buffer where the marker will be written to.
+  * pname:dstOffset is the byte offset into the buffer where the marker will
+    be written to.
+  * pname:marker is the 32-bit value of the marker.
+
+When fname:vkCmdWriteBufferMarkerAMD is submitted to a queue, it defines an
+execution dependency between prior operations and writing the marker value,
+as well as a memory dependency from earlier <<copies-buffer-markers,buffer
+marker write commands>>.
+
+The first <<synchronization-dependencies-scopes, synchronization scope>>
+includes operations performed by operations that occur earlier in
+<<synchronization-submission-order,submission order>> in the pipeline stage
+identified by pname:pipelineStage.
+It additionally includes other <<copies-buffer-markers,buffer marker write
+commands>> that occur earlier in <<synchronization-submission-order,
+submission order>> that specified either the same pname:pipelineStage or a
+stage that is <<synchronization-pipeline-stages-order,logically earlier>>.
+
+The second <<synchronization-dependencies-scopes, synchronization scope>>
+includes only the buffer marker write.
+
+The first <<synchronization-dependencies-access-scopes, access scope>>
+includes only accesses performed by other <<copies-buffer-markers,buffer
+marker write commands>>.
+
+The second <<synchronization-dependencies-access-scopes, access scope>> is
+empty.
+
+The access scope for buffer marker writes falls under the
+ename:VK_ACCESS_TRANSFER_WRITE_BIT flag, and is performed by either
+pname:pipelineStage or ename:VK_PIPELINE_STAGE_TRANSFER_BIT.
+<<synchronization, Synchronization commands>> should specify this access
+flag and both pipeline stages when defining dependencies with this command.
+
+
+[NOTE]
+====
+Similar to fname:vkCmdWriteTimestamp, if an implementation is unable to
+write a marker at any specific pipeline stage, it may: instead do so at any
+logically later stage.
+====
+
+[NOTE]
+====
+Implementations may: only support a limited number of pipelined marker write
+operations in flight at a given time, thus excessive number of marker write
+operations may: degrade command execution performance.
+====
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/pipeline_stage_common.adoc[]
+  * [[VUID-vkCmdWriteBufferMarkerAMD-dstOffset-01798]]
+    pname:dstOffset must: be less than or equal to the size of
+    pname:dstBuffer minus `4`
+  * [[VUID-vkCmdWriteBufferMarkerAMD-dstBuffer-01799]]
+    pname:dstBuffer must: have been created with the
+    ename:VK_BUFFER_USAGE_TRANSFER_DST_BIT usage flag set
+  * [[VUID-vkCmdWriteBufferMarkerAMD-dstBuffer-01800]]
+    If pname:dstBuffer is non-sparse then it must: be bound completely and
+    contiguously to a single sname:VkDeviceMemory object
+  * [[VUID-vkCmdWriteBufferMarkerAMD-dstOffset-01801]]
+    pname:dstOffset must: be a multiple of `4`
+****
+
+include::{generated}/validity/protos/vkCmdWriteBufferMarkerAMD.adoc[]
+--
+endif::VK_AMD_buffer_marker[]
+
+
+ifdef::VK_ARM_tensors[]
+[[copies-tensors]]
+== Copying Data Between Tensors
+
+flink:vkCmdCopyTensorARM performs tensor copies in a similar manner to a
+host memcpy.
+It does not perform general-purpose conversions such as scaling, resizing,
+or format conversions.
+Rather, it simply copies raw tensor data.
+flink:vkCmdCopyTensorARM can: copy between tensors with different formats,
+provided the formats are compatible.
+Tensor formats are compatible if they share the same class, as shown in the
+<<formats-compatibility,Compatible Formats>>.
+
+[open,refpage='vkCmdCopyTensorARM',desc='Copy data between tensors',type='protos']
+--
+To copy data between tensor objects, call:
+
+include::{generated}/api/protos/vkCmdCopyTensorARM.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command will be
+    recorded.
+  * pname:pCopyTensorInfo is a pointer to slink:VkCopyTensorInfoARM
+    structure describing the copy parameters.
+
+include::{generated}/validity/protos/vkCmdCopyTensorARM.adoc[]
+--
+
+[open,refpage='VkCopyTensorInfoARM',desc='Structure specifying an tensor copy operation',type='structs']
+--
+The sname:VkCopyTensorInfoARM structure is defined as:
+
+include::{generated}/api/structs/VkCopyTensorInfoARM.adoc[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is NULL or a pointer to a structure extending this
+    structure.
+  * pname:srcTensor is the source tensor.
+  * pname:dstTensor is the destination tensor.
+  * pname:regionCount is the number of regions to copy.
+  * pname:pRegions is a pointer to an array of slink:VkTensorCopyARM
+    structures specifying the regions to copy.
+
+Each region in pname:pRegions describes a region to be copied from the
+source tensor to a corresponding region of the destination tensor.
+pname:srcTensor and pname:dstTensor can: be the same tensor or alias the
+same memory.
+
+[[copies-tensors-format-compatibility]]
+The formats of pname:srcTensor and pname:dstTensor must: be compatible.
+Formats are compatible if they share the same class, as shown in the
+<<formats-compatibility,Compatible Formats>> table.
+
+ifdef::editing-notes[]
+[NOTE]
+.editing-note
+====
+The valid usage rules restrict copies to copying whole tensors of equal
+sizes.
+That is, only a single region can be copied and this region must be the
+entire tensor.
+This means the entire tensor must be copied.
+These restrictions may be relaxed in future extensions.
+====
+endif::editing-notes[]
+
+
+[[copies-tensors-format-size-compatibility]]
+fname:vkCmdCopyTensorARM allows copying between _size-compatible_ internal
+formats.
+
+.Valid Usage
+****
+  * [[VUID-VkCopyTensorInfoARM-dimensionCount-09684]]
+    pname:srcTensor and pname:dstTensor must: have been created with equal
+    values for slink:VkTensorDescriptionARM::pname:dimensionCount
+  * [[VUID-VkCopyTensorInfoARM-pDimensions-09685]]
+    For each of the elements of
+    slink:VkTensorDescriptionARM::pname:pDimensions, pname:srcTensor and
+    pname:dstTensor must: be the same size
+  * [[VUID-VkCopyTensorInfoARM-regionCount-09686]]
+    pname:regionCount must be equal to 1
+  * [[VUID-VkCopyTensorInfoARM-pRegions-09687]]
+    Each element of pname:pRegions must: be a slink:VkTensorCopyARM
+    structure whose pname:pSrcOffset is `NULL` or has all its elements equal
+    to `0`
+  * [[VUID-VkCopyTensorInfoARM-pRegions-09688]]
+    Each element of pname:pRegions must: be a slink:VkTensorCopyARM
+    structure whose pname:pDstOffset is `NULL` or has all its elements equal
+    to `0`
+  * [[VUID-VkCopyTensorInfoARM-pRegions-09689]]
+    Each element of pname:pRegions must: be a slink:VkTensorCopyARM
+    structure whose pname:pExtent is `NULL` or equal to the
+    slink:VkTensorDescriptionARM::pname:pDimensions array specified when
+    pname:srcTensor and pname:dstTensor were created
+  * [[VUID-VkCopyTensorInfoARM-pRegions-09954]]
+    Each element of pname:pRegions must: be a slink:VkTensorCopyARM
+    structure whose pname:dimensionCount, if it is not equal to 0, is equal
+    to the largest of the slink:VkTensorDescriptionARM::pname:dimensionCount
+    of pname:srcTensor or pname:dstTensor
+  * [[VUID-VkCopyTensorInfoARM-srcTensor-09690]]
+    The <<resources-tensor-view-format-features,format features>> of
+    pname:srcTensor must: contain ename:VK_FORMAT_FEATURE_2_TRANSFER_SRC_BIT
+  * [[VUID-VkCopyTensorInfoARM-srcTensor-09691]]
+    pname:srcTensor must: have been created with the
+    ename:VK_TENSOR_USAGE_TRANSFER_SRC_BIT_ARM usage flag set
+  * [[VUID-VkCopyTensorInfoARM-dstTensor-09692]]
+    The <<resources-tensor-view-format-features,format features>> of
+    pname:dstTensor must: contain ename:VK_FORMAT_FEATURE_2_TRANSFER_DST_BIT
+  * [[VUID-VkCopyTensorInfoARM-dstTensor-09693]]
+    pname:dstTensor must: have been created with the
+    ename:VK_TENSOR_USAGE_TRANSFER_DST_BIT_ARM usage flag set
+  * [[VUID-VkCopyTensorInfoARM-srcTensor-09694]]
+    If pname:srcTensor is non-sparse then it must: be bound completely and
+    contiguously to a single slink:VkDeviceMemory object
+  * [[VUID-VkCopyTensorInfoARM-dstTensor-09695]]
+    If pname:dstTensor is non-sparse then it must: be bound completely and
+    contiguously to a single slink:VkDeviceMemory object
+****
+
+include::{generated}/validity/structs/VkCopyTensorInfoARM.adoc[]
+--
+
+[open,refpage='VkTensorCopyARM',desc='Structure specifying an tensor copy region',type='structs']
+--
+The sname:VkTensorCopyARM structure is defined as:
+
+include::{generated}/api/structs/VkTensorCopyARM.adoc[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:dimensionCount is the number of elements in the pname:pSrcOffset,
+    pname:pDstOffset and pname:pExtent arrays.
+  * pname:pSrcOffset is `NULL` or an array of size pname:dimensionCount
+    providing an offset into the source tensor.
+    When pname:pSrcOffset is `NULL`, the offset into the source tensor is
+    `0` in all dimensions.
+  * pname:pDstOffset is `NULL` or an array of size pname:dimensionCount
+    providing an offset into the destination tensor.
+    When pname:pDstOffset is `NULL`, the offset into the destination tensor
+    is `0` in all dimensions.
+  * pname:pExtent is `NULL` or an array of size pname:dimensionCount
+    providing the number of elements to copy in each dimension.
+    When pname:pExtent is `NULL`, the number of elements to copy is taken as
+    the total number of elements in each dimension of the source tensor.
+
+.Valid Usage
+****
+  * [[VUID-VkTensorCopyARM-dimensionCount-09955]]
+    pname:dimensionCount must: be greater than 0 if pname:pSrcOffset,
+    pname:pDstOffset, or pname:pExtent is not `NULL`
+****
+
+include::{generated}/validity/structs/VkTensorCopyARM.adoc[]
+--
+endif::VK_ARM_tensors[]

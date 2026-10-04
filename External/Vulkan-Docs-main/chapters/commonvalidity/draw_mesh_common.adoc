@@ -1,0 +1,69 @@
+// Copyright 2019-2026 The Khronos Group Inc.
+//
+// SPDX-License-Identifier: CC-BY-4.0
+
+// Common Valid Usage
+// Common to drawing commands for mesh shading
+ifdef::VK_NV_mesh_shader,VK_EXT_mesh_shader[]
+  * [[VUID-{refpage}-stage-06480]]
+    The bound graphics pipeline must: not have been created with the
+    slink:VkPipelineShaderStageCreateInfo::pname:stage member of any element
+    of slink:VkGraphicsPipelineCreateInfo::pname:pStages set to
+    ename:VK_SHADER_STAGE_VERTEX_BIT,
+    ename:VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT,
+    ename:VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT or
+    ename:VK_SHADER_STAGE_GEOMETRY_BIT
+ifdef::VK_EXT_shader_object[]
+  * [[VUID-{refpage}-pStages-10680]]
+    If there is no bound graphics pipeline, fname:vkCmdBindShadersEXT must:
+    not have last bound the pname:pStages element of
+    ename:VK_SHADER_STAGE_VERTEX_BIT,
+    ename:VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT,
+    ename:VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT or
+    ename:VK_SHADER_STAGE_GEOMETRY_BIT with a valid shader object other than
+    dlink:VK_NULL_HANDLE
+endif::VK_EXT_shader_object[]
+ifdef::VK_EXT_transform_feedback[]
+  * [[VUID-{refpage}-None-07074]]
+    <<queries-transform-feedback, Transform Feedback Queries>> must: not be
+    active
+endif::VK_EXT_transform_feedback[]
+ifdef::VK_EXT_primitives_generated_query[]
+  * [[VUID-{refpage}-None-07075]]
+    <<queries-primitives-generated, Primitives Generated Queries>> must: not
+    be active
+endif::VK_EXT_primitives_generated_query[]
+  * [[VUID-{refpage}-pipelineStatistics-07076]]
+    The pname:pipelineStatistics member used to create any active
+    <<queries-pipestats, Pipeline Statistics Query>> must: not contain
+    ename:VK_QUERY_PIPELINE_STATISTIC_INPUT_ASSEMBLY_VERTICES_BIT,
+    ename:VK_QUERY_PIPELINE_STATISTIC_INPUT_ASSEMBLY_PRIMITIVES_BIT,
+    ename:VK_QUERY_PIPELINE_STATISTIC_VERTEX_SHADER_INVOCATIONS_BIT,
+    ename:VK_QUERY_PIPELINE_STATISTIC_GEOMETRY_SHADER_INVOCATIONS_BIT,
+    ename:VK_QUERY_PIPELINE_STATISTIC_GEOMETRY_SHADER_PRIMITIVES_BIT,
+    ename:VK_QUERY_PIPELINE_STATISTIC_CLIPPING_INVOCATIONS_BIT,
+    ename:VK_QUERY_PIPELINE_STATISTIC_CLIPPING_PRIMITIVES_BIT,
+    ename:VK_QUERY_PIPELINE_STATISTIC_TESSELLATION_CONTROL_SHADER_PATCHES_BIT,
+    or
+    ename:VK_QUERY_PIPELINE_STATISTIC_TESSELLATION_EVALUATION_SHADER_INVOCATIONS_BIT
+endif::VK_NV_mesh_shader,VK_EXT_mesh_shader[]
+ifdef::VK_EXT_shader_object[]
+  * [[VUID-{refpage}-None-08694]]
+    If there is no bound graphics pipeline, and both the
+    <<features-taskShader, pname:taskShader>> and <<features-meshShader,
+    pname:meshShader>> features are enabled, and a valid sname:VkShaderEXT
+    is bound the to the ename:VK_SHADER_STAGE_MESH_BIT_EXT stage, and that
+    sname:VkShaderEXT was created without the
+    ename:VK_SHADER_CREATE_NO_TASK_SHADER_BIT_EXT flag, a valid
+    sname:VkShaderEXT must: be bound to the
+    ename:VK_SHADER_STAGE_TASK_BIT_EXT stage
+  * [[VUID-{refpage}-None-08695]]
+    If there is no bound graphics pipeline, and both the
+    <<features-taskShader, pname:taskShader>> and <<features-meshShader,
+    pname:meshShader>> features are enabled, and a valid sname:VkShaderEXT
+    is bound the to the ename:VK_SHADER_STAGE_MESH_BIT_EXT stage, and that
+    sname:VkShaderEXT was created with the
+    ename:VK_SHADER_CREATE_NO_TASK_SHADER_BIT_EXT flag, there must: be no
+    sname:VkShaderEXT bound to the ename:VK_SHADER_STAGE_TASK_BIT_EXT stage
+endif::VK_EXT_shader_object[]
+// Common Valid Usage

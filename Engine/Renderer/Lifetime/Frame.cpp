@@ -105,6 +105,36 @@ blk::create_frame(const Context& context, const Descriptor_Layouts& layouts, Fra
 
 	frame.skybox_buffer = skybox_buffer;
 
+	// Create terrain buffer.
+
+	Buffer terrain_buffer = {};
+
+	if (const Result result = create_buffer(
+			context,
+			sizeof(Terrain_UBO),
+			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			terrain_buffer
+		);
+		result != Result::SUCCESS)
+	{
+		BLK_ERROR("Failed to create frame terrain buffer\n");
+		destroy_frame(context, frame);
+
+		return result;
+	}
+
+	if (const Result result = map_buffer(context, terrain_buffer); result != Result::SUCCESS)
+	{
+		BLK_ERROR("Failed to map terrain buffer\n");
+		destroy_buffer(context, terrain_buffer);
+		destroy_frame(context, frame);
+
+		return result;
+	}
+
+	frame.terrain_buffer = terrain_buffer;
+
 	// The following images are created with `VK_IMAGE_USAGE_TRANSFER_DST_BIT` because of `render_frame`: when
 	// `World_Settings` disables the pass that fills this LUT, it clears the image instead of dispatching, so the
 	// shaders sampling it see black rather than whatever the last enabled frame left behind.
@@ -206,7 +236,7 @@ blk::create_frame(const Context& context, const Descriptor_Layouts& layouts, Fra
 			SKYBOX_AERIAL_LUT_DEPTH,
 			VK_FORMAT_R16G16B16A16_SFLOAT,
 			VK_IMAGE_TILING_OPTIMAL,
-			VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+			VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 			VK_IMAGE_ASPECT_COLOR_BIT,
 			skybox_aerial_lut
@@ -285,6 +315,10 @@ blk::create_frame(const Context& context, const Descriptor_Layouts& layouts, Fra
 	skybox_descriptor_buffer_info.buffer = frame.skybox_buffer.buffer;
 	skybox_descriptor_buffer_info.range = frame.skybox_buffer.size;
 
+	VkDescriptorBufferInfo terrain_descriptor_buffer_info = {};
+	terrain_descriptor_buffer_info.buffer = frame.terrain_buffer.buffer;
+	terrain_descriptor_buffer_info.range = frame.terrain_buffer.size;
+
 	VkDescriptorImageInfo skybox_transmittance_storage_image_info = {};
 	skybox_transmittance_storage_image_info.imageView = frame.skybox_transmittance_lut.view;
 	skybox_transmittance_storage_image_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
@@ -355,13 +389,22 @@ blk::create_frame(const Context& context, const Descriptor_Layouts& layouts, Fra
 			.dstBinding = 3,
 			.dstArrayElement = 0,
 			.descriptorCount = 1,
+			.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			.pBufferInfo = &terrain_descriptor_buffer_info,
+		},
+		VkWriteDescriptorSet{
+			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+			.dstSet = frame.descriptor_set,
+			.dstBinding = 4,
+			.dstArrayElement = 0,
+			.descriptorCount = 1,
 			.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
 			.pImageInfo = &skybox_transmittance_storage_image_info,
 		},
 		VkWriteDescriptorSet{
 			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
 			.dstSet = frame.descriptor_set,
-			.dstBinding = 4,
+			.dstBinding = 5,
 			.dstArrayElement = 0,
 			.descriptorCount = 1,
 			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
@@ -370,7 +413,7 @@ blk::create_frame(const Context& context, const Descriptor_Layouts& layouts, Fra
 		VkWriteDescriptorSet{
 			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
 			.dstSet = frame.descriptor_set,
-			.dstBinding = 5,
+			.dstBinding = 6,
 			.dstArrayElement = 0,
 			.descriptorCount = 1,
 			.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
@@ -379,7 +422,7 @@ blk::create_frame(const Context& context, const Descriptor_Layouts& layouts, Fra
 		VkWriteDescriptorSet{
 			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
 			.dstSet = frame.descriptor_set,
-			.dstBinding = 6,
+			.dstBinding = 7,
 			.dstArrayElement = 0,
 			.descriptorCount = 1,
 			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
@@ -388,7 +431,7 @@ blk::create_frame(const Context& context, const Descriptor_Layouts& layouts, Fra
 		VkWriteDescriptorSet{
 			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
 			.dstSet = frame.descriptor_set,
-			.dstBinding = 7,
+			.dstBinding = 8,
 			.dstArrayElement = 0,
 			.descriptorCount = 1,
 			.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
@@ -397,7 +440,7 @@ blk::create_frame(const Context& context, const Descriptor_Layouts& layouts, Fra
 		VkWriteDescriptorSet{
 			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
 			.dstSet = frame.descriptor_set,
-			.dstBinding = 8,
+			.dstBinding = 9,
 			.dstArrayElement = 0,
 			.descriptorCount = 1,
 			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
@@ -406,7 +449,7 @@ blk::create_frame(const Context& context, const Descriptor_Layouts& layouts, Fra
 		VkWriteDescriptorSet{
 			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
 			.dstSet = frame.descriptor_set,
-			.dstBinding = 9,
+			.dstBinding = 10,
 			.dstArrayElement = 0,
 			.descriptorCount = 1,
 			.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
@@ -415,7 +458,7 @@ blk::create_frame(const Context& context, const Descriptor_Layouts& layouts, Fra
 		VkWriteDescriptorSet{
 			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
 			.dstSet = frame.descriptor_set,
-			.dstBinding = 10,
+			.dstBinding = 11,
 			.dstArrayElement = 0,
 			.descriptorCount = 1,
 			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
@@ -431,6 +474,16 @@ blk::create_frame(const Context& context, const Descriptor_Layouts& layouts, Fra
 		result != Result::SUCCESS)
 	{
 		BLK_ERROR("Failed to create frame mesh draw commands array\n");
+		destroy_frame(context, frame);
+
+		return result;
+	}
+
+	if (const Result result =
+			create_dyn_array(frame.terrain_draw_commands, context.allocator, INITIAL_DRAW_COMMAND_COUNT);
+		result != Result::SUCCESS)
+	{
+		BLK_ERROR("Failed to create frame terrain draw commands array\n");
 		destroy_frame(context, frame);
 
 		return result;
@@ -455,6 +508,7 @@ blk::destroy_frame(const Context& context, Frame& frame)
 	// Destroy draw arrays.
 
 	destroy_dyn_array(frame.mesh_draw_commands);
+	destroy_dyn_array(frame.terrain_draw_commands);
 	destroy_dyn_array(frame.skybox_draw_commands);
 
 	// Destroy descriptor set.
@@ -468,6 +522,7 @@ blk::destroy_frame(const Context& context, Frame& frame)
 	destroy_buffer(context, frame.light_buffer);
 	destroy_buffer(context, frame.camera_buffer);
 	destroy_buffer(context, frame.skybox_buffer);
+	destroy_buffer(context, frame.terrain_buffer);
 
 	destroy_command_buffer(context, context.frame_command_pool, frame.command_buffer);
 

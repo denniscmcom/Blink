@@ -13,7 +13,6 @@ target_sources(BlkEngine
 			Log.hpp
 			Result.hpp
 			Time.hpp
-			Types.hpp
 			Window.hpp
 	PRIVATE
 		FILE_SET privateHeaders

@@ -1,0 +1,27 @@
+// Copyright 2020-2026 The Khronos Group Inc.
+//
+// SPDX-License-Identifier: CC-BY-4.0
+
+// Common Valid Usage
+// Common to VkBufferImageCopy*, VkMemoryToImageCopy*, VkImageToMemoryCopy*,
+// and VkDeviceMemoryImageCopy* structs
+// This relies on the following additional attributes being set:
+//  - {bufferrowlength}, specifying image row length in the buffer or memory
+//  - {bufferimageheight}, specifying image height in the buffer or memory
+
+  * [[VUID-{refpage}-{bufferrowlength}-09101]]
+    pname:{bufferrowlength} must: be `0`, or greater than or equal to the
+    pname:width member of pname:imageExtent
+  * [[VUID-{refpage}-{bufferimageheight}-09102]]
+    pname:{bufferimageheight} must: be `0`, or greater than or equal to the
+    pname:height member of pname:imageExtent
+  * [[VUID-{refpage}-aspectMask-09103]]
+    The pname:aspectMask member of pname:imageSubresource must: only have a
+    single bit set
+  * [[VUID-{refpage}-imageExtent-06659]]
+    pname:imageExtent.width must: not be 0
+  * [[VUID-{refpage}-imageExtent-06660]]
+    pname:imageExtent.height must: not be 0
+  * [[VUID-{refpage}-imageExtent-06661]]
+    pname:imageExtent.depth must: not be 0
+// Common Valid Usage

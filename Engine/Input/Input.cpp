@@ -47,6 +47,9 @@ blk::update_input(Input_State& state)
 			state.mouse_delta_x += event.mouse_delta_x;
 			state.mouse_delta_y += event.mouse_delta_y;
 			break;
+		case Event_Type::MOUSE_WHEEL:
+			state.mouse_wheel_delta += event.mouse_wheel_delta;
+			break;
 		}
 	}
 }
@@ -59,6 +62,7 @@ blk::clear_frame_events(Input_State& state)
 
 	state.mouse_delta_x = 0;
 	state.mouse_delta_y = 0;
+	state.mouse_wheel_delta = 0.0f;
 }
 
 void

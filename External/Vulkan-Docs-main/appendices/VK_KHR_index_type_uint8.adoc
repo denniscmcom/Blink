@@ -1,0 +1,33 @@
+// Copyright 2019-2026 The Khronos Group Inc.
+//
+// SPDX-License-Identifier: CC-BY-4.0
+
+include::{generated}/meta/{refprefix}VK_KHR_index_type_uint8.adoc[]
+
+=== Other Extension Metadata
+
+*Last Modified Date*::
+    2023-06-06
+*IP Status*::
+    No known IP claims.
+*Contributors*::
+  - Jeff Bolz, NVIDIA
+
+=== Description
+
+This extension allows code:uint8_t indices to be used with
+flink:vkCmdBindIndexBuffer.
+
+include::{generated}/interfaces/VK_KHR_index_type_uint8.adoc[]
+
+=== Promotion to Vulkan 1.4
+
+Functionality in this extension is included in core Vulkan 1.4 with the KHR
+suffix omitted.
+The original type, enum, and command names are still available as aliases of
+the core functionality.
+
+=== Version History
+
+  * Revision 1, 2023-06-06 (Piers Daniell)
+  ** Internal revisions

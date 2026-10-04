@@ -9,56 +9,63 @@
 #include "Engine/Core/Math/Vector.hpp"
 #include "Engine/Editor/Context.hpp"
 #include "Engine/Input/Input.hpp"
-#include "Engine/Platform/Assert.hpp"
 #include "Engine/Platform/Event.hpp"
 #include "Engine/Scene/Node.hpp"
 #include "Engine/World/Camera.hpp"
-#include "Engine/World/World.hpp"
+
+#include <math.h>
 
 namespace
 {
 constexpr float MOUSE_SENSITIVITY = 0.0015f;
-constexpr float MOVE_SPEED = 5.0f;
+/// Factor each mouse wheel notch scales the speed by. Scaling instead of adding takes as many notches to go from 1 to
+/// 10 m/s as from 100 to 1000 m/s.
+constexpr float SPEED_STEP = 1.25f;
+/// Slowest speed in meters per second.
+constexpr float MIN_SPEED = 0.5f;
+/// Fastest speed in meters per second.
+constexpr float MAX_SPEED = 5'000.0f;
 /// Pitch is clamped just short of 90 degrees. At exactly straight up or down the forward vector becomes parallel to
 /// `world_up`, so their cross product collapses to zero and the right vector is undefined.
 constexpr float PITCH_LIMIT = 1.55f;
+
+/// Current camera speed.
+float speed = 0.0f;
 }  // namespace
 
 void
-blk::update_editor_camera(
-	World& world,
-	const Pool_Handle<Camera>& handle,
-	const Input_State& input_state,
-	double delta_time
-)
+blk::update_editor_camera(const Editor_Context& context, const Input_State& input_state, double delta_time)
 {
-	// Get camera node to update the transform component.
-	Node* node = get_node(world, handle);
-
-	if (!node)
+	if (context.mode == Editor_Mode::WORLD && !context.world_context.is_editor_camera_active)
 	{
-		BLK_ERROR("Failed to find editor camera node\n");
-
+		// `WORLD` is the only mode that has in-game camera.
 		return;
 	}
+
+	// Get camera node to update transform.
+
+	Camera* camera = get_camera(*context.active_world, context.active_world->active_camera_handle);
+	BLK_CHECK(camera);
+
+	Node* camera_node = get_node(context.active_world->scene_graph, camera->node_handle);
 
 	// TODO (Knowledge): This is copy pasted from the internet and I do not currently understand all of it.
 
 	// Mouse right increases yaw, which rotates `+Z` towards `+X`. Mouse down increases pitch, which tilts `+Z` down.
-	node->transform.rotation.y += static_cast<float>(input_state.mouse_delta_x) * MOUSE_SENSITIVITY;
-	node->transform.rotation.x += static_cast<float>(input_state.mouse_delta_y) * MOUSE_SENSITIVITY;
+	camera_node->transform.rotation.y += static_cast<float>(input_state.mouse_delta_x) * MOUSE_SENSITIVITY;
+	camera_node->transform.rotation.x += static_cast<float>(input_state.mouse_delta_y) * MOUSE_SENSITIVITY;
 
-	if (node->transform.rotation.x > PITCH_LIMIT)
+	if (camera_node->transform.rotation.x > PITCH_LIMIT)
 	{
-		node->transform.rotation.x = PITCH_LIMIT;
+		camera_node->transform.rotation.x = PITCH_LIMIT;
 	}
-	else if (node->transform.rotation.x < -PITCH_LIMIT)
+	else if (camera_node->transform.rotation.x < -PITCH_LIMIT)
 	{
-		node->transform.rotation.x = -PITCH_LIMIT;
+		camera_node->transform.rotation.x = -PITCH_LIMIT;
 	}
 
 	// Initialize the rotation matrix.
-	const Matrix4 rotation_matrix = init_rotation_matrix(node->transform.rotation);
+	const Matrix4 rotation_matrix = init_rotation_matrix(camera_node->transform.rotation);
 
 	// Engine's forward convention `+Z`. We use a `Vector4` because we have to multiply it by the `rotation_matrix`.
 	constexpr Vector4 world_forward = {
@@ -132,11 +139,25 @@ blk::update_editor_camera(
 		velocity += world_up;
 	}
 
-	// TODO (Knowledge): What is that for?
+	// Mouse wheel up increases the speed and down decreases it.
+
+	if (input_state.mouse_wheel_delta != 0.0f)
+	{
+		speed *= powf(SPEED_STEP, input_state.mouse_wheel_delta);
+
+		if (speed < MIN_SPEED)
+		{
+			speed = MIN_SPEED;
+		}
+		else if (speed > MAX_SPEED)
+		{
+			speed = MAX_SPEED;
+		}
+	}
+
 	if (compute_vector_magnitude_squared(velocity) > 0.0f)
 	{
-		// TODO (Knowledge): Explain it.
 		velocity = compute_unit_vector(velocity);
-		node->transform.position += MOVE_SPEED * static_cast<float>(delta_time) * velocity;
+		camera_node->transform.position += speed * static_cast<float>(delta_time) * velocity;
 	}
 }

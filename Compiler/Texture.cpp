@@ -53,22 +53,36 @@ blk::compiler::compile_texture(Serial& input_serial, Serial& output_serial)
 		BLK_FATAL("Invalid PNG magic number; file is corrupted\n");
 	}
 
-	// Load PNG data from file.
+	// `stb_image` parses the PNG header itself, so it needs the whole file – including the magic number we just read
+	// past. Handing it `input_serial.position` instead would give it a file with no header, which it rejects.
+
+	const auto* file = reinterpret_cast<const stbi_uc*>(input_serial.buffer);
+	const auto file_size = static_cast<int>(input_serial.size);
 
 	int width = 0;
 	int height = 0;
 	int channel_count = 0;
 
-	// `stb_image` parses the PNG header itself, so it needs the whole file – including the magic number we just read
-	// past. Handing it `input_serial.position` instead would give it a file with no header, which it rejects.
-	stbi_uc* pixels = stbi_load_from_memory(
-		reinterpret_cast<const stbi_uc*>(input_serial.buffer),
-		static_cast<int>(input_serial.size),
-		&width,
-		&height,
-		&channel_count,
-		STBI_rgb_alpha
-	);
+	if (!stbi_info_from_memory(file, file_size, &width, &height, &channel_count))
+	{
+		BLK_FATAL("Failed to read PNG header\n");
+	}
+
+	// A 16-bit grayscale PNG, like a heightmap, keeps its 16 bits in `R16`. Everything else is decoded to `RGBA8`,
+	// which also converts 16-bit color PNGs to 8 bits.
+
+	Texture_Format format = Texture_Format::RGBA8;
+	void* pixels = nullptr;
+
+	if (stbi_is_16_bit_from_memory(file, file_size) && channel_count == STBI_grey)
+	{
+		format = Texture_Format::R16;
+		pixels = stbi_load_16_from_memory(file, file_size, &width, &height, &channel_count, STBI_grey);
+	}
+	else
+	{
+		pixels = stbi_load_from_memory(file, file_size, &width, &height, &channel_count, STBI_rgb_alpha);
+	}
 
 	if (!pixels)
 	{
@@ -98,6 +112,13 @@ blk::compiler::compile_texture(Serial& input_serial, Serial& output_serial)
 		BLK_FATAL("Failed to write texture version\n");
 	}
 
+	// Write texture format.
+
+	BLK_IF_NOT_SUCCESS(write(output_serial, format))
+	{
+		BLK_FATAL("Failed to write texture format\n");
+	}
+
 	// Write texture size.
 
 	BLK_IF_NOT_SUCCESS(write(output_serial, static_cast<uint32_t>(width)))
@@ -112,13 +133,13 @@ blk::compiler::compile_texture(Serial& input_serial, Serial& output_serial)
 
 	// Write the texture data.
 
-	// `channel_count` reports the channels of the source file, not the decoded ones. `STBI_rgb_alpha` always
-	// decodes to 4 channels regardless of the source.
-	constexpr size_t bytes_per_pixel = STBI_rgb_alpha * sizeof(stbi_uc);
+	// `channel_count` reports the channels of the source file, not the decoded ones, so we size the data from `format`.
 
-	BLK_IF_NOT_SUCCESS(
-		write(output_serial, pixels, static_cast<size_t>(width) * static_cast<size_t>(height) * bytes_per_pixel)
-	)
+	BLK_IF_NOT_SUCCESS(write(
+		output_serial,
+		static_cast<const uint8_t*>(pixels),
+		static_cast<size_t>(width) * static_cast<size_t>(height) * get_pixel_size(format)
+	))
 	{
 		BLK_FATAL("Failed to write texture data\n");
 	}

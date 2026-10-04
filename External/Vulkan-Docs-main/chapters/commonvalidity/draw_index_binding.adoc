@@ -1,0 +1,13 @@
+// Copyright 2019-2026 The Khronos Group Inc.
+//
+// SPDX-License-Identifier: CC-BY-4.0
+
+// Common Valid Usage
+  * [[VUID-{refpage}-robustBufferAccess2-08798]]
+    If the <<features-robustBufferAccess2, pname:robustBufferAccess2>>
+    feature is not enabled, [eq]#(code:indexSize {times} (pname:firstIndex
+    {plus} pname:indexCount))# must: be less than or equal to the size of
+    the <<index-buffer-range,bound index buffer range>>, with code:indexSize
+    being based on the type specified by pname:indexType, and the other
+    parameters sourced from this command
+// Common Valid Usage

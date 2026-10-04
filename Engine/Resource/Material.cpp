@@ -36,7 +36,8 @@ blk::create_material_storage(Allocator* allocator)
 
 	constexpr uint32_t fallback_texture_width = 1'024;
 	constexpr uint32_t fallback_texture_height = 1'024;
-	constexpr uint64_t fallback_texture_size = fallback_texture_width * fallback_texture_height;
+	constexpr uint64_t fallback_texture_size =
+		fallback_texture_width * fallback_texture_height * sizeof(Color_RGBA<uint8_t>);
 
 	constexpr Color_RGBA<uint8_t> fallback_albedo_light_color = {.r = 255, .g = 0, .b = 255, .a = 255};
 	constexpr Color_RGBA<uint8_t> fallback_albedo_dark_color = {.r = 105, .g = 0, .b = 105, .a = 255};
@@ -49,7 +50,11 @@ blk::create_material_storage(Allocator* allocator)
 	Texture fallback_normal = {};
 	Texture fallback_orm = {};
 
-	// Set dimensions.
+	// Set format and dimensions.
+
+	fallback_albedo.format = Texture_Format::RGBA8;
+	fallback_normal.format = Texture_Format::RGBA8;
+	fallback_orm.format = Texture_Format::RGBA8;
 
 	fallback_albedo.width = fallback_texture_width;
 	fallback_albedo.height = fallback_texture_height;
@@ -105,20 +110,29 @@ blk::create_material_storage(Allocator* allocator)
 
 		for (uint32_t x = 0; x < fallback_texture_width; ++x)
 		{
-			push(fallback_normal.pixels, fallback_normal_color);
-			push(fallback_orm.pixels, fallback_orm_color);
-
 			const uint32_t cell_x = x / cell_size;
 
 			// Stepping one cell along either axis flips the parity of the sum, so neighbouring cells alternate.
-			if (const bool is_light_cell = (cell_x + cell_y) % 2 == 0)
-			{
-				push(fallback_albedo.pixels, fallback_albedo_light_color);
-			}
-			else
-			{
-				push(fallback_albedo.pixels, fallback_albedo_dark_color);
-			}
+			const bool is_light_cell = (cell_x + cell_y) % 2 == 0;
+			const Color_RGBA<uint8_t> albedo_color =
+				is_light_cell ? fallback_albedo_light_color : fallback_albedo_dark_color;
+
+			// `pixels` stores bytes, so we push each channel.
+
+			push(fallback_albedo.pixels, albedo_color.r);
+			push(fallback_albedo.pixels, albedo_color.g);
+			push(fallback_albedo.pixels, albedo_color.b);
+			push(fallback_albedo.pixels, albedo_color.a);
+
+			push(fallback_normal.pixels, fallback_normal_color.r);
+			push(fallback_normal.pixels, fallback_normal_color.g);
+			push(fallback_normal.pixels, fallback_normal_color.b);
+			push(fallback_normal.pixels, fallback_normal_color.a);
+
+			push(fallback_orm.pixels, fallback_orm_color.r);
+			push(fallback_orm.pixels, fallback_orm_color.g);
+			push(fallback_orm.pixels, fallback_orm_color.b);
+			push(fallback_orm.pixels, fallback_orm_color.a);
 		}
 	}
 

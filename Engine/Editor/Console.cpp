@@ -9,6 +9,7 @@
 
 #include <imgui.h>
 
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -48,17 +49,21 @@ blk::log_editor(const char* msg)
 	// Write `msg` to `dst`.
 	const int written = snprintf(dst, MAX_LINE_LENGTH, "%s", msg);
 
-	if (written < 0 || static_cast<size_t>(written) >= MAX_LINE_LENGTH)
+	if (written < 0)
 	{
 		// An error occurred writing `msg` to `dst`. We cannot use `BLK_VERIFY` here: this function is a log sink, so
 		// logging the failure would call back into it and recurse until the stack overflows.
 		return;
 	}
 
+	// A `msg` longer than a line is truncated to fit it instead of being dropped.
+	const size_t length =
+		static_cast<size_t>(written) < MAX_LINE_LENGTH ? static_cast<size_t>(written) : MAX_LINE_LENGTH - 1;
+
 	// Strip trailing newline so each entry renders as one row.
-	if (written > 0 && dst[written - 1] == '\n')
+	if (length > 0 && dst[length - 1] == '\n')
 	{
-		dst[written - 1] = '\0';
+		dst[length - 1] = '\0';
 	}
 
 	// Compute next line index. We wrap around if we reach `MAX_LINE_COUNT`.
@@ -81,19 +86,20 @@ blk::draw_console(Editor_Context& context)
 	// Compute console size and position. Console is located at the bottom of the screen above the status bar, and its
 	// width is derived by the side widgets.
 
-	context.world_context.console_size.x =
-		viewport->WorkSize.x - context.world_context.scene_graph_size.x - context.world_context.settings_size.x;
-	context.world_context.console_size.y = 650.0f;
+	// The left column is taken if either the scene graph or the stats widget is visible.
+	const float left_column_width = fmaxf(context.scene_graph_size.x, context.stats_size.x);
 
-	context.world_context.console_position.x = viewport->WorkPos.x + context.world_context.stats_size.x;
-	context.world_context.console_position.y = viewport->WorkPos.y + viewport->WorkSize.y -
-											   context.world_context.console_size.y -
-											   context.viewport_context.status_bar_size.y;
+	context.console_size.x = viewport->WorkSize.x - left_column_width - context.settings_size.x;
+	context.console_size.y = 650.0f;
+
+	context.console_position.x = viewport->WorkPos.x + left_column_width;
+	context.console_position.y =
+		viewport->WorkPos.y + viewport->WorkSize.y - context.console_size.y - context.status_bar_size.y;
 
 	// Pass size and position to ImGui.
 
-	ImGui::SetNextWindowPos(context.world_context.console_position, ImGuiCond_Always);
-	ImGui::SetNextWindowSize(context.world_context.console_size, ImGuiCond_Always);
+	ImGui::SetNextWindowPos(context.console_position, ImGuiCond_Always);
+	ImGui::SetNextWindowSize(context.console_size, ImGuiCond_Always);
 
 	// Console is non-movable nor resizable by the user.
 

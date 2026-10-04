@@ -9,14 +9,13 @@
 
 namespace blk
 {
-/// Represents a light that gets emitted in a specific direction.
+/// A light that is emitted in a specific direction.
 struct Directional_Light
 {
-	/// Light color. The default value is full white.
+	/// Light color.
+	/// The default value is full white.
 	Color_RGB<float> color = {.r = 1.0f, .g = 1.0f, .b = 1.0f};
-	/// Only one `Directional_Light` in the scene can represent the sun.
-	///
-	/// If it is true, the `x` scale component of the node is used as the sun radius in degress.
-	bool is_sun;
+	/// Scale applied to `color`.
+	float intensity = 10.0f;
 };
 }  // namespace blk

@@ -4,13 +4,13 @@
 // ============================================================================
 
 #include "Interface/Frame_Set.slang"
-#include "Interface/Push_Constants.slang"
+#include "Interface/Mesh_Constants.slang"
 #include "Interface/Vertex_Input.slang"
 #include "Pass/Mesh.slang"
 
 [shader("vertex")]
 VS_Mesh_Output
-vs_main(VS_Mesh_Input input)
+vs_main(VS_Vertex_UV input)
 {
 	float4 fragment_position = mul(mesh_constants.model, float4(input.position, 1.0));
 

@@ -76,29 +76,72 @@ static_assert(offsetof(Light_UBO, light_colors) == 16 + 16 * MAX_LIGHT_COUNT);
 
 /// Skybox uniform buffer object.
 /// It should match the GPU-side `Skybox_UBO` structure in `Shaders/Interface/Frame_Set.slang`.
+///
+/// Every `Vector3` is a plain `Vector3` and not a `Vector3_STD140`, and each one is followed by a scalar. std140 gives
+/// a `float3` a base alignment of 16 but a size of 12, and a scalar aligns to 4, so the shader packs that scalar into
+/// the four bytes left after the vector. The host struct packs it there too, and every vector lands on a multiple of
+/// 16 without padding. A `Vector3_STD140` would push the scalar to the next 16 bytes, where the shader does not read
+/// it. `Vector3_STD140` is for arrays, where the 16-byte stride applies to every element.
+///
+/// Atmosphere parameters are described in `Atmosphere_Settings`.
 struct Skybox_UBO
 {
 	/// The inverse of projection times view with the translation component removed.
 	Matrix4 inversed_view_projection;
 	/// Normalized direction toward the sun.
-	///
-	/// A plain `Vector3` and not a `Vector3_STD140`: std140 gives a `float3` a base alignment of 16 but a size of 12,
-	/// and the four bytes that follow it are only padded away to align whatever comes next. `sun_radius` is a scalar,
-	/// so it aligns to 4 and the shader packs it into those leftover bytes at offset 76. A `Vector3_STD140` here
-	/// would push `sun_radius` to offset 80 and the shader would read it from the padding instead.
-	/// `Vector3_STD140` is for arrays, where the 16-byte stride applies to every element.
 	Vector3 sun_direction;
 	/// The radius of the sun in radians.
 	Radians sun_radius;
+	Vector3 rayleigh_scattering;
 	/// View height above the planet surface in meters.
 	float view_height;
+	Vector3 ozone_absorption;
+	float mie_scattering;
+	/// The sun's `Directional_Light::color` in linear space, scaled by its `Directional_Light::intensity`.
+	Vector3 sun_intensity;
+	float mie_absorption;
+	Vector3 ground_albedo;
+	float rayleigh_scale;
+	float mie_scale;
+	float ozone_mid_point;
+	float ozone_low_point;
+	float planet_radius;
+	float atmosphere_radius;
+	float mie_asymmetry;
 };
 
-static_assert(sizeof(Skybox_UBO) == 64 + 12 + 4 + 4);
+static_assert(sizeof(Skybox_UBO) == 64 + 16 * 5 + 4 * 6);
 static_assert(offsetof(Skybox_UBO, inversed_view_projection) == 0);
 static_assert(offsetof(Skybox_UBO, sun_direction) == 64);
 static_assert(offsetof(Skybox_UBO, sun_radius) == 64 + 12);
-static_assert(offsetof(Skybox_UBO, view_height) == 64 + 12 + 4);
+static_assert(offsetof(Skybox_UBO, rayleigh_scattering) == 80);
+static_assert(offsetof(Skybox_UBO, view_height) == 80 + 12);
+static_assert(offsetof(Skybox_UBO, ozone_absorption) == 96);
+static_assert(offsetof(Skybox_UBO, mie_scattering) == 96 + 12);
+static_assert(offsetof(Skybox_UBO, sun_intensity) == 112);
+static_assert(offsetof(Skybox_UBO, mie_absorption) == 112 + 12);
+static_assert(offsetof(Skybox_UBO, ground_albedo) == 128);
+static_assert(offsetof(Skybox_UBO, rayleigh_scale) == 128 + 12);
+static_assert(offsetof(Skybox_UBO, mie_scale) == 144);
+static_assert(offsetof(Skybox_UBO, ozone_mid_point) == 148);
+static_assert(offsetof(Skybox_UBO, ozone_low_point) == 152);
+static_assert(offsetof(Skybox_UBO, planet_radius) == 156);
+static_assert(offsetof(Skybox_UBO, atmosphere_radius) == 160);
+static_assert(offsetof(Skybox_UBO, mie_asymmetry) == 164);
+
+/// Terrain uniform buffer object.
+/// It should match the GPU-side `Terrain_UBO` structure in `Shaders/Interface/Frame_Set.slang`.
+struct Terrain_UBO
+{
+	/// `compute_chunk_size`.
+	float chunk_size;
+	/// `Terrain_Settings::height`.
+	float terrain_height;
+};
+
+static_assert(sizeof(Terrain_UBO) == 8);
+static_assert(offsetof(Terrain_UBO, chunk_size) == 0);
+static_assert(offsetof(Terrain_UBO, terrain_height) == 4);
 
 /// Initial number of draw commands a frame can hold before its arrays have to grow.
 constexpr size_t INITIAL_DRAW_COMMAND_COUNT = 64;
@@ -121,6 +164,8 @@ struct Frame
 	Buffer light_buffer;
 	/// Skybox buffer to store `Skybox_UBO`.
 	Buffer skybox_buffer;
+	/// Terrain buffer to store `Terrain_UBO`.
+	Buffer terrain_buffer;
 	/// Transmittance LUT for the skybox.
 	Image skybox_transmittance_lut;
 	/// Multiscattering LUT for the skybox.
@@ -136,6 +181,8 @@ struct Frame
 	VkDescriptorSet descriptor_set = VK_NULL_HANDLE;
 	/// Array of draw commands to render meshes.
 	Dyn_Array<Draw_Command> mesh_draw_commands;
+	/// Array of draw commands to render terrain.
+	Dyn_Array<Draw_Command> terrain_draw_commands;
 	/// Array of draw commands to render the skybox.
 	Dyn_Array<Draw_Command> skybox_draw_commands;
 };

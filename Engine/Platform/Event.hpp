@@ -40,6 +40,7 @@ enum class Event_Type : uint8_t
 	KEY_DOWN,
 	KEY_UP,
 	MOUSE_MOVE,
+	MOUSE_WHEEL,
 };
 
 /// Input event.
@@ -51,6 +52,8 @@ struct Event
 	Key key;
 	int32_t mouse_delta_x;
 	int32_t mouse_delta_y;
+	/// Mouse wheel rotation in notches. Positive away from the user.
+	float mouse_wheel_delta;
 };
 
 /// Writes an `event` to the event buffer.

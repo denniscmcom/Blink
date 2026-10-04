@@ -25,14 +25,14 @@ blk::create_descriptor_layouts(const Context& context, Descriptor_Layouts& layou
 	constexpr Array descriptor_pool_sizes = {{
 		VkDescriptorPoolSize{
 			.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-			// 3 UBOs (camera, light, skybox) * frame + 1 material UBO * material count.
-			.descriptorCount = 3 * MAX_FRAMES_IN_FLIGHT + MAX_MATERIAL_COUNT,
+			// 4 UBOs (camera, light, skybox, terrain) * frame + 1 material UBO * material count.
+			.descriptorCount = 4 * MAX_FRAMES_IN_FLIGHT + MAX_MATERIAL_COUNT,
 		},
 		VkDescriptorPoolSize{
 			.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
 			// 3 textures (albedo, normal, ORM) * material count + (skybox transmittance LUT + skybox multiscattering
-			// LUT + skybox sky-view LUT + skybox aerial LUT) * frame.
-			.descriptorCount = 3 * MAX_MATERIAL_COUNT + 4 * MAX_FRAMES_IN_FLIGHT,
+			// LUT + skybox sky-view LUT + skybox aerial LUT) * frame + 1 global terrain heightmap.
+			.descriptorCount = 3 * MAX_MATERIAL_COUNT + 4 * MAX_FRAMES_IN_FLIGHT + 1,
 		},
 		VkDescriptorPoolSize{
 			.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
@@ -86,58 +86,66 @@ blk::create_descriptor_layouts(const Context& context, Descriptor_Layouts& layou
 			.descriptorCount = 1,
 			.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT,
 		},
-		// Write skybox transmittance LUT.
+		// Terrain UBO. Read by `VS_Terrain.slang`.
 		VkDescriptorSetLayoutBinding{
 			.binding = 3,
+			.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			.descriptorCount = 1,
+			.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+		},
+		// Write skybox transmittance LUT.
+		VkDescriptorSetLayoutBinding{
+			.binding = 4,
 			.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
 			.descriptorCount = 1,
 			.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
 		},
-		// Sample skybox transmittance LUT.
+		// Sample skybox transmittance LUT. Read by the multiscattering, sky-view and aerial passes, and by
+		// `FS_Skybox.slang` for the sun disk.
 		VkDescriptorSetLayoutBinding{
-			.binding = 4,
+			.binding = 5,
 			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
 			.descriptorCount = 1,
 			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT,
 		},
 		// Write skybox multiscattering LUT.
 		VkDescriptorSetLayoutBinding{
-			.binding = 5,
+			.binding = 6,
 			.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
 			.descriptorCount = 1,
 			.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
 		},
-		// Sample skybox multiscattering LUT.
+		// Sample skybox multiscattering LUT. Read by the sky-view and aerial passes only.
 		VkDescriptorSetLayoutBinding{
-			.binding = 6,
+			.binding = 7,
 			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
 			.descriptorCount = 1,
-			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT,
+			.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
 		},
 		// Write skybox sky-view LUT.
 		VkDescriptorSetLayoutBinding{
-			.binding = 7,
+			.binding = 8,
 			.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
 			.descriptorCount = 1,
 			.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
 		},
-		// Sample skybox sky-view LUT.
+		// Sample skybox sky-view LUT. Read by `FS_Skybox.slang`.
 		VkDescriptorSetLayoutBinding{
-			.binding = 8,
+			.binding = 9,
 			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
 			.descriptorCount = 1,
 			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
 		},
 		// Write skybox aerial LUT.
 		VkDescriptorSetLayoutBinding{
-			.binding = 9,
+			.binding = 10,
 			.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
 			.descriptorCount = 1,
 			.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
 		},
-		// Sample skybox aerial LUT.
+		// Sample skybox aerial LUT. Read by the mesh fragment shader, over opaque geometry.
 		VkDescriptorSetLayoutBinding{
-			.binding = 10,
+			.binding = 11,
 			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
 			.descriptorCount = 1,
 			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
@@ -215,14 +223,20 @@ blk::create_descriptor_layouts(const Context& context, Descriptor_Layouts& layou
 
 	// Create global descriptor set layout.
 
-	// Empty for now.
-	// constexpr Array<VkDescriptorSetLayoutBinding, 0> global_bindings = {{
-	// }};
+	constexpr Array global_bindings = {{
+		// Terrain heightmap. Read by `VS_Terrain.slang`.
+		VkDescriptorSetLayoutBinding{
+			.binding = 0,
+			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			.descriptorCount = 1,
+			.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+		},
+	}};
 
 	VkDescriptorSetLayoutCreateInfo global_layout_info = {};
 	global_layout_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	global_layout_info.bindingCount = 0;
-	global_layout_info.pBindings = nullptr;
+	global_layout_info.bindingCount = global_bindings.capacity;
+	global_layout_info.pBindings = global_bindings.buffer;
 
 	VkDescriptorSetLayout global_layout = VK_NULL_HANDLE;
 

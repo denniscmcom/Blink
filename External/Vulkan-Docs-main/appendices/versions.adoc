@@ -1,0 +1,1047 @@
+// Copyright 2015-2026 The Khronos Group Inc.
+// SPDX-License-Identifier: CC-BY-4.0
+
+[appendix]
+[[versions]]
+= Core Revisions (Informative)
+
+New minor versions of the Vulkan API are defined periodically by the Khronos
+Vulkan Working Group.
+These consist of some amount of additional functionality added to the core
+API, potentially including both new functionality and functionality
+<<extendingvulkan-compatibility-promotion,promoted>> from extensions.
+
+ifdef::VK_VERSION_1_1[]
+It is possible to build the specification for earlier versions, but to aid
+readability of the latest versions, this appendix gives an overview of the
+changes as compared to earlier versions.
+endif::VK_VERSION_1_1[]
+
+ifndef::VKSC_VERSION_1_0[:promoted: {generated}/meta]
+ifdef::VKSC_VERSION_1_0[:promoted: {appendices}/sc_static]
+
+
+ifdef::VK_VERSION_1_4[]
+[[versions-1.4]]
+== Vulkan Version 1.4
+
+[open,refpage='VK_VERSION_1_4',desc='Vulkan version 1.4',type='feature',anchor='versions-1.4',xrefs='VK_VERSION_1_0 VK_VERSION_1_1 VK_VERSION_1_2 VK_VERSION_1_3']
+--
+// This allows the Vulkan refpages to work when built separately from this chapter
+ifndef::VKSC_VERSION_1_0[:promoted: {generated}/meta]
+ifdef::VKSC_VERSION_1_0[:promoted: {appendices}/sc_static]
+
+[[versions-1.4-promotions]]
+Vulkan Version 1.4 <<extendingvulkan-compatibility-promotion,promoted>> a
+number of key extensions into the core API:
+
+include::{generated}/meta/promoted_extensions_VK_VERSION_1_4.adoc[]
+
+All differences in behavior between these extensions and the corresponding
+Vulkan 1.4 functionality are summarized below.
+
+Differences Relative to `VK_KHR_dynamic_rendering_local_read`::
++
+[open]
+----
+If the apiext:VK_KHR_dynamic_rendering_local_read extension is not
+supported, Vulkan 1.4 implementations must: support local read only for
+storage resources and single sampled color attachments.
+
+Support for reading depth/stencil attachments and multi-sampled attachments
+are respectively gated behind the new boolean
+pname:dynamicRenderingLocalReadDepthStencilAttachments and
+pname:dynamicRenderingLocalReadMultisampledAttachments properties.
+
+  * If pname:dynamicRenderingLocalReadDepthStencilAttachments is
+    ename:VK_FALSE, implementations do not support depth/stencil attachment
+    access within dynamic rendering.
+  * If pname:dynamicRenderingLocalReadMultisampledAttachments is
+    ename:VK_FALSE, implementations do not support multisampled attachment
+    access within dynamic rendering.
+  * If both properties are ename:VK_TRUE, the full functionality of the
+    extension is supported.
+----
+
+
+Differences Relative to `VK_EXT_host_image_copy`::
++
+[open]
+----
+If the apiext:VK_EXT_host_image_copy extension is not supported, support for
+it is optional in Vulkan 1.4.
+
+  * An implementation that has a ename:VK_QUEUE_GRAPHICS_BIT queue must support either:
+  ** the <<features-hostImageCopy, pname:hostImageCopy>> feature; or
+  ** an additional queue that supports ename:VK_QUEUE_TRANSFER_BIT.
+----
+
+
+Differences Relative to `VK_KHR_push_descriptor`::
+
+apiext:VK_KHR_push_descriptor did not include a feature bit, so a new
+feature bit has been added to slink:VkPhysicalDeviceVulkan14Features to gate
+its functionality: <<features-pushDescriptor, pname:pushDescriptor>>.
+Enabling this new feature has the same effect as enabling the extension.
+
+
+Differences Relative to `VK_EXT_pipeline_protected_access`::
+
+apiext:VK_EXT_pipeline_protected_access is only useful when the
+<<features-protectedMemory, pname:protectedMemory>> feature is supported.
+As the <<features-protectedMemory, pname:protectedMemory>> feature is
+optional in core Vulkan, the <<features-pipelineProtectedAccess,
+pname:pipelineProtectedAccess>> feature is only required when the
+<<features-protectedMemory, pname:protectedMemory>> feature is supported.
+
+
+Differences Relative to `VK_KHR_line_rasterization`::
+
+The <<features-bresenhamLines,pname:bresenhamLines>> feature is required,
+rather than just any one of the line style features.
+
+
+Differences Relative to `VK_KHR_shader_subgroup_rotate`::
+
+The
+<<features-shaderSubgroupRotateClustered,pname:shaderSubgroupRotateClustered>>
+feature is required in addition to <<features-shaderSubgroupRotate,
+pname:shaderSubgroupRotate>>.
+
+
+Additional Vulkan 1.4 Feature Support::
++
+[open]
+----
+[[versions-1.4-new-features]]
+In addition to the promoted extensions described above, Vulkan 1.4 added
+required support for:
+
+  * All queues supporting ename:VK_QUEUE_GRAPHICS_BIT or
+    ename:VK_QUEUE_COMPUTE_BIT must: also advertise
+    ename:VK_QUEUE_TRANSFER_BIT.
+  * Clustered subgroup operations must: be advertised in Vulkan 1.4 via
+    setting both ename:VK_SUBGROUP_FEATURE_CLUSTERED_BIT and
+    ename:VK_SUBGROUP_FEATURE_ROTATE_CLUSTERED_BIT (as an interaction with
+    the promoted apiext:VK_KHR_shader_subgroup_rotate functionality) in
+    <<limits-subgroupSupportedOperations, pname:supportedOperations>>.
+  * The following features that were optional in earlier versions:
+  ** <<features-fullDrawIndexUint32, pname:fullDrawIndexUint32>>
+  ** <<features-imageCubeArray, pname:imageCubeArray>>
+  ** <<features-independentBlend, pname:independentBlend>>
+  ** <<features-sampleRateShading, pname:sampleRateShading>>
+  ** <<features-drawIndirectFirstInstance, pname:drawIndirectFirstInstance>>
+  ** <<features-depthClamp, pname:depthClamp>>
+  ** <<features-depthBiasClamp, pname:depthBiasClamp>>
+  ** <<features-samplerAnisotropy, pname:samplerAnisotropy>>
+  ** <<features-fragmentStoresAndAtomics, pname:fragmentStoresAndAtomics>>
+  ** <<features-shaderStorageImageExtendedFormats, pname:shaderStorageImageExtendedFormats>>
+  ** <<features-shaderUniformBufferArrayDynamicIndexing, pname:shaderUniformBufferArrayDynamicIndexing>>
+  ** <<features-shaderSampledImageArrayDynamicIndexing, pname:shaderSampledImageArrayDynamicIndexing>>
+  ** <<features-shaderStorageBufferArrayDynamicIndexing, pname:shaderStorageBufferArrayDynamicIndexing>>
+  ** <<features-shaderStorageImageArrayDynamicIndexing, pname:shaderStorageImageArrayDynamicIndexing>>
+  ** <<features-shaderImageGatherExtended, pname:shaderImageGatherExtended>>
+  ** <<features-shaderInt16, pname:shaderInt16>>
+  ** <<features-largePoints, pname:largePoints>>
+  ** <<features-samplerYcbcrConversion, pname:samplerYcbcrConversion>>
+  ** <<features-storageBuffer16BitAccess, pname:storageBuffer16BitAccess>>
+  ** <<features-variablePointers, pname:variablePointers>>
+  ** <<features-variablePointersStorageBuffer, pname:variablePointersStorageBuffer>>
+  ** <<features-samplerMirrorClampToEdge, pname:samplerMirrorClampToEdge>>
+  ** <<features-scalarBlockLayout, pname:scalarBlockLayout>>
+  ** <<features-shaderUniformTexelBufferArrayDynamicIndexing, pname:shaderUniformTexelBufferArrayDynamicIndexing>>
+  ** <<features-shaderStorageTexelBufferArrayDynamicIndexing, pname:shaderStorageTexelBufferArrayDynamicIndexing>>
+  ** <<features-shaderInt8, pname:shaderInt8>>
+  ** <<features-storageBuffer8BitAccess, pname:storageBuffer8BitAccess>>
+----
+
+Updated Vulkan 1.4 Limit Support::
++
+[open]
+----
+[[versions-1.4-updated-limits]]
+Vulkan 1.4 also requires support for the following updated limits:
+
+  * <<limits-maxImageDimension1D, pname:maxImageDimension1D>> is increased from 4096 to 8192
+  * <<limits-maxImageDimension2D, pname:maxImageDimension2D>> is increased from 4096 to 8192
+  * <<limits-maxImageDimension3D, pname:maxImageDimension3D>> is increased from 256 to 512
+  * <<limits-maxImageDimensionCube, pname:maxImageDimensionCube>> is increased from 4096 to 8192
+  * <<limits-maxImageArrayLayers, pname:maxImageArrayLayers>> is increased from 256 to 2048
+  * <<limits-maxUniformBufferRange, pname:maxUniformBufferRange>> is increased from 16384 to 65536
+  * <<limits-maxPushConstantsSize, pname:maxPushConstantsSize>> is increased from 128 to 256
+  * <<limits-bufferImageGranularity, pname:bufferImageGranularity>> is decreased from 131072 to 4096
+  * <<limits-maxBoundDescriptorSets, pname:maxBoundDescriptorSets>> is increased from 4 to 7
+  * <<limits-maxPerStageDescriptorUniformBuffers, pname:maxPerStageDescriptorUniformBuffers>> is increased from 12 to 15
+  * <<limits-maxPerStageResources, pname:maxPerStageResources>> is increased from 128 to 200
+  * <<limits-maxDescriptorSetUniformBuffers, pname:maxDescriptorSetUniformBuffers>> is increased from 72 to 90
+  * <<limits-maxDescriptorSetStorageBuffers, pname:maxDescriptorSetStorageBuffers>> is increased from 24 to 96
+  * <<limits-maxDescriptorSetStorageImages, pname:maxDescriptorSetStorageImages>> is increased from 24 to 144
+  * <<limits-maxFragmentCombinedOutputResources, pname:maxFragmentCombinedOutputResources>> is increased from 4 to 16
+  * <<limits-maxComputeWorkGroupInvocations, pname:maxComputeWorkGroupInvocations>> is increased from 128 to 256
+  * <<limits-maxComputeWorkGroupSize, pname:maxComputeWorkGroupSize>> is increased from (128,128,64) to (256,256,64)
+  * <<limits-shaderSignedZeroInfNanPreserveFloat16, pname:shaderSignedZeroInfNanPreserveFloat16>> is changed from unspecified to ename:VK_TRUE
+  * <<limits-shaderSignedZeroInfNanPreserveFloat32, pname:shaderSignedZeroInfNanPreserveFloat32>> is changed from unspecified to ename:VK_TRUE
+  * <<limits-subTexelPrecisionBits, pname:subTexelPrecisionBits>> is increased from 4 to 8
+  * <<limits-mipmapPrecisionBits, pname:mipmapPrecisionBits>> is increased from 4 to 6
+  * <<limits-maxSamplerLodBias, pname:maxSamplerLodBias>> is increased from 2 to 14
+  * <<limits-maxViewportDimensions, pname:maxViewportDimensions>> is increased from (4096,4096) to (7680,7680)
+  * <<limits-viewportboundsrange, pname:viewportBoundsRange>> is increased from (-8192,8191) to (-15360,15359)
+  * <<limits-maxFramebufferWidth, pname:maxFramebufferWidth>> is increased from 4096 to 7680
+  * <<limits-maxFramebufferHeight, pname:maxFramebufferHeight>> is increased from 4096 to 7680
+  * <<limits-maxColorAttachments, pname:maxColorAttachments>> is increased from 7 to 8
+  * <<limits-timestampComputeAndGraphics, pname:timestampComputeAndGraphics>> is changed from unspecified to ename:VK_TRUE
+  * <<limits-pointSizeRange, pname:pointSizeRange>> is increased from (1.0,64.0 - ULP) to (1.0,256.0 - pname:pointSizeGranularity)
+  * <<limits-pointSizeGranularity, pname:pointSizeGranularity>> is decreased from 1.0 to 0.125
+  * <<limits-lineWidthGranularity, pname:lineWidthGranularity>> is decreased from 1.0 to 0.5
+  * <<limits-maxPushDescriptors, pname:maxPushDescriptors>> is increased from 16 to 32
+  * <<limits-standardSampleLocations, pname:standardSampleLocations>> is changed from unspecified to ename:VK_TRUE
+----
+
+// This include does not work inside the open block in the spec used to
+// delimit refpage content, but does work in the refpage extracted from the
+// spec.
+
+ifdef::isrefpage[]
+include::{generated}/interfaces/VK_VERSION_1_4.adoc[]
+endif::isrefpage[]
+--
+
+ifndef::isrefpage[]
+include::{generated}/interfaces/VK_VERSION_1_4.adoc[]
+endif::isrefpage[]
+
+endif::VK_VERSION_1_4[]
+
+
+
+ifdef::VK_VERSION_1_3[]
+[[versions-1.3]]
+== Vulkan Version 1.3
+
+[open,refpage='VK_VERSION_1_3',desc='Vulkan version 1.3',type='feature',anchor='versions-1.3',xrefs='VK_VERSION_1_0 VK_VERSION_1_1 VK_VERSION_1_2 VK_VERSION_1_4']
+--
+// This allows the Vulkan refpages to work when built separately from this chapter
+ifndef::VKSC_VERSION_1_0[:promoted: {generated}/meta]
+ifdef::VKSC_VERSION_1_0[:promoted: {appendices}/sc_static]
+
+[[versions-1.3-promotions]]
+Vulkan Version 1.3 <<extendingvulkan-compatibility-promotion,promoted>> a
+number of key extensions into the core API:
+
+include::{promoted}/promoted_extensions_VK_VERSION_1_3.adoc[]
+
+All differences in behavior between these extensions and the corresponding
+Vulkan 1.3 functionality are summarized below.
+
+
+Differences Relative to `VK_EXT_4444_formats`::
+
+If the `apiext:VK_EXT_4444_formats` extension is not supported, support for
+all formats defined by it are optional in Vulkan 1.3.
+There are no members in the slink:VkPhysicalDeviceVulkan13Features structure
+corresponding to the sname:VkPhysicalDevice4444FormatsFeaturesEXT structure.
+
+
+Differences Relative to `VK_EXT_extended_dynamic_state`::
+
+All dynamic state enumerants and commands defined by
+`apiext:VK_EXT_extended_dynamic_state` are required in Vulkan 1.3.
+There are no members in the slink:VkPhysicalDeviceVulkan13Features structure
+corresponding to the sname:VkPhysicalDeviceExtendedDynamicStateFeaturesEXT
+structure.
+
+
+Differences Relative to `VK_EXT_extended_dynamic_state2`::
+
+The optional dynamic state enumerants and commands defined by
+`apiext:VK_EXT_extended_dynamic_state2` for patch control points and logic
+op are not promoted in Vulkan 1.3.
+There are no members in the slink:VkPhysicalDeviceVulkan13Features structure
+corresponding to the sname:VkPhysicalDeviceExtendedDynamicState2FeaturesEXT
+structure.
+
+
+Differences Relative to `VK_EXT_texel_buffer_alignment`::
+
+The more specific alignment requirements defined by
+slink:VkPhysicalDeviceTexelBufferAlignmentProperties are required in Vulkan
+1.3.
+There are no members in the slink:VkPhysicalDeviceVulkan13Features structure
+corresponding to the sname:VkPhysicalDeviceTexelBufferAlignmentFeaturesEXT
+structure.
+The pname:texelBufferAlignment feature is enabled if using a Vulkan 1.3
+instance.
+
+
+Differences Relative to `VK_EXT_texture_compression_astc_hdr`::
+
+If the `apiext:VK_EXT_texture_compression_astc_hdr` extension is not
+supported, support for all formats defined by it are optional in Vulkan 1.3.
+The <<features-textureCompressionASTC_HDR,
+pname:textureCompressionASTC_HDR>> member of
+slink:VkPhysicalDeviceVulkan13Features indicates whether a Vulkan 1.3
+implementation supports these formats.
+
+
+Differences Relative to `VK_EXT_ycbcr_2plane_444_formats`::
+
+If the `apiext:VK_EXT_ycbcr_2plane_444_formats` extension is not supported,
+support for all formats defined by it are optional in Vulkan 1.3.
+There are no members in the slink:VkPhysicalDeviceVulkan13Features structure
+corresponding to the sname:VkPhysicalDeviceYcbcr2Plane444FormatsFeaturesEXT
+structure.
+
+
+Additional Vulkan 1.3 Feature Support::
++
+[open]
+----
+[[versions-1.3-new-features]]
+In addition to the promoted extensions described above, Vulkan 1.3 added
+required support for:
+
+  * SPIR-V version 1.6
+  ** SPIR-V 1.6 deprecates (but does not remove) the code:WorkgroupSize
+     decoration.
+  * The <<features-bufferDeviceAddress, pname:bufferDeviceAddress>> feature
+    which indicates support for accessing memory in shaders as storage
+    buffers via flink:vkGetBufferDeviceAddress.
+  * The <<features-vulkanMemoryModel, pname:vulkanMemoryModel>> and
+    <<features-vulkanMemoryModelDeviceScope,
+    pname:vulkanMemoryModelDeviceScope>> features, which indicate support
+    for the corresponding Vulkan Memory Model capabilities.
+  * The <<limits-maxInlineUniformTotalSize,
+    pname:maxInlineUniformTotalSize>> limit is added to provide the total
+    size of all inline uniform block bindings in a pipeline layout.
+----
+
+// This include does not work inside the open block in the spec used to
+// delimit refpage content, but does work in the refpage extracted from the
+// spec.
+
+ifdef::isrefpage[]
+include::{generated}/interfaces/VK_VERSION_1_3.adoc[]
+endif::isrefpage[]
+--
+
+ifndef::isrefpage[]
+include::{generated}/interfaces/VK_VERSION_1_3.adoc[]
+endif::isrefpage[]
+
+endif::VK_VERSION_1_3[]
+
+
+ifdef::VK_VERSION_1_2[]
+[[versions-1.2]]
+== Vulkan Version 1.2
+
+[open,refpage='VK_VERSION_1_2',desc='Vulkan version 1.2',type='feature',anchor='versions-1.2',xrefs='VK_VERSION_1_0 VK_VERSION_1_1 VK_VERSION_1_3 VK_VERSION_1_4']
+--
+// This allows the Vulkan refpages to work when built separately from this chapter
+ifndef::VKSC_VERSION_1_0[:promoted: {generated}/meta]
+ifdef::VKSC_VERSION_1_0[:promoted: {appendices}/sc_static]
+
+[[versions-1.2-promotions]]
+Vulkan Version 1.2 <<extendingvulkan-compatibility-promotion,promoted>> a
+number of key extensions into the core API:
+
+include::{promoted}/promoted_extensions_VK_VERSION_1_2.adoc[]
+
+All differences in behavior between these extensions and the corresponding
+Vulkan 1.2 functionality are summarized below.
+
+
+Differences Relative to `VK_KHR_8bit_storage`::
+
+If the `apiext:VK_KHR_8bit_storage` extension is not supported, support for
+the SPIR-V <<features-storageBuffer8BitAccess,
+pname:storageBuffer8BitAccess>> capability in shader modules is optional.
+Support for this feature is defined by
+slink:VkPhysicalDeviceVulkan12Features::pname:storageBuffer8BitAccess when
+queried via flink:vkGetPhysicalDeviceFeatures2.
+
+
+Differences Relative to `VK_KHR_draw_indirect_count`::
+
+If the `apiext:VK_KHR_draw_indirect_count` extension is not supported,
+support for the commands flink:vkCmdDrawIndirectCount and
+flink:vkCmdDrawIndexedIndirectCount is optional.
+Support for this feature is defined by
+slink:VkPhysicalDeviceVulkan12Features::pname:drawIndirectCount when queried
+via flink:vkGetPhysicalDeviceFeatures2.
+
+
+Differences Relative to `VK_KHR_sampler_mirror_clamp_to_edge`::
+
+If the `apiext:VK_KHR_sampler_mirror_clamp_to_edge` extension is not
+supported, support for the elink:VkSamplerAddressMode
+ename:VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE is optional.
+Support for this feature is defined by
+slink:VkPhysicalDeviceVulkan12Features::pname:samplerMirrorClampToEdge when
+queried via flink:vkGetPhysicalDeviceFeatures2.
+
+
+Differences Relative to `VK_EXT_descriptor_indexing`::
+
+If the `apiext:VK_EXT_descriptor_indexing` extension is not supported,
+support for the <<features-descriptorIndexing, pname:descriptorIndexing>>
+feature is optional.
+Support for this feature is defined by
+slink:VkPhysicalDeviceVulkan12Features::pname:descriptorIndexing when
+queried via flink:vkGetPhysicalDeviceFeatures2.
+
+
+Differences Relative to `VK_EXT_scalar_block_layout`::
+
+If the `apiext:VK_EXT_scalar_block_layout` extension is not supported,
+support for the <<features-scalarBlockLayout, pname:scalarBlockLayout>>
+feature is optional.
+Support for this feature is defined by
+slink:VkPhysicalDeviceVulkan12Features::pname:scalarBlockLayout when queried
+via flink:vkGetPhysicalDeviceFeatures2.
+
+
+Differences Relative to `VK_EXT_shader_viewport_index_layer`::
+
+The code:ShaderViewportIndexLayerEXT SPIR-V capability was replaced with the
+code:ShaderViewportIndex and code:ShaderLayer capabilities.
+Declaring both is equivalent to declaring code:ShaderViewportIndexLayerEXT.
+If the `apiext:VK_EXT_shader_viewport_index_layer` extension is not
+supported, support for the code:ShaderViewportIndexLayerEXT SPIR-V
+capability is optional.
+Support for this feature is defined by
+slink:VkPhysicalDeviceVulkan12Features::pname:shaderOutputViewportIndex and
+slink:VkPhysicalDeviceVulkan12Features::pname:shaderOutputLayer when queried
+via flink:vkGetPhysicalDeviceFeatures2.
+
+
+Differences Relative to `VK_KHR_buffer_device_address`::
+
+If the `apiext:VK_KHR_buffer_device_address` extension is not supported,
+support for the <<features-bufferDeviceAddress, pname:bufferDeviceAddress>>
+feature is optional.
+Support for this feature is defined by
+slink:VkPhysicalDeviceVulkan12Features::pname:bufferDeviceAddress when
+queried via flink:vkGetPhysicalDeviceFeatures2.
+
+
+Differences Relative to `VK_KHR_shader_atomic_int64`::
+
+If the `apiext:VK_KHR_shader_atomic_int64` extension is not supported,
+support for the <<features-shaderBufferInt64Atomics,
+pname:shaderBufferInt64Atomics>> feature is optional.
+Support for this feature is defined by
+slink:VkPhysicalDeviceVulkan12Features::pname:shaderBufferInt64Atomics when
+queried via flink:vkGetPhysicalDeviceFeatures2.
+
+
+Differences Relative to `VK_KHR_shader_float16_int8`::
+
+If the `apiext:VK_KHR_shader_float16_int8` extension is not supported,
+support for the <<features-shaderFloat16, pname:shaderFloat16>> and
+<<features-shaderInt8, pname:shaderInt8>> features is optional.
+Support for these features are defined by
+slink:VkPhysicalDeviceVulkan12Features::pname:shaderFloat16 and
+slink:VkPhysicalDeviceVulkan12Features::pname:shaderInt8 when queried via
+flink:vkGetPhysicalDeviceFeatures2.
+
+
+Differences Relative to `VK_KHR_vulkan_memory_model`::
+
+If the `apiext:VK_KHR_vulkan_memory_model` extension is not supported,
+support for the <<features-vulkanMemoryModel, pname:vulkanMemoryModel>>
+feature is optional.
+Support for this feature is defined by
+slink:VkPhysicalDeviceVulkan12Features::pname:vulkanMemoryModel when queried
+via flink:vkGetPhysicalDeviceFeatures2.
+
+
+Additional Vulkan 1.2 Feature Support::
++
+[open]
+----
+[[versions-1.2-new-features]]
+In addition to the promoted extensions described above, Vulkan 1.2 added
+support for:
+
+  * SPIR-V version 1.4.
+  * SPIR-V version 1.5.
+  * The <<features-samplerMirrorClampToEdge,
+    pname:samplerMirrorClampToEdge>> feature which indicates whether the
+    implementation supports the
+    ename:VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE sampler address mode.
+  * The <<spirvenv-capabilities-table-ShaderNonUniform,
+    code:ShaderNonUniform>> capability in SPIR-V version 1.5.
+  * The <<features-shaderOutputViewportIndex,
+    pname:shaderOutputViewportIndex>> feature which indicates that the
+    <<spirvenv-capabilities-table-ShaderViewportIndex,
+    code:ShaderViewportIndex>> capability can be used.
+  * The <<features-shaderOutputLayer, pname:shaderOutputLayer>> feature
+    which indicates that the <<spirvenv-capabilities-table-ShaderLayer,
+    code:ShaderLayer>> capability can be used.
+  * The <<features-subgroupBroadcastDynamicId,
+    pname:subgroupBroadcastDynamicId>> feature which allows the "`Id`"
+    operand of code:OpGroupNonUniformBroadcast to be dynamically uniform
+    within a subgroup, and the "`Index`" operand of
+    code:OpGroupNonUniformQuadBroadcast to be dynamically uniform within a
+    derivative group, in shader modules of version 1.5 or higher.
+  * The <<features-drawIndirectCount, pname:drawIndirectCount>> feature
+    which indicates whether the flink:vkCmdDrawIndirectCount and
+    flink:vkCmdDrawIndexedIndirectCount functions can be used.
+  * The <<features-descriptorIndexing, pname:descriptorIndexing>> feature
+    which indicates the implementation supports the minimum number of
+    descriptor indexing features as defined in the <<features-requirements,
+    Feature Requirements>> section.
+  * The <<features-samplerFilterMinmax, pname:samplerFilterMinmax>> feature
+    which indicates whether the implementation supports the minimum number
+    of image formats that support the
+    ename:VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_MINMAX_BIT feature bit as
+    defined by the
+    <<limits-filterMinmaxSingleComponentFormats-minimum-requirements,
+    pname:filterMinmaxSingleComponentFormats>> property minimum
+    requirements.
+  * The <<limits-framebufferIntegerColorSampleCounts,
+    pname:framebufferIntegerColorSampleCounts>> limit which indicates the
+    color sample counts that are supported for all framebuffer color
+    attachments with integer formats.
+----
+
+// This include does not work inside the open block in the spec used to
+// delimit refpage content, but does work in the refpage extracted from the
+// spec.
+
+ifdef::isrefpage[]
+include::{generated}/interfaces/VK_VERSION_1_2.adoc[]
+endif::isrefpage[]
+--
+
+ifndef::isrefpage[]
+include::{generated}/interfaces/VK_VERSION_1_2.adoc[]
+endif::isrefpage[]
+
+endif::VK_VERSION_1_2[]
+
+
+ifdef::VK_VERSION_1_1[]
+[[versions-1.1]]
+== Vulkan Version 1.1
+
+[open,refpage='VK_VERSION_1_1',desc='Vulkan version 1.1',type='feature',anchor='versions-1.1',xrefs='VK_VERSION_1_0 VK_VERSION_1_2 VK_VERSION_1_3 VK_VERSION_1_4']
+--
+// This allows the Vulkan refpages to work when built separately from this chapter
+ifndef::VKSC_VERSION_1_0[:promoted: {generated}/meta]
+ifdef::VKSC_VERSION_1_0[:promoted: {appendices}/sc_static]
+
+[[versions-1.1-promotions]]
+Vulkan Version 1.1 <<extendingvulkan-compatibility-promotion,promoted>> a
+number of key extensions into the core API:
+
+include::{promoted}/promoted_extensions_VK_VERSION_1_1.adoc[]
+
+All differences in behavior between these extensions and the corresponding
+Vulkan 1.1 functionality are summarized below.
+
+
+Differences Relative to `VK_KHR_16bit_storage`::
+
+If the `apiext:VK_KHR_16bit_storage` extension is not supported, support for
+the <<features-storageBuffer16BitAccess, pname:storageBuffer16BitAccess>>
+feature is optional.
+Support for this feature is defined by
+slink:VkPhysicalDevice16BitStorageFeatures::pname:storageBuffer16BitAccess
+ifdef::VK_COMPUTE_VERSION_1_2[]
+or slink:VkPhysicalDeviceVulkan11Features::pname:storageBuffer16BitAccess
+endif::VK_COMPUTE_VERSION_1_2[]
+when queried via flink:vkGetPhysicalDeviceFeatures2.
+
+
+Differences Relative to `VK_KHR_sampler_ycbcr_conversion`::
+
+If the `apiext:VK_KHR_sampler_ycbcr_conversion` extension is not supported,
+support for the <<features-samplerYcbcrConversion,
+pname:samplerYcbcrConversion>> feature is optional.
+Support for this feature is defined by
+slink:VkPhysicalDeviceSamplerYcbcrConversionFeatures::pname:samplerYcbcrConversion
+ifdef::VK_COMPUTE_VERSION_1_2[]
+or slink:VkPhysicalDeviceVulkan11Features::pname:samplerYcbcrConversion
+endif::VK_COMPUTE_VERSION_1_2[]
+when queried via flink:vkGetPhysicalDeviceFeatures2.
+
+
+Differences Relative to `VK_KHR_shader_draw_parameters`::
+
+If the `apiext:VK_KHR_shader_draw_parameters` extension is not supported,
+support for the
+{spirv}/KHR/SPV_KHR_shader_draw_parameters.html[`SPV_KHR_shader_draw_parameters`]
+SPIR-V extension is optional.
+Support for this feature is defined by
+slink:VkPhysicalDeviceShaderDrawParametersFeatures::pname:shaderDrawParameters
+ifdef::VK_GRAPHICS_VERSION_1_2[]
+or slink:VkPhysicalDeviceVulkan11Features::pname:shaderDrawParameters
+endif::VK_GRAPHICS_VERSION_1_2[]
+when queried via flink:vkGetPhysicalDeviceFeatures2.
+
+
+Differences Relative to `VK_KHR_variable_pointers`::
+
+If the `apiext:VK_KHR_variable_pointers` extension is not supported, support
+for the <<features-variablePointersStorageBuffer,
+pname:variablePointersStorageBuffer>> feature is optional.
+Support for this feature is defined by
+slink:VkPhysicalDeviceVariablePointersFeatures::pname:variablePointersStorageBuffer
+ifdef::VK_COMPUTE_VERSION_1_2[]
+or
+slink:VkPhysicalDeviceVulkan11Features::pname:variablePointersStorageBuffer
+endif::VK_COMPUTE_VERSION_1_2[]
+when queried via flink:vkGetPhysicalDeviceFeatures2.
+
+
+Additional Vulkan 1.1 Feature Support::
++
+[open]
+----
+[[versions-1.1-new-features]]
+In addition to the promoted extensions described above, Vulkan 1.1 added
+support for:
+
+  * SPIR-V version 1.1
+  * SPIR-V version 1.2
+  * SPIR-V version 1.3
+  * The <<shaders-group-operations, group operations>> and
+    <<shaders-scope-subgroup, subgroup scope>>.
+  * The <<memory-protected-memory, protected memory>> feature.
+  * A new command to enumerate the instance version:
+    flink:vkEnumerateInstanceVersion.
+  * The slink:VkPhysicalDeviceShaderDrawParametersFeatures feature query
+    structure (where the `apiext:VK_KHR_shader_draw_parameters` extension did
+    not have one).
+----
+
+// This include does not work inside the open block in the spec used to
+// delimit refpage content, but does work in the refpage extracted from the
+// spec.
+
+ifdef::isrefpage[]
+include::{generated}/interfaces/VK_VERSION_1_1.adoc[]
+endif::isrefpage[]
+--
+
+ifndef::isrefpage[]
+include::{generated}/interfaces/VK_VERSION_1_1.adoc[]
+endif::isrefpage[]
+
+endif::VK_VERSION_1_1[]
+
+ifdef::VK_VERSION_1_0[]
+[[versions-1.0]]
+== Vulkan Version 1.0
+
+// Unfortunately we cannot include titles in an open refpage block, so this
+// is a refpage-specific alternate form of the section.
+ifdef::isrefpage[]
+[open,refpage='VK_VERSION_1_0',desc='Vulkan version 1.0',type='feature',anchor='versions-1.0',xrefs='VK_VERSION_1_1 VK_VERSION_1_2 VK_VERSION_1_3 VK_VERSION_1_4']
+--
+Vulkan Version 1.0 was the initial release of the Vulkan API.
+
+include::{generated}/interfaces/VK_VERSION_1_0.adoc[]
+--
+endif::isrefpage[]
+
+// This is the spec-specific form of the section
+Vulkan Version 1.0 was the initial release of the Vulkan API.
+
+include::{generated}/interfaces/VK_VERSION_1_0.adoc[]
+endif::VK_VERSION_1_0[]
+
+
+ifdef::VKSC_VERSION_1_0[]
+[[versions-sc-1.0]]
+== Vulkan SC Version 1.0
+
+// Unfortunately we cannot include titles in an open refpage block, so this
+// is a refpage-specific alternate form of the section.
+ifdef::isrefpage[]
+[open,refpage='VKSC_VERSION_1_0',desc='Vulkan SC version 1.0',type='feature',anchor='versions-sc-1.0']
+--
+Vulkan SC Version 1.0 is a variant of the Vulkan 1.2 API that is tailored
+for safety-critical use cases.
+
+include::{generated}/interfaces/VKSC_VERSION_1_0.adoc[]
+--
+endif::isrefpage[]
+
+// This is the spec-specific form of the section
+Vulkan SC Version 1.0 is a variant of the Vulkan 1.2 API that is tailored
+for safety-critical use cases.
+
+include::{generated}/interfaces/VKSC_VERSION_1_0.adoc[]
+endif::VKSC_VERSION_1_0[]
+
+
+// only include the base/compute/graphics version 1.x section if the
+// corresponding merged version 1.x section is not included
+ifdef::VK_BASE_VERSION_1_4[]
+ifndef::VK_VERSION_1_4[]
+[[versions-base-1.4]]
+== Vulkan Base Version 1.4
+
+// Unfortunately we cannot include titles in an open refpage block, so this
+// is a refpage-specific alternate form of the section.
+ifdef::isrefpage[]
+[open,refpage='VK_BASE_VERSION_1_4',desc='Vulkan Base version 1.4',type='feature',anchor='versions-base-1.4',xrefs='VK_BASE_VERSION_1_0 VK_BASE_VERSION_1_1 VK_BASE_VERSION_1_2 VK_BASE_VERSION_1_3']
+--
+Vulkan Base Version 1.4 is a subset of the Vulkan 1.4 API.
+
+include::{generated}/interfaces/VK_BASE_VERSION_1_1.adoc[]
+--
+endif::isrefpage[]
+
+// This is the spec-specific form of the section
+Vulkan Base Version 1.4 is a subset of the Vulkan 1.4 API.
+
+include::{generated}/interfaces/VK_BASE_VERSION_1_4.adoc[]
+
+endif::VK_VERSION_1_4[]
+endif::VK_BASE_VERSION_1_4[]
+
+ifdef::VK_BASE_VERSION_1_3[]
+ifndef::VK_VERSION_1_3[]
+[[versions-base-1.3]]
+== Vulkan Base Version 1.3
+
+// Unfortunately we cannot include titles in an open refpage block, so this
+// is a refpage-specific alternate form of the section.
+ifdef::isrefpage[]
+[open,refpage='VK_BASE_VERSION_1_3',desc='Vulkan Base version 1.3',type='feature',anchor='versions-base-1.3',xrefs='VK_BASE_VERSION_1_0 VK_BASE_VERSION_1_1 VK_BASE_VERSION_1_2 VK_BASE_VERSION_1_4']
+--
+Vulkan Base Version 1.3 is a subset of the Vulkan 1.3 API.
+
+include::{generated}/interfaces/VK_BASE_VERSION_1_1.adoc[]
+--
+endif::isrefpage[]
+
+// This is the spec-specific form of the section
+Vulkan Base Version 1.3 is a subset of the Vulkan 1.3 API.
+
+include::{generated}/interfaces/VK_BASE_VERSION_1_3.adoc[]
+
+endif::VK_VERSION_1_3[]
+endif::VK_BASE_VERSION_1_3[]
+
+ifdef::VK_BASE_VERSION_1_2[]
+ifndef::VK_VERSION_1_2[]
+[[versions-base-1.2]]
+== Vulkan Base Version 1.2
+
+// Unfortunately we cannot include titles in an open refpage block, so this
+// is a refpage-specific alternate form of the section.
+ifdef::isrefpage[]
+[open,refpage='VK_BASE_VERSION_1_2',desc='Vulkan Base version 1.2',type='feature',anchor='versions-base-1.2',xrefs='VK_BASE_VERSION_1_0 VK_BASE_VERSION_1_1 VK_BASE_VERSION_1_3 VK_BASE_VERSION_1_4']
+--
+Vulkan Base Version 1.2 is a subset of the Vulkan 1.2 API.
+
+include::{generated}/interfaces/VK_BASE_VERSION_1_2.adoc[]
+--
+endif::isrefpage[]
+
+// This is the spec-specific form of the section
+Vulkan Base Version 1.2 is a subset of the Vulkan 1.2 API.
+
+include::{generated}/interfaces/VK_BASE_VERSION_1_2.adoc[]
+
+endif::VK_VERSION_1_2[]
+endif::VK_BASE_VERSION_1_2[]
+
+ifdef::VK_BASE_VERSION_1_1[]
+ifndef::VK_VERSION_1_1[]
+[[versions-base-1.1]]
+== Vulkan Base Version 1.1
+
+// Unfortunately we cannot include titles in an open refpage block, so this
+// is a refpage-specific alternate form of the section.
+ifdef::isrefpage[]
+[open,refpage='VK_BASE_VERSION_1_1',desc='Vulkan Base version 1.1',type='feature',anchor='versions-base-1.1',xrefs='VK_BASE_VERSION_1_0 VK_BASE_VERSION_1_2 VK_BASE_VERSION_1_3 VK_BASE_VERSION_1_4']
+--
+Vulkan Base Version 1.1 is a subset of the Vulkan 1.1 API.
+
+include::{generated}/interfaces/VK_BASE_VERSION_1_1.adoc[]
+--
+endif::isrefpage[]
+
+// This is the spec-specific form of the section
+Vulkan Base Version 1.1 is a subset of the Vulkan 1.1 API.
+
+include::{generated}/interfaces/VK_BASE_VERSION_1_1.adoc[]
+
+endif::VK_VERSION_1_1[]
+endif::VK_BASE_VERSION_1_1[]
+
+ifdef::VK_BASE_VERSION_1_0[]
+ifndef::VK_VERSION_1_0[]
+[[versions-base-1.0]]
+== Vulkan Base Version 1.0
+
+// Unfortunately we cannot include titles in an open refpage block, so this
+// is a refpage-specific alternate form of the section.
+ifdef::isrefpage[]
+[open,refpage='VK_BASE_VERSION_1_0',desc='Vulkan Base version 1.0',type='feature',anchor='versions-base-1.0',xrefs='VK_BASE_VERSION_1_1 VK_BASE_VERSION_1_2 VK_BASE_VERSION_1_3 VK_BASE_VERSION_1_4']
+--
+Vulkan Base Version 1.0 is a subset of the initial release of the Vulkan 1.0
+API.
+
+include::{generated}/interfaces/VK_BASE_VERSION_1_0.adoc[]
+--
+endif::isrefpage[]
+
+// This is the spec-specific form of the section
+Vulkan Base Version 1.0 is a subset the initial release of the Vulkan 1.0
+API.
+
+include::{generated}/interfaces/VK_BASE_VERSION_1_0.adoc[]
+
+endif::VK_VERSION_1_0[]
+endif::VK_BASE_VERSION_1_0[]
+
+ifdef::VK_COMPUTE_VERSION_1_4[]
+ifndef::VK_VERSION_1_4[]
+[[versions-compute-1.4]]
+== Vulkan Compute Version 1.4
+
+// Unfortunately we cannot include titles in an open refpage block, so this
+// is a refpage-specific alternate form of the section.
+ifdef::isrefpage[]
+[open,refpage='VK_COMPUTE_VERSION_1_4',desc='Vulkan Compute version 1.4',type='feature',anchor='versions-compute-1.4',xrefs='VK_COMPUTE_VERSION_1_0 VK_COMPUTE_VERSION_1_1 VK_COMPUTE_VERSION_1_2 VK_COMPUTE_VERSION_1_3']
+--
+Vulkan Compute Version 1.4 is a subset of the Vulkan 1.4 API.
+
+include::{generated}/interfaces/VK_COMPUTE_VERSION_1_4.adoc[]
+--
+endif::isrefpage[]
+
+// This is the spec-specific form of the section
+Vulkan Compute Version 1.4 is a subset of the Vulkan 1.4 API.
+
+include::{generated}/interfaces/VK_COMPUTE_VERSION_1_4.adoc[]
+
+endif::VK_VERSION_1_4[]
+endif::VK_COMPUTE_VERSION_1_4[]
+
+ifdef::VK_COMPUTE_VERSION_1_3[]
+ifndef::VK_VERSION_1_3[]
+[[versions-compute-1.3]]
+== Vulkan Compute Version 1.3
+
+// Unfortunately we cannot include titles in an open refpage block, so this
+// is a refpage-specific alternate form of the section.
+ifdef::isrefpage[]
+[open,refpage='VK_COMPUTE_VERSION_1_3',desc='Vulkan Compute version 1.3',type='feature',anchor='versions-compute-1.3',xrefs='VK_COMPUTE_VERSION_1_0 VK_COMPUTE_VERSION_1_1 VK_COMPUTE_VERSION_1_2 VK_COMPUTE_VERSION_1_4']
+--
+Vulkan Compute Version 1.3 is a subset of the Vulkan 1.3 API.
+
+include::{generated}/interfaces/VK_COMPUTE_VERSION_1_3.adoc[]
+--
+endif::isrefpage[]
+
+// This is the spec-specific form of the section
+Vulkan Compute Version 1.3 is a subset of the Vulkan 1.3 API.
+
+include::{generated}/interfaces/VK_COMPUTE_VERSION_1_3.adoc[]
+
+endif::VK_VERSION_1_3[]
+endif::VK_COMPUTE_VERSION_1_3[]
+
+ifdef::VK_COMPUTE_VERSION_1_2[]
+ifndef::VK_VERSION_1_2[]
+[[versions-compute-1.2]]
+== Vulkan Compute Version 1.2
+
+// Unfortunately we cannot include titles in an open refpage block, so this
+// is a refpage-specific alternate form of the section.
+ifdef::isrefpage[]
+[open,refpage='VK_COMPUTE_VERSION_1_2',desc='Vulkan Compute version 1.2',type='feature',anchor='versions-compute-1.2',xrefs='VK_COMPUTE_VERSION_1_0 VK_COMPUTE_VERSION_1_1 VK_COMPUTE_VERSION_1_3 VK_COMPUTE_VERSION_1_4']
+--
+Vulkan Compute Version 1.2 is a subset of the Vulkan 1.2 API.
+
+include::{generated}/interfaces/VK_COMPUTE_VERSION_1_2.adoc[]
+--
+endif::isrefpage[]
+
+// This is the spec-specific form of the section
+Vulkan Compute Version 1.2 is a subset of the Vulkan 1.2 API.
+
+include::{generated}/interfaces/VK_COMPUTE_VERSION_1_2.adoc[]
+
+endif::VK_VERSION_1_2[]
+endif::VK_COMPUTE_VERSION_1_2[]
+
+ifdef::VK_COMPUTE_VERSION_1_1[]
+ifndef::VK_VERSION_1_1[]
+[[versions-compute-1.1]]
+== Vulkan Compute Version 1.1
+
+// Unfortunately we cannot include titles in an open refpage block, so this
+// is a refpage-specific alternate form of the section.
+ifdef::isrefpage[]
+[open,refpage='VK_COMPUTE_VERSION_1_1',desc='Vulkan Compute version 1.1',type='feature',anchor='versions-compute-1.1',xrefs='VK_COMPUTE_VERSION_1_0 VK_COMPUTE_VERSION_1_2 VK_COMPUTE_VERSION_1_3 VK_COMPUTE_VERSION_1_4']
+--
+Vulkan Compute Version 1.1 is a subset of the Vulkan 1.1 API.
+
+include::{generated}/interfaces/VK_COMPUTE_VERSION_1_1.adoc[]
+--
+endif::isrefpage[]
+
+// This is the spec-specific form of the section
+Vulkan Compute Version 1.1 is a subset of the Vulkan 1.1 API.
+
+include::{generated}/interfaces/VK_COMPUTE_VERSION_1_1.adoc[]
+
+endif::VK_VERSION_1_1[]
+endif::VK_COMPUTE_VERSION_1_1[]
+
+ifdef::VK_COMPUTE_VERSION_1_0[]
+ifndef::VK_VERSION_1_0[]
+[[versions-compute-1.0]]
+== Vulkan Compute Version 1.0
+
+// Unfortunately we cannot include titles in an open refpage block, so this
+// is a refpage-specific alternate form of the section.
+ifdef::isrefpage[]
+[open,refpage='VK_COMPUTE_VERSION_1_0',desc='Vulkan Compute version 1.0',type='feature',anchor='versions-compute-1.0',xrefs='VK_COMPUTE_VERSION_1_1 VK_COMPUTE_VERSION_1_2 VK_COMPUTE_VERSION_1_3 VK_COMPUTE_VERSION_1_4']
+--
+Vulkan Compute Version 1.0 is a subset of the initial release of the Vulkan
+1.0 API.
+
+include::{generated}/interfaces/VK_COMPUTE_VERSION_1_0.adoc[]
+--
+endif::isrefpage[]
+
+// This is the spec-specific form of the section
+Vulkan Compute Version 1.0 is a subset of the initial release of the Vulkan
+1.0 API.
+
+include::{generated}/interfaces/VK_COMPUTE_VERSION_1_0.adoc[]
+
+endif::VK_VERSION_1_0[]
+endif::VK_COMPUTE_VERSION_1_0[]
+
+ifdef::VK_GRAPHICS_VERSION_1_4[]
+ifndef::VK_VERSION_1_4[]
+[[versions-graphics-1.4]]
+== Vulkan Graphics Version 1.4
+
+// Unfortunately we cannot include titles in an open refpage block, so this
+// is a refpage-specific alternate form of the section.
+ifdef::isrefpage[]
+[open,refpage='VK_GRAPHICS_VERSION_1_4',desc='Vulkan Graphics version 1.4',type='feature',anchor='versions-graphics-1.4',xrefs='VK_GRAPHICS_VERSION_1_0 VK_GRAPHICS_VERSION_1_1 VK_GRAPHICS_VERSION_1_2 VK_GRAPHICS_VERSION_1_3']
+--
+Vulkan Graphics Version 1.4 is a subset of the Vulkan 1.4 API.
+
+include::{generated}/interfaces/VK_GRAPHICS_VERSION_1_4.adoc[]
+--
+endif::isrefpage[]
+
+// This is the spec-specific form of the section
+Vulkan Graphics Version 1.4 is a subset of the Vulkan 1.4 API.
+
+include::{generated}/interfaces/VK_GRAPHICS_VERSION_1_4.adoc[]
+
+endif::VK_VERSION_1_4[]
+endif::VK_GRAPHICS_VERSION_1_4[]
+
+ifdef::VK_GRAPHICS_VERSION_1_3[]
+ifndef::VK_VERSION_1_3[]
+[[versions-graphics-1.3]]
+== Vulkan Graphics Version 1.3
+
+// Unfortunately we cannot include titles in an open refpage block, so this
+// is a refpage-specific alternate form of the section.
+ifdef::isrefpage[]
+[open,refpage='VK_GRAPHICS_VERSION_1_3',desc='Vulkan Graphics version 1.3',type='feature',anchor='versions-graphics-1.3',xrefs='VK_GRAPHICS_VERSION_1_0 VK_GRAPHICS_VERSION_1_1 VK_GRAPHICS_VERSION_1_2 VK_GRAPHICS_VERSION_1_4']
+--
+Vulkan Graphics Version 1.3 is a subset of the Vulkan 1.3 API.
+
+include::{generated}/interfaces/VK_GRAPHICS_VERSION_1_3.adoc[]
+--
+endif::isrefpage[]
+
+// This is the spec-specific form of the section
+Vulkan Graphics Version 1.3 is a subset of the Vulkan 1.3 API.
+
+include::{generated}/interfaces/VK_GRAPHICS_VERSION_1_3.adoc[]
+
+endif::VK_VERSION_1_3[]
+endif::VK_GRAPHICS_VERSION_1_3[]
+
+ifdef::VK_GRAPHICS_VERSION_1_2[]
+ifndef::VK_VERSION_1_2[]
+[[versions-graphics-1.2]]
+== Vulkan Graphics Version 1.2
+
+// Unfortunately we cannot include titles in an open refpage block, so this
+// is a refpage-specific alternate form of the section.
+ifdef::isrefpage[]
+[open,refpage='VK_GRAPHICS_VERSION_1_2',desc='Vulkan Graphics version 1.2',type='feature',anchor='versions-graphics-1.2',xrefs='VK_GRAPHICS_VERSION_1_0 VK_GRAPHICS_VERSION_1_1 VK_GRAPHICS_VERSION_1_3 VK_GRAPHICS_VERSION_1_4']
+--
+Vulkan Graphics Version 1.2 is a subset of the Vulkan 1.2 API.
+
+include::{generated}/interfaces/VK_GRAPHICS_VERSION_1_2.adoc[]
+--
+endif::isrefpage[]
+
+// This is the spec-specific form of the section
+Vulkan Graphics Version 1.2 is a subset of the Vulkan 1.2 API.
+
+include::{generated}/interfaces/VK_GRAPHICS_VERSION_1_2.adoc[]
+
+endif::VK_VERSION_1_2[]
+endif::VK_GRAPHICS_VERSION_1_2[]
+
+ifdef::VK_GRAPHICS_VERSION_1_1[]
+ifndef::VK_VERSION_1_1[]
+[[versions-graphics-1.1]]
+== Vulkan Graphics Version 1.1
+
+// Unfortunately we cannot include titles in an open refpage block, so this
+// is a refpage-specific alternate form of the section.
+ifdef::isrefpage[]
+[open,refpage='VK_GRAPHICS_VERSION_1_1',desc='Vulkan Graphics version 1.1',type='feature',anchor='versions-graphics-1.1',xrefs='VK_GRAPHICS_VERSION_1_0 VK_GRAPHICS_VERSION_1_2 VK_GRAPHICS_VERSION_1_3 VK_GRAPHICS_VERSION_1_4']
+--
+Vulkan Graphics Version 1.1 is a subset of the Vulkan 1.1 API.
+
+include::{generated}/interfaces/VK_GRAPHICS_VERSION_1_1.adoc[]
+--
+endif::isrefpage[]
+
+// This is the spec-specific form of the section
+Vulkan Graphics Version 1.1 is a subset of the Vulkan 1.1 API.
+
+include::{generated}/interfaces/VK_GRAPHICS_VERSION_1_1.adoc[]
+
+endif::VK_VERSION_1_1[]
+endif::VK_GRAPHICS_VERSION_1_1[]
+
+ifdef::VK_GRAPHICS_VERSION_1_0[]
+ifndef::VK_VERSION_1_0[]
+[[versions-graphics-1.0]]
+== Vulkan Graphics Version 1.0
+
+// Unfortunately we cannot include titles in an open refpage block, so this
+// is a refpage-specific alternate form of the section.
+ifdef::isrefpage[]
+[open,refpage='VK_GRAPHICS_VERSION_1_0',desc='Vulkan Graphics version 1.0',type='feature',anchor='versions-graphics-1.0',xrefs='VK_GRAPHICS_VERSION_1_1 VK_GRAPHICS_VERSION_1_2 VK_GRAPHICS_VERSION_1_3 VK_GRAPHICS_VERSION_1_4']
+--
+Vulkan Graphics Version 1.0 is a subset of the initial release of the Vulkan
+1.0 API.
+
+include::{generated}/interfaces/VK_GRAPHICS_VERSION_1_0.adoc[]
+--
+endif::isrefpage[]
+
+// This is the spec-specific form of the section
+Vulkan Graphics Version 1.0 is a subset of the initial release of the Vulkan
+1.0 API.
+
+include::{generated}/interfaces/VK_GRAPHICS_VERSION_1_0.adoc[]
+
+endif::VK_VERSION_1_0[]
+endif::VK_GRAPHICS_VERSION_1_0[]

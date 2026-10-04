@@ -1,0 +1,525 @@
+/* Copyright (c) 2024-2026, Sascha Willems
+ * Copyright (c) 2024-2026, Arm Limited and Contributors
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Licensed under the Apache License, Version 2.0 the "License";
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#include "shader_debugprintf.h"
+
+#include "scene_graph/components/sub_mesh.h"
+
+#define validation_layer_name "VK_LAYER_KHRONOS_validation"
+
+std::string ShaderDebugPrintf::debug_output{};
+
+VKAPI_ATTR VkBool32 VKAPI_CALL ShaderDebugPrintf::debug_utils_message_callback(
+    VkDebugUtilsMessageSeverityFlagBitsEXT      messageSeverity,
+    VkDebugUtilsMessageTypeFlagsEXT             messageType,
+    const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
+    void                                       *pUserData)
+{
+	// Look for Validation Layer message id names: VVL-DEBUG-PRINTF or WARNING-DEBUG-PRINTF or UNASSIGNED-DEBUG-PRINTF (have observed WARNING and UNASSIGNED with older Vulkan SDKs)
+	if (strcmp(pCallbackData->pMessageIdName, "VVL-DEBUG-PRINTF") == 0 || strcmp(pCallbackData->pMessageIdName, "WARNING-DEBUG-PRINTF") == 0 || strcmp(pCallbackData->pMessageIdName, "UNASSIGNED-DEBUG-PRINTF") == 0)
+	{
+		// Validation messages are a bit verbose, but we only want the text from the shader, so we cut off everything before the first word from the shader message
+		// See scene.vert: debugPrintfEXT("Position = %v3f", outPos);
+		std::string shader_message{pCallbackData->pMessage};
+		shader_message = shader_message.substr(shader_message.find("Position"));
+		debug_output.append(shader_message + "\n");
+	}
+	return VK_FALSE;
+}
+
+ShaderDebugPrintf::ShaderDebugPrintf()
+{
+	title = "Shader debugprintf";
+
+	add_device_extension(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
+}
+
+ShaderDebugPrintf::~ShaderDebugPrintf()
+{
+	if (has_device())
+	{
+		vkDestroyPipeline(get_device().get_handle(), pipelines.skysphere, nullptr);
+		vkDestroyPipeline(get_device().get_handle(), pipelines.sphere, nullptr);
+
+		vkDestroyPipelineLayout(get_device().get_handle(), pipeline_layout, nullptr);
+
+		vkDestroyDescriptorSetLayout(get_device().get_handle(), descriptor_set_layout, nullptr);
+
+		vkDestroySampler(get_device().get_handle(), textures.skysphere.sampler, nullptr);
+	}
+}
+
+uint32_t ShaderDebugPrintf::get_api_version() const
+{
+	// The validation layer (VVL) version is needed to work around validation layer performance issues when running with Vulkan SDKs <= 1.3.290
+	uint32_t layer_property_count;
+	VK_CHECK(vkEnumerateInstanceLayerProperties(&layer_property_count, nullptr));
+	std::vector<VkLayerProperties> layer_properties(layer_property_count);
+	VK_CHECK(vkEnumerateInstanceLayerProperties(&layer_property_count, layer_properties.data()));
+
+	const auto vvl_properties = std::ranges::find_if(layer_properties,
+	                                                 [](VkLayerProperties const &properties) { return strcmp(properties.layerName, validation_layer_name) == 0; });
+
+	// Make sure we have found the validation layer before checking the VVL version and enumerating VVL instance extensions for VK_EXT_layer_settings
+	if (vvl_properties != layer_properties.end())
+	{
+		// debugPrintfEXT layer feature requires Vulkan API 1.1, but override with API 1.2 for Vulkan SDKs <= 1.3.290 to work around VVL performance defect
+		// See VVL issue https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/7562 for defect and fix information (fix available in SDK 1.3.296)
+		// Note: An additional, unrelated VVL performance issue affecting nVidia GPUs was found in SDK 1.3.296 following release - for nVidia GPUs please
+		//       use SDK 1.3.290 until a fix is made available in a later SDK (see https://github.com/KhronosGroup/Vulkan-ValidationLayers/pull/8766).
+		if (vvl_properties->specVersion <= VK_MAKE_API_VERSION(0, 1, 3, 290))
+		{
+			return VK_API_VERSION_1_2;
+		}
+	}
+	return VK_API_VERSION_1_1;
+}
+
+void ShaderDebugPrintf::request_gpu_features(vkb::core::PhysicalDeviceC &gpu)
+{
+	auto const &supportedFeatures = gpu.get_features();
+	auto       &requestedFeatures = gpu.get_mutable_requested_features();
+
+	// debugPrintfEXT requires fragmentStoresAndAtomics and vertexPipelineStoresAndAtomics
+	if (supportedFeatures.fragmentStoresAndAtomics && supportedFeatures.vertexPipelineStoresAndAtomics)
+	{
+		requestedFeatures.fragmentStoresAndAtomics       = VK_TRUE;
+		requestedFeatures.vertexPipelineStoresAndAtomics = VK_TRUE;
+	}
+	else
+	{
+		throw vkb::VulkanException(VK_ERROR_FEATURE_NOT_PRESENT, "Selected GPU does not support features fragmentStoresAndAtomics and/or vertexPipelineStoresAndAtomics");
+	}
+
+	// Enable anisotropic filtering if supported
+	if (supportedFeatures.samplerAnisotropy)
+	{
+		requestedFeatures.samplerAnisotropy = VK_TRUE;
+	}
+}
+
+void ShaderDebugPrintf::request_instance_extensions(std::unordered_map<std::string, vkb::RequestMode> &requested_extensions) const
+{
+	ApiVulkanSample::request_instance_extensions(requested_extensions);
+	// Vulkan Samples framework requires VK_EXT_layer_settings extension to use layer settings for configuring the Validation Layer
+	requested_extensions[VK_EXT_LAYER_SETTINGS_EXTENSION_NAME] = vkb::RequestMode::Optional;
+}
+
+void ShaderDebugPrintf::request_layer_settings(std::vector<VkLayerSettingEXT> &requested_layer_settings, vkb::StructureChainBuilderC<VkInstanceCreateInfo> &scb) const
+{
+	ApiVulkanSample::request_layer_settings(requested_layer_settings, scb);
+	requested_layer_settings.push_back(
+	    {validation_layer_name, "printf_enable", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &scb.add_chain_data<VkBool32>(VK_TRUE)});
+}
+
+void ShaderDebugPrintf::request_validation_feature_enables(std::vector<VkValidationFeatureEnableEXT> &requested_layer_settings) const
+{
+	ApiVulkanSample::request_validation_feature_enables(requested_layer_settings);
+	requested_layer_settings.push_back(VK_VALIDATION_FEATURE_ENABLE_DEBUG_PRINTF_EXT);
+}
+
+void ShaderDebugPrintf::request_layers(std::unordered_map<std::string, vkb::RequestMode> &requested_layers) const
+{
+	ApiVulkanSample::request_layers(requested_layers);
+	requested_layers[validation_layer_name] = vkb::RequestMode::Required;
+}
+
+void ShaderDebugPrintf::build_command_buffers()
+{
+	VkCommandBufferBeginInfo command_buffer_begin_info = vkb::initializers::command_buffer_begin_info();
+
+	VkClearValue clear_values[2];
+	clear_values[0].color        = {{0.0f, 0.0f, 0.0f, 0.0f}};
+	clear_values[1].depthStencil = {0.0f, 0};
+
+	VkRenderPassBeginInfo render_pass_begin_info = vkb::initializers::render_pass_begin_info();
+	render_pass_begin_info.renderPass            = render_pass;
+	render_pass_begin_info.renderArea.offset.x   = 0;
+	render_pass_begin_info.renderArea.offset.y   = 0;
+	render_pass_begin_info.clearValueCount       = 2;
+	render_pass_begin_info.pClearValues          = clear_values;
+
+	for (int32_t i = 0; i < draw_cmd_buffers.size(); ++i)
+	{
+		VK_CHECK(vkBeginCommandBuffer(draw_cmd_buffers[i], &command_buffer_begin_info));
+
+		VkClearValue clear_values[2];
+		clear_values[0].color        = {{0.0f, 0.0f, 0.0f, 0.0f}};
+		clear_values[1].depthStencil = {0.0f, 0};
+
+		// Final composition
+		VkRenderPassBeginInfo render_pass_begin_info    = vkb::initializers::render_pass_begin_info();
+		render_pass_begin_info.framebuffer              = framebuffers[i];
+		render_pass_begin_info.renderPass               = render_pass;
+		render_pass_begin_info.clearValueCount          = 2;
+		render_pass_begin_info.renderArea.extent.width  = width;
+		render_pass_begin_info.renderArea.extent.height = height;
+		render_pass_begin_info.pClearValues             = clear_values;
+
+		vkCmdBeginRenderPass(draw_cmd_buffers[i], &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
+
+		VkViewport viewport = vkb::initializers::viewport(static_cast<float>(width), static_cast<float>(height), 0.0f, 1.0f);
+		vkCmdSetViewport(draw_cmd_buffers[i], 0, 1, &viewport);
+
+		VkRect2D scissor = vkb::initializers::rect2D(width, height, 0, 0);
+		vkCmdSetScissor(draw_cmd_buffers[i], 0, 1, &scissor);
+
+		if (display_skysphere)
+		{
+			vkCmdBindPipeline(draw_cmd_buffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.skysphere);
+			push_const_block.object_type = 0;
+			vkCmdPushConstants(draw_cmd_buffers[i], pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_const_block), &push_const_block);
+			vkCmdBindDescriptorSets(draw_cmd_buffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor_sets.skysphere, 0, nullptr);
+
+			draw_model(models.skysphere, draw_cmd_buffers[i]);
+		}
+
+		// Spheres
+		vkCmdBindPipeline(draw_cmd_buffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.sphere);
+		vkCmdBindDescriptorSets(draw_cmd_buffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor_sets.sphere, 0, nullptr);
+		std::vector<glm::vec3> mesh_colors = {
+		    glm::vec3(1.0f, 0.0f, 0.0f),
+		    glm::vec3(0.0f, 1.0f, 0.0f),
+		    glm::vec3(0.0f, 0.0f, 1.0f),
+		};
+		std::vector<glm::vec3> mesh_offsets = {
+		    glm::vec3(-2.5f, 0.0f, 0.0f),
+		    glm::vec3(0.0f, 0.0f, 0.0f),
+		    glm::vec3(2.5f, 0.0f, 0.0f),
+		};
+		for (uint32_t j = 0; j < 3; j++)
+		{
+			push_const_block.object_type = 1;
+			push_const_block.offset      = glm::vec4(mesh_offsets[j], 0.0f);
+			push_const_block.color       = glm::vec4(mesh_colors[j], 0.0f);
+			vkCmdPushConstants(draw_cmd_buffers[i], pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_const_block), &push_const_block);
+			draw_model(models.scene, draw_cmd_buffers[i]);
+		}
+
+		draw_ui(draw_cmd_buffers[i]);
+
+		vkCmdEndRenderPass(draw_cmd_buffers[i]);
+
+		VK_CHECK(vkEndCommandBuffer(draw_cmd_buffers[i]));
+	}
+}
+
+void ShaderDebugPrintf::load_assets()
+{
+	models.skysphere   = load_model("scenes/geosphere.gltf");
+	textures.skysphere = load_texture("textures/skysphere_rgba.ktx", vkb::sg::Image::Color);
+	models.scene       = load_model("scenes/geosphere.gltf");
+}
+
+void ShaderDebugPrintf::setup_descriptor_pool()
+{
+	// Note: Using debugprintf in a shader consumes a descriptor set, so we need to allocate one additional descriptor set
+	std::vector<VkDescriptorPoolSize> pool_sizes = {
+	    vkb::initializers::descriptor_pool_size(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2),
+	    vkb::initializers::descriptor_pool_size(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2)};
+	uint32_t                   num_descriptor_sets = 2;
+	VkDescriptorPoolCreateInfo descriptor_pool_create_info =
+	    vkb::initializers::descriptor_pool_create_info(static_cast<uint32_t>(pool_sizes.size()), pool_sizes.data(), num_descriptor_sets);
+	VK_CHECK(vkCreateDescriptorPool(get_device().get_handle(), &descriptor_pool_create_info, nullptr, &descriptor_pool));
+}
+
+void ShaderDebugPrintf::setup_descriptor_set_layout()
+{
+	// Object rendering (into offscreen buffer)
+	std::vector<VkDescriptorSetLayoutBinding> set_layout_bindings = {
+	    vkb::initializers::descriptor_set_layout_binding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0),
+	    vkb::initializers::descriptor_set_layout_binding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 1),
+	};
+
+	VkDescriptorSetLayoutCreateInfo descriptor_layout_create_info =
+	    vkb::initializers::descriptor_set_layout_create_info(set_layout_bindings.data(), static_cast<uint32_t>(set_layout_bindings.size()));
+
+	VK_CHECK(vkCreateDescriptorSetLayout(get_device().get_handle(), &descriptor_layout_create_info, nullptr, &descriptor_set_layout));
+	VkPipelineLayoutCreateInfo pipeline_layout_create_info =
+	    vkb::initializers::pipeline_layout_create_info(
+	        &descriptor_set_layout,
+	        1);
+
+	// Pass object offset and color via push constant
+	VkPushConstantRange push_constant_range            = vkb::initializers::push_constant_range(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, sizeof(push_const_block), 0);
+	pipeline_layout_create_info.pushConstantRangeCount = 1;
+	pipeline_layout_create_info.pPushConstantRanges    = &push_constant_range;
+
+	VK_CHECK(vkCreatePipelineLayout(get_device().get_handle(), &pipeline_layout_create_info, nullptr, &pipeline_layout));
+}
+
+void ShaderDebugPrintf::setup_descriptor_sets()
+{
+	VkDescriptorSetAllocateInfo alloc_info =
+	    vkb::initializers::descriptor_set_allocate_info(
+	        descriptor_pool,
+	        &descriptor_set_layout,
+	        1);
+
+	// Sphere model object descriptor set
+	VK_CHECK(vkAllocateDescriptorSets(get_device().get_handle(), &alloc_info, &descriptor_sets.sphere));
+
+	VkDescriptorBufferInfo            matrix_buffer_descriptor     = create_descriptor(*uniform_buffers.matrices);
+	VkDescriptorImageInfo             environment_image_descriptor = create_descriptor(textures.skysphere);
+	std::vector<VkWriteDescriptorSet> write_descriptor_sets        = {
+        vkb::initializers::write_descriptor_set(descriptor_sets.sphere, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &matrix_buffer_descriptor),
+        vkb::initializers::write_descriptor_set(descriptor_sets.sphere, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &environment_image_descriptor),
+    };
+	vkUpdateDescriptorSets(get_device().get_handle(), static_cast<uint32_t>(write_descriptor_sets.size()), write_descriptor_sets.data(), 0, nullptr);
+
+	// Sky sphere descriptor set
+	VK_CHECK(vkAllocateDescriptorSets(get_device().get_handle(), &alloc_info, &descriptor_sets.skysphere));
+
+	matrix_buffer_descriptor     = create_descriptor(*uniform_buffers.matrices);
+	environment_image_descriptor = create_descriptor(textures.skysphere);
+	write_descriptor_sets        = {
+        vkb::initializers::write_descriptor_set(descriptor_sets.skysphere, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &matrix_buffer_descriptor),
+        vkb::initializers::write_descriptor_set(descriptor_sets.skysphere, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &environment_image_descriptor),
+    };
+	vkUpdateDescriptorSets(get_device().get_handle(), static_cast<uint32_t>(write_descriptor_sets.size()), write_descriptor_sets.data(), 0, nullptr);
+}
+
+void ShaderDebugPrintf::prepare_pipelines()
+{
+	VkPipelineInputAssemblyStateCreateInfo input_assembly_state =
+	    vkb::initializers::pipeline_input_assembly_state_create_info(
+	        VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+	        0,
+	        VK_FALSE);
+
+	VkPipelineRasterizationStateCreateInfo rasterization_state =
+	    vkb::initializers::pipeline_rasterization_state_create_info(
+	        VK_POLYGON_MODE_FILL,
+	        VK_CULL_MODE_BACK_BIT,
+	        VK_FRONT_FACE_COUNTER_CLOCKWISE,
+	        0);
+
+	VkPipelineColorBlendAttachmentState blend_attachment_state =
+	    vkb::initializers::pipeline_color_blend_attachment_state(
+	        0xf,
+	        VK_FALSE);
+
+	VkPipelineColorBlendStateCreateInfo color_blend_state =
+	    vkb::initializers::pipeline_color_blend_state_create_info(
+	        1,
+	        &blend_attachment_state);
+
+	// Note: Using reversed depth-buffer for increased precision, so Greater depth values are kept
+	VkPipelineDepthStencilStateCreateInfo depth_stencil_state =
+	    vkb::initializers::pipeline_depth_stencil_state_create_info(
+	        VK_FALSE,
+	        VK_FALSE,
+	        VK_COMPARE_OP_GREATER);
+
+	VkPipelineViewportStateCreateInfo viewport_state =
+	    vkb::initializers::pipeline_viewport_state_create_info(1, 1, 0);
+
+	VkPipelineMultisampleStateCreateInfo multisample_state =
+	    vkb::initializers::pipeline_multisample_state_create_info(
+	        VK_SAMPLE_COUNT_1_BIT,
+	        0);
+
+	std::vector<VkDynamicState> dynamic_state_enables = {
+	    VK_DYNAMIC_STATE_VIEWPORT,
+	    VK_DYNAMIC_STATE_SCISSOR};
+	VkPipelineDynamicStateCreateInfo dynamic_state =
+	    vkb::initializers::pipeline_dynamic_state_create_info(
+	        dynamic_state_enables.data(),
+	        static_cast<uint32_t>(dynamic_state_enables.size()),
+	        0);
+
+	VkGraphicsPipelineCreateInfo pipeline_create_info =
+	    vkb::initializers::pipeline_create_info(
+	        pipeline_layout,
+	        render_pass,
+	        0);
+
+	std::vector<VkPipelineColorBlendAttachmentState> blend_attachment_states = {
+	    vkb::initializers::pipeline_color_blend_attachment_state(0xf, VK_FALSE),
+	    vkb::initializers::pipeline_color_blend_attachment_state(0xf, VK_FALSE),
+	};
+
+	// Vertex bindings an attributes for model rendering
+	// Binding description
+	std::vector<VkVertexInputBindingDescription> vertex_input_bindings = {
+	    vkb::initializers::vertex_input_binding_description(0, sizeof(Vertex), VK_VERTEX_INPUT_RATE_VERTEX),
+	};
+
+	std::array<VkPipelineShaderStageCreateInfo, 2> shader_stages;
+
+	// Attribute descriptions
+	std::vector<VkVertexInputAttributeDescription> vertex_input_attributes = {
+	    vkb::initializers::vertex_input_attribute_description(0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0),                        // Position
+	    vkb::initializers::vertex_input_attribute_description(0, 1, VK_FORMAT_R32G32B32_SFLOAT, sizeof(float) * 3),        // Normal
+	    vkb::initializers::vertex_input_attribute_description(0, 2, VK_FORMAT_R32G32_SFLOAT, sizeof(float) * 6),           // UV
+	};
+
+	VkPipelineVertexInputStateCreateInfo vertex_input_state = vkb::initializers::pipeline_vertex_input_state_create_info();
+	vertex_input_state.vertexBindingDescriptionCount        = static_cast<uint32_t>(vertex_input_bindings.size());
+	vertex_input_state.pVertexBindingDescriptions           = vertex_input_bindings.data();
+	vertex_input_state.vertexAttributeDescriptionCount      = static_cast<uint32_t>(vertex_input_attributes.size());
+	vertex_input_state.pVertexAttributeDescriptions         = vertex_input_attributes.data();
+
+	pipeline_create_info.layout              = pipeline_layout;
+	pipeline_create_info.renderPass          = render_pass;
+	pipeline_create_info.pInputAssemblyState = &input_assembly_state;
+	pipeline_create_info.pRasterizationState = &rasterization_state;
+	pipeline_create_info.pColorBlendState    = &color_blend_state;
+	pipeline_create_info.pMultisampleState   = &multisample_state;
+	pipeline_create_info.pViewportState      = &viewport_state;
+	pipeline_create_info.pDepthStencilState  = &depth_stencil_state;
+	pipeline_create_info.pDynamicState       = &dynamic_state;
+	pipeline_create_info.pVertexInputState   = &vertex_input_state;
+	pipeline_create_info.stageCount          = static_cast<uint32_t>(shader_stages.size());
+	pipeline_create_info.pStages             = shader_stages.data();
+
+	shader_stages[0] = load_shader("shader_debugprintf", "scene.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
+	shader_stages[1] = load_shader("shader_debugprintf", "scene.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
+
+	// skysphere pipeline (background cube)
+	rasterization_state.cullMode = VK_CULL_MODE_BACK_BIT;
+
+	VK_CHECK(vkCreateGraphicsPipelines(get_device().get_handle(), pipeline_cache, 1, &pipeline_create_info, nullptr, &pipelines.skysphere));
+
+	// sphere model pipeline
+	depth_stencil_state.depthWriteEnable = VK_TRUE;
+	depth_stencil_state.depthTestEnable  = VK_TRUE;
+	// Flip cull mode
+	rasterization_state.cullMode = VK_CULL_MODE_FRONT_BIT;
+	VK_CHECK(vkCreateGraphicsPipelines(get_device().get_handle(), pipeline_cache, 1, &pipeline_create_info, nullptr, &pipelines.sphere));
+}
+
+// Prepare and initialize uniform buffer containing shader uniforms
+void ShaderDebugPrintf::prepare_uniform_buffers()
+{
+	// Matrices vertex shader uniform buffer
+	uniform_buffers.matrices = std::make_unique<vkb::core::BufferC>(get_device(),
+	                                                                sizeof(ubo_vs),
+	                                                                VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+	                                                                VMA_MEMORY_USAGE_CPU_TO_GPU);
+
+	update_uniform_buffers();
+}
+
+void ShaderDebugPrintf::update_uniform_buffers()
+{
+	ubo_vs.projection          = camera.matrices.perspective;
+	ubo_vs.modelview           = camera.matrices.view * glm::mat4(1.0f);
+	ubo_vs.skysphere_modelview = camera.matrices.view;
+	uniform_buffers.matrices->convert_and_update(ubo_vs);
+}
+
+void ShaderDebugPrintf::draw()
+{
+	ApiVulkanSample::prepare_frame();
+	submit_info.commandBufferCount = 1;
+	submit_info.pCommandBuffers    = &draw_cmd_buffers[current_buffer];
+	VK_CHECK(vkQueueSubmit(queue, 1, &submit_info, VK_NULL_HANDLE));
+	ApiVulkanSample::submit_frame();
+}
+
+bool ShaderDebugPrintf::prepare(const vkb::ApplicationOptions &options)
+{
+	if (!ApiVulkanSample::prepare(options))
+	{
+		return false;
+	}
+
+	camera.type = vkb::CameraType::LookAt;
+	camera.set_position(glm::vec3(0.0f, 0.0f, -6.0f));
+	camera.set_rotation(glm::vec3(0.0f, 180.0f, 0.0f));
+
+	// Note: Using reversed depth-buffer for increased precision, so Znear and Zfar are flipped
+	camera.set_perspective(60.0f, static_cast<float>(width) / static_cast<float>(height), 256.0f, 0.1f);
+
+	load_assets();
+	prepare_uniform_buffers();
+	setup_descriptor_set_layout();
+	prepare_pipelines();
+	setup_descriptor_pool();
+	setup_descriptor_sets();
+	build_command_buffers();
+	prepared = true;
+	return true;
+}
+
+void ShaderDebugPrintf::extend_instance_create_info(vkb::StructureChainBuilderC<VkInstanceCreateInfo> &scb) const
+{
+	ApiVulkanSample::extend_instance_create_info(scb);
+
+	// Register a sample specific debug utils callback in addition to the one registered by the base class
+	VkDebugUtilsMessengerCreateInfoEXT debug_utils_messenger_create_info{.sType           = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+	                                                                     .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT,
+	                                                                     .messageType     = VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT,
+	                                                                     .pfnUserCallback = debug_utils_message_callback};
+	scb.add_struct(debug_utils_messenger_create_info);
+}
+
+VkDebugUtilsMessengerCreateInfoEXT const *ShaderDebugPrintf::get_debug_utils_messenger_create_info() const
+{
+	// Register a sample specific debug utils callback in addition to the one registered by the base class
+	static VkDebugUtilsMessengerCreateInfoEXT local_debug_utils_messenger_create_info{.sType           = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+	                                                                                  .pNext           = ApiVulkanSample::get_debug_utils_messenger_create_info(),
+	                                                                                  .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT,
+	                                                                                  .messageType     = VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT,
+	                                                                                  .pfnUserCallback = debug_utils_message_callback};
+	return &local_debug_utils_messenger_create_info;
+}
+
+void ShaderDebugPrintf::render(float delta_time)
+{
+	if (!prepared)
+	{
+		return;
+	}
+	draw();
+	if (camera.updated)
+	{
+		update_uniform_buffers();
+	}
+}
+
+void ShaderDebugPrintf::on_update_ui_overlay(vkb::Drawer &drawer)
+{
+	if (drawer.header("Settings"))
+	{
+		if (drawer.checkbox("skysphere", &display_skysphere))
+		{
+			rebuild_command_buffers();
+		}
+	}
+	if (drawer.header("Debug output"))
+	{
+		drawer.text(debug_output.c_str());
+	}
+
+	// Clear saved debug output, so we only get output for the last frame
+	debug_output.clear();
+}
+
+bool ShaderDebugPrintf::resize(const uint32_t width, const uint32_t height)
+{
+	ApiVulkanSample::resize(width, height);
+	update_uniform_buffers();
+	return true;
+}
+
+std::unique_ptr<vkb::Application> create_shader_debugprintf()
+{
+	return std::make_unique<ShaderDebugPrintf>();
+}

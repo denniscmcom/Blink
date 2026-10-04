@@ -31,7 +31,7 @@ struct Camera
 };
 
 /// Initializes the view matrix of `camera`.
-/// @warning The `camera` node should be in `scene_graph`.
+/// @warning The `camera` node should be in `scene_graph`, and `update_node_transforms` should have run this frame.
 Matrix4 init_view_matrix(Scene_Graph& scene_graph, const Camera& camera);
 /// Initializes the projection matrix of `camera`.
 Matrix4 init_projection_matrix(const Camera& camera, float aspect_ratio);

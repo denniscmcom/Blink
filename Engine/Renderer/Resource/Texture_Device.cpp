@@ -41,9 +41,9 @@ blk::transfer_texture(
 		return Result::INVALID_ARGUMENTS;
 	}
 
-	// Verify if texture size is the same as the texture staging buffer.
+	// Verify the texture fits in the texture staging buffer.
 
-	if (!BLK_VERIFY(sizeof(Color_RGBA<uint8_t>) * texture_host->pixels.count == arena.texture_buffer.size))
+	if (!BLK_VERIFY(texture_host->pixels.count <= arena.texture_buffer.size))
 	{
 		return Result::OUT_OF_MEMORY;
 	}
@@ -57,12 +57,8 @@ blk::transfer_texture(
 	}
 
 	// Copy texture data from host to device texture buffer.
-	if (const Result result = update_buffer(
-			arena.texture_buffer,
-			texture_host->pixels.buffer,
-			sizeof(Color_RGBA<uint8_t>) * texture_host->pixels.count,
-			0
-		);
+	if (const Result result =
+			update_buffer(arena.texture_buffer, texture_host->pixels.buffer, texture_host->pixels.count, 0);
 		result != Result::SUCCESS)
 	{
 		BLK_ERROR("Failed to update staging texture buffer\n");
@@ -121,4 +117,8 @@ blk::transfer_texture(
 void
 blk::unload_texture_from_device(const Context& context, Arena& arena, Texture_Device& texture)
 {
+	remove(arena.textures, texture.host_handle);
+	destroy_image(context, texture.image);
+
+	texture = {};
 }

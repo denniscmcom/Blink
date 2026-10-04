@@ -12,7 +12,6 @@
 #include "Engine/Platform/Event.hpp"
 #include "Engine/Platform/Log.hpp"
 #include "Engine/Platform/Result.hpp"
-#include "Engine/Platform/Types.hpp"
 #include "Engine/Platform/Window_Internal.hpp"
 
 #include <Windows.h>
@@ -133,11 +132,10 @@ blk::destroy_window()
 }
 
 blk::Result
-blk::get_window_client_rect(Rect<unsigned>& rect)
+blk::get_window_client_size(size_t& x, size_t& y)
 {
 	if (!BLK_VERIFY(window))
 	{
-		rect = {};
 		return Result::INVALID_ARGUMENTS;
 	}
 
@@ -148,13 +146,8 @@ blk::get_window_client_rect(Rect<unsigned>& rect)
 		return Result::OS_ERROR;
 	}
 
-	const auto width = static_cast<unsigned>(hwnd_rect.right - hwnd_rect.left);
-	const auto height = static_cast<unsigned>(hwnd_rect.bottom - hwnd_rect.top);
-
-	rect = Rect{
-		.x = width,
-		.y = height,
-	};
+	x = static_cast<size_t>(hwnd_rect.right - hwnd_rect.left);
+	y = static_cast<size_t>(hwnd_rect.bottom - hwnd_rect.top);
 
 	return Result::SUCCESS;
 }
@@ -250,6 +243,15 @@ MainWndProc(HWND hwnd, const UINT message, const WPARAM w_param, const LPARAM l_
 			{
 				event.type = blk::Event_Type::KEY_UP;
 				event.key = blk::Key::MOUSE_RIGHT;
+				blk::write_event(event);
+			}
+
+			if (mouse_input.usButtonFlags & RI_MOUSE_WHEEL)
+			{
+				// `usButtonData` holds the signed rotation, in multiples of `WHEEL_DELTA` per notch.
+				event.type = blk::Event_Type::MOUSE_WHEEL;
+				event.mouse_wheel_delta =
+					static_cast<float>(static_cast<SHORT>(mouse_input.usButtonData)) / static_cast<float>(WHEEL_DELTA);
 				blk::write_event(event);
 			}
 		}

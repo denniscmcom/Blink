@@ -10,24 +10,23 @@ target_sources(BlkEngine
 		TYPE HEADERS
 		BASE_DIRS ${CMAKE_SOURCE_DIR}
 		FILES
-			Material/Settings.hpp
-			World/Outliner.hpp
-			World/Stats.hpp
 			Camera.hpp
 			Console.hpp
 			Context.hpp
 			Menu.hpp
+			Scene_Graph.hpp
+			Settings.hpp
+			Stats.hpp
 			Status_Bar.hpp
 			Toolbar.hpp
 	PRIVATE
-		Material/Settings.cpp
-		World/Outliner.cpp
-		World/Stats.cpp
 		Camera.cpp
 		Console.cpp
-		Context.cpp
 		Editor.cpp
 		Menu.cpp
+		Scene_Graph.cpp
+		Settings.cpp
+		Stats.cpp
 		Status_Bar.cpp
 		Toolbar.cpp
 )

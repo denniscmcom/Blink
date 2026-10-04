@@ -1,0 +1,95 @@
+// Copyright 2019-2026 The Khronos Group Inc.
+//
+// SPDX-License-Identifier: CC-BY-4.0
+
+// Common Valid Usage
+// Common to KHR trace rays SBT commands/structures
+
+  * [[VUID-{refpage}-pRayGenShaderBindingTable-03681]]
+    {rayGenShaderBindingTableAddress} must: be a device address allocated to
+    the application from a buffer created with the
+    ename:VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR usage flag set
+  * [[VUID-{refpage}-pRayGenShaderBindingTable-03682]]
+    {rayGenShaderBindingTableAddress} must: be a multiple of
+    sname:VkPhysicalDeviceRayTracingPipelinePropertiesKHR::pname:shaderGroupBaseAlignment
+  * [[VUID-{refpage}-pMissShaderBindingTable-03684]]
+    {missShaderBindingTableAddress} must: be a device address allocated to
+    the application from a buffer created with the
+    ename:VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR usage flag set
+  * [[VUID-{refpage}-pMissShaderBindingTable-03685]]
+    {missShaderBindingTableAddress} must: be a multiple of
+    sname:VkPhysicalDeviceRayTracingPipelinePropertiesKHR::pname:shaderGroupBaseAlignment
+  * [[VUID-{refpage}-stride-03686]]
+    {missShaderBindingTableStride} must: be a multiple of
+    sname:VkPhysicalDeviceRayTracingPipelinePropertiesKHR::pname:shaderGroupHandleAlignment
+  * [[VUID-{refpage}-stride-04029]]
+    {missShaderBindingTableStride} must: be less than or equal to
+    sname:VkPhysicalDeviceRayTracingPipelinePropertiesKHR::pname:maxShaderGroupStride
+  * [[VUID-{refpage}-pHitShaderBindingTable-03688]]
+    {hitShaderBindingTableAddress} must: be a device address allocated to
+    the application from a buffer created with the
+    ename:VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR usage flag set
+  * [[VUID-{refpage}-pHitShaderBindingTable-03689]]
+    {hitShaderBindingTableAddress} must: be a multiple of
+    sname:VkPhysicalDeviceRayTracingPipelinePropertiesKHR::pname:shaderGroupBaseAlignment
+  * [[VUID-{refpage}-stride-03690]]
+    {hitShaderBindingTableStride} must: be a multiple of
+    sname:VkPhysicalDeviceRayTracingPipelinePropertiesKHR::pname:shaderGroupHandleAlignment
+  * [[VUID-{refpage}-stride-04035]]
+    {hitShaderBindingTableStride} must: be less than or equal to
+    sname:VkPhysicalDeviceRayTracingPipelinePropertiesKHR::pname:maxShaderGroupStride
+  * [[VUID-{refpage}-pCallableShaderBindingTable-03692]]
+    {callableShaderBindingTableAddress} must: be a device address allocated
+    to the application from a buffer created with the
+    ename:VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR usage flag set
+  * [[VUID-{refpage}-pCallableShaderBindingTable-03693]]
+    {callableShaderBindingTableAddress} must: be a multiple of
+    sname:VkPhysicalDeviceRayTracingPipelinePropertiesKHR::pname:shaderGroupBaseAlignment
+  * [[VUID-{refpage}-stride-03694]]
+    {callableShaderBindingTableStride} must: be a multiple of
+    sname:VkPhysicalDeviceRayTracingPipelinePropertiesKHR::pname:shaderGroupHandleAlignment
+  * [[VUID-{refpage}-stride-04041]]
+    {callableShaderBindingTableStride} must: be less than or equal to
+    sname:VkPhysicalDeviceRayTracingPipelinePropertiesKHR::pname:maxShaderGroupStride
+  * [[VUID-{refpage}-flags-03511]]
+    If the bound ray tracing pipeline was created with pname:flags that
+    included
+    ename:VK_PIPELINE_CREATE_RAY_TRACING_NO_NULL_MISS_SHADERS_BIT_KHR, the
+    entries in the table identified by {missShaderBindingTableAddress}
+    accessed as a result of this command in order to execute a miss shader
+    must: not be zero
+  * [[VUID-{refpage}-flags-03512]]
+    If the bound ray tracing pipeline was created with pname:flags that
+    included
+    ename:VK_PIPELINE_CREATE_RAY_TRACING_NO_NULL_ANY_HIT_SHADERS_BIT_KHR,
+    entries in the table identified by {hitShaderBindingTableAddress}
+    accessed as a result of this command in order to execute an any-hit
+    shader must: not be zero
+  * [[VUID-{refpage}-flags-03513]]
+    If the bound ray tracing pipeline was created with pname:flags that
+    included
+    ename:VK_PIPELINE_CREATE_RAY_TRACING_NO_NULL_CLOSEST_HIT_SHADERS_BIT_KHR,
+    entries in the table identified by {hitShaderBindingTableAddress}
+    accessed as a result of this command in order to execute a closest hit
+    shader must: not be zero
+  * [[VUID-{refpage}-flags-03514]]
+    If the bound ray tracing pipeline was created with pname:flags that
+    included
+    ename:VK_PIPELINE_CREATE_RAY_TRACING_NO_NULL_INTERSECTION_SHADERS_BIT_KHR,
+    entries in the table identified by {hitShaderBindingTableAddress}
+    accessed as a result of this command in order to execute an intersection
+    shader must: not be zero
+  * [[VUID-{refpage}-pHitShaderBindingTable-04735]]
+    Any non-zero hit shader group entries in the table identified by
+    {hitShaderBindingTableAddress} accessed by this call from a geometry
+    with a pname:geometryType of ename:VK_GEOMETRY_TYPE_TRIANGLES_KHR must:
+    have been created with
+    ename:VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR
+  * [[VUID-{refpage}-pHitShaderBindingTable-04736]]
+    Any non-zero hit shader group entries in the table identified by
+    {hitShaderBindingTableAddress} accessed by this call from a geometry
+    with a pname:geometryType of ename:VK_GEOMETRY_TYPE_AABBS_KHR must: have
+    been created with
+    ename:VK_RAY_TRACING_SHADER_GROUP_TYPE_PROCEDURAL_HIT_GROUP_KHR
+
+// Common Valid Usage

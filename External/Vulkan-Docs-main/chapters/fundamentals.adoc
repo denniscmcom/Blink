@@ -1,0 +1,2122 @@
+// Copyright 2015-2026 The Khronos Group Inc.
+// SPDX-License-Identifier: CC-BY-4.0
+
+[[fundamentals]]
+= Fundamentals
+
+This chapter introduces fundamental concepts including the Vulkan
+architecture and execution model, API syntax, queues, pipeline
+configurations, numeric representation, state and state queries, and the
+different types of objects and shaders.
+It provides a framework for interpreting more specific descriptions of
+commands and behavior in the remainder of the Specification.
+
+
+[[fundamentals-host-environment]]
+== Host and Device Environment
+
+The Vulkan Specification assumes and requires: the following properties of
+the host environment with respect to Vulkan implementations:
+
+  * The host must: have runtime support for 8-, 16-, 32-, and 64-bit signed
+    and unsigned twos-complement integers, all addressable at the
+    granularity of their size in bytes.
+  * The host must: have runtime support for 32- and 64-bit floating-point
+    types satisfying the range and precision constraints in the
+    <<fundamentals-floating-point, Floating-Point Computation>> section.
+  * The representation and endianness of these types on the host must: match
+    the representation and endianness of the same types on every physical
+    device supported.
+
+[NOTE]
+====
+Since a variety of data types and structures in Vulkan may: be accessible by
+both host and physical device operations, the implementation should: be able
+to access such data efficiently in both paths in order to facilitate writing
+portable and performant applications.
+====
+
+
+[[fundamentals-execmodel]]
+== Execution Model
+
+This section outlines the execution model of a Vulkan system.
+
+Vulkan exposes one or more _devices_, each of which exposes one or more
+_queues_ which may: process work asynchronously to one another.
+The set of queues supported by a device is partitioned into _families_.
+Each family supports one or more types of functionality and may: contain
+multiple queues with similar characteristics.
+Queues within a single family are considered _compatible_ with one another,
+and work produced for a family of queues can: be executed on any queue
+within that family.
+This specification defines the following types of functionality that queues
+may: support: graphics, compute,
+ifdef::VK_KHR_video_decode_queue[]
+video decode,
+endif::VK_KHR_video_decode_queue[]
+ifdef::VK_KHR_video_encode_queue[]
+video encode,
+endif::VK_KHR_video_encode_queue[]
+ifdef::VK_BASE_VERSION_1_1[protected memory management,]
+ifndef::VKSC_VERSION_1_0[sparse memory management,]
+and transfer.
+
+[NOTE]
+====
+A single device may: report multiple similar queue families rather than, or
+as well as, reporting multiple members of one or more of those families.
+This indicates that while members of those families have similar
+capabilities, they are _not_ directly compatible with one another.
+====
+
+Device memory is explicitly managed by the application.
+Each device may: advertise one or more heaps, representing different areas
+of memory.
+Memory heaps are either device-local or host-local, but are always visible
+to the device.
+Further detail about memory heaps is exposed via memory types available on
+that heap.
+Examples of memory areas that may: be available on an implementation
+include:
+
+  * _device-local_ is memory that is physically connected to the device.
+  * _device-local, host visible_ is device-local memory that is visible to
+    the host.
+  * _host-local, host visible_ is memory that is local to the host and
+    visible to the device and host.
+
+On other architectures, there may: only be a single heap that can: be used
+for any purpose.
+
+
+[[fundamentals-queueoperation]]
+=== Queue Operation
+
+Each device supports a number of <<devsandqueues-queues,queues>>, which
+provide an interface for <<devsandqueues-submission, submitting work>> for
+execution on the device.
+
+<<devsandqueues-submission,_Queue submission commands_>> are used to submit
+work, along with a set of <<synchronization, synchronization primitives>>
+used to constrain the order of submitted operations.
+Queues are intended for asynchronous execution of submitted workloads, and
+queue submission commands should: return as soon as the work has been
+submitted, without waiting for the work to complete.
+Once submitted to a queue, work will begin and complete execution without
+further application intervention.
+
+There are no implicit ordering constraints between queue operations on
+different queues, or between queues and the host, so these may: operate in
+any order with respect to each other.
+Explicit ordering constraints between different queues or with the host can:
+be expressed with <<synchronization-semaphores,semaphores>> and
+<<synchronization-fences,fences>>.
+
+Many commands for queues are recorded into <<commandbuffers,_command
+buffers_>> first, before the command buffers are then submitted to a queue
+for execution.
+Command buffer submissions to a single queue respect
+<<synchronization-submission-order, submission order>> and other
+<<synchronization-implicit, implicit ordering guarantees>>, but otherwise
+may: overlap or execute out of order.
+Other types of batches and queue submissions against a single queue
+ifndef::VKSC_VERSION_1_0[(e.g. <<sparsemem-memory-binding, sparse memory binding>>)]
+have no implicit ordering constraints with any other queue submission or
+batch.
+Additional explicit ordering constraints between queue submissions and
+individual batches can be expressed with
+<<synchronization-semaphores,semaphores>> and
+<<synchronization-fences,fences>>.
+
+Before a fence or semaphore is signaled, it is guaranteed that any
+previously submitted queue operations have completed execution, and that
+memory writes from those queue operations are
+<<synchronization-dependencies-available-and-visible,available>> to future
+queue operations.
+Waiting on a signaled semaphore or fence guarantees that previous writes
+that are available are also
+<<synchronization-dependencies-available-and-visible,visible>> to subsequent
+commands.
+
+Command buffer boundaries, both between primary command buffers of the same
+or different batches or submissions as well as between primary and secondary
+command buffers, do not introduce any additional ordering constraints.
+In other words, submitting the set of command buffers (which can: include
+executing secondary command buffers) between any semaphore or fence
+operations execute the recorded commands as if they had all been recorded
+into a single primary command buffer, except that the current state is
+<<commandbuffers-statereset,reset>> on each boundary.
+Explicit ordering constraints can: be expressed with <<synchronization,
+explicit synchronization primitives>>.
+
+There are a few <<synchronization-implicit, implicit ordering guarantees>>
+between commands within a command buffer, but only covering a subset of
+execution.
+Additional explicit ordering constraints can be expressed with the various
+<<synchronization, explicit synchronization primitives>>.
+
+[NOTE]
+====
+Implementations have significant freedom to overlap execution of work
+submitted to a queue, and this is common due to deep pipelining and
+parallelism in Vulkan devices.
+====
+
+[[fundamentals-queueoperation-command-types]]
+Commands recorded in command buffers can perform actions, set state that
+persists across commands, synchronize other commands, or indirectly launch
+other commands, with some commands fulfilling several of these roles.
+The "`Command Properties`" section for each such command lists which of
+these roles the command takes:
+
+Action::
+    _Action commands_ perform operations that can update values in memory.
+    E.g. <<drawing,draw commands>>, <<dispatch,dispatch commands>>.
+
+State::
+    _State setting commands_ update the current state of a command buffer,
+    affecting the operation of future action commands.
+
+Synchronization::
+    _Synchronization commands_ impose ordering constraints on action
+    commands, by introducing explicit
+    <<synchronization-dependencies,execution and memory dependencies>>.
+
+Indirection::
+    _Indirection commands_ execute other commands which were not directly
+    recorded in the same command buffer.
+
+[NOTE]
+====
+In the absence of explicit synchronization or <<synchronization-implicit,
+implicit ordering guarantees>>, action commands may overlap execution or
+execute out of order, potentially leading to data races.
+However, such reordering does not affect the current state observed by any
+action command.
+Each action command uses the state in effect at the point where the command
+occurs in the command buffer, regardless of when it is executed.
+====
+
+
+[[fundamentals-objectmodel-overview]]
+== Object Model
+
+The devices, queues, and other entities in Vulkan are represented by Vulkan
+objects.
+At the API level, all objects are referred to by handles.
+There are two classes of handles: dispatchable and non-dispatchable.
+_Dispatchable_ handle types are a pointer to an opaque type.
+This pointer may: be used by layers as part of intercepting API commands,
+and thus each API command takes a dispatchable type as its first parameter.
+Each object of a dispatchable type must: have a unique handle value during
+its lifetime.
+
+_Non-dispatchable_ handle types are a 64-bit integer type whose meaning is
+implementation-dependent.
+ifdef::VK_BASE_VERSION_1_3,VK_EXT_private_data[]
+If the <<features-privateData, pname:privateData>> feature is enabled for a
+slink:VkDevice, each object of a non-dispatchable type created on that
+device must: have a handle value that is unique among objects created on
+that device, for the duration of the object's lifetime.
+Otherwise, non-dispatchable
+endif::VK_BASE_VERSION_1_3,VK_EXT_private_data[]
+ifndef::VK_BASE_VERSION_1_3,VK_EXT_private_data[Non-dispatchable]
+handles may: encode object information directly in the handle rather than
+acting as a reference to an underlying object, and thus may: not have unique
+handle values.
+If handle values are not unique, then destroying one such handle must: not
+cause identical handles of other types to become invalid, and must: not
+cause identical handles of the same type to become invalid if that handle
+value has been created more times than it has been destroyed.
+
+All objects created or allocated from a sname:VkDevice (i.e. with a
+sname:VkDevice as the first parameter) are private to that device, and must:
+not be used on other devices.
+
+
+[[fundamentals-objectmodel-lifetime]]
+=== Object Lifetime
+
+Objects are created or allocated by ftext:vkCreate* and ftext:vkAllocate*
+commands, respectively.
+Once an object is created or allocated, its "`structure`" is considered to
+be immutable, though the content of certain object types is still free to
+change.
+When an object is passed to another command, it may: be accessed by the
+implementation, which may: include both read and write access unless
+explicitly stated otherwise.
+Objects are destroyed or freed by ftext:vkDestroy* and ftext:vkFree*
+commands, respectively.
+
+Objects that are allocated (rather than created) take resources from an
+existing pool object or memory heap, and when freed return resources to that
+pool or heap.
+While object creation and destruction are generally expected to be
+low-frequency occurrences during runtime, allocating and freeing objects
+can: occur at high frequency.
+Pool objects help accommodate improved performance of the allocations and
+frees.
+
+ifdef::VKSC_VERSION_1_0[]
+In Vulkan SC, data structures for objects are reserved by the implementation
+at device creation time in order to enable implementations to rely solely on
+static memory management at runtime.
+The slink:VkDeviceObjectReservationCreateInfo structure provides upper
+bounds on the simultaneous number of objects of each type that can: be
+allocated during the lifetime of the slink:VkDevice.
+Most objects can be created and destroyed as needed, provided that no more
+than the requested number are in existence at any point in time.
+endif::VKSC_VERSION_1_0[]
+
+[[fundamentals-objectmodel-lifetime-acquire]]
+Applications are responsible for managing the lifetimes of Vulkan objects
+and memory passed into the Vulkan API.
+The access semantics of different functions in the API follow a typical
+pattern as laid out below, with any exceptions listed with the commands or
+objects that have them.
+
+Application-owned memory and Vulkan objects may: be accessed at any time
+during the execution of a command they are passed to.
+ifdef::VK_BASE_VERSION_1_2,VK_KHR_buffer_device_address[]
+Vulkan objects that device addresses are retrieved from may: be accessed by
+the implementation any time that memory backing the device address is
+accessed.
+Device addresses and
+endif::VK_BASE_VERSION_1_2,VK_KHR_buffer_device_address[]
+Vulkan objects passed in during the creation or allocation of another object
+may: be accessed by the implementation any time that the created/allocated
+object is accessed unless explicitly stated otherwise.
+ifdef::VK_BASE_VERSION_1_2,VK_KHR_buffer_device_address[]
+Device addresses and
+endif::VK_BASE_VERSION_1_2,VK_KHR_buffer_device_address[]
+Vulkan objects passed to a recording command (ftext:vkCmd*) may: be accessed
+at any time during the execution of the command, when the command buffer is
+subsequently recorded into another command buffer, during any subsequent
+command that is recorded to either the command buffer or one it is recorded
+into, or while the command buffer is in the <<commandbuffers-lifecycle,
+_pending state_>>, unless explicitly stated otherwise.
+ifdef::VK_KHR_deferred_host_operations[]
+If an application is using <<deferred-host-operations, deferred host
+operations>> in a command, and that operation is successfully deferred,
+objects and memory passed to that command may: be accessed at any time until
+the deferred operation is complete.
+endif::VK_KHR_deferred_host_operations[]
+Some additional operations hold references to other objects or
+application-owned memory beyond the duration of the command; in which case
+the access semantics and lifetime of those references are described by that
+command.
+
+When destroying or freeing an object, implementations must: not access any
+memory or other objects that may: otherwise be accessed when the object is
+accessed.
+Applications can: free or destroy objects in any order, except that parent
+objects must: be freed only after all child objects are freed.
+An object is the parent of another child object if the parent was used as
+the first object parameter in the creation of the child.
+Once an object is freed or destroyed it must: not be accessed again, either
+directly or via access through another object.
+Applications must: not free or destroy any object while it is being
+accessed.
+
+
+ifdef::VK_BASE_VERSION_1_1,VK_KHR_external_memory_capabilities,VK_KHR_external_semaphore_capabilities,VK_KHR_external_fence_capabilities[]
+[[fundamentals-objectmodel-external]]
+=== External Object Handles
+
+As defined above, the scope of object handles created or allocated from a
+sname:VkDevice is limited to that logical device.
+Objects which are not in scope are said to be external.
+To bring an external object into scope, an external handle must: be exported
+from the object in the source scope and imported into the destination scope.
+
+[NOTE]
+====
+The scope of external handles and their associated resources may: vary
+according to their type, but they can: generally be shared across process
+and API boundaries.
+====
+endif::VK_BASE_VERSION_1_1,VK_KHR_external_memory_capabilities,VK_KHR_external_semaphore_capabilities,VK_KHR_external_fence_capabilities[]
+
+
+[[fundamentals-abi]]
+== Application Binary Interface
+
+The mechanism by which Vulkan is made available to applications is platform-
+or implementation- defined.
+On many platforms the C interface described in this Specification is
+provided by a shared library.
+Since shared libraries can be changed independently of the applications that
+use them, they present particular compatibility challenges, and this
+Specification places some requirements on them.
+
+Shared library implementations must: use the default Application Binary
+Interface (ABI) of the standard C compiler for the platform, or provide
+customized API headers that cause application code to use the
+implementation's non-default ABI.
+An ABI in this context means the size, alignment, and layout of C data
+types; the procedure calling convention; and the naming convention for
+shared library symbols corresponding to C functions.
+Customizing the calling convention for a platform is usually accomplished by
+defining <<boilerplate-platform-specific-calling-conventions,calling
+convention macros>> appropriately in `vk_platform.h`.
+
+On platforms where Vulkan is provided as a shared library, library symbols
+beginning with "`vk`" and followed by a digit or uppercase letter are
+reserved for use by the implementation.
+Applications which use Vulkan must: not provide definitions of these
+symbols.
+This allows the Vulkan shared library to be updated with additional symbols
+for new API versions or extensions without causing symbol conflicts with
+existing applications.
+
+Shared library implementations should: provide library symbols for commands
+in the highest version of this Specification they support, and for
+ifdef::VK_KHR_surface[]
+<<wsi,Window System Integration>>
+endif::VK_KHR_surface[]
+ifndef::VK_KHR_surface[]
+Window System Integration
+endif::VK_KHR_surface[]
+extensions relevant to the platform.
+They may: also provide library symbols for commands defined by additional
+extensions.
+
+[NOTE]
+====
+These requirements and recommendations are intended to allow implementors to
+take advantage of platform-specific conventions for SDKs, ABIs, library
+versioning mechanisms, etc.
+while still minimizing the code changes necessary to port applications or
+libraries between platforms.
+Platform vendors, or providers of the _de facto_ standard Vulkan shared
+library for a platform, are encouraged to document what symbols the shared
+library provides and how it will be versioned when new symbols are added.
+
+Applications should: only rely on shared library symbols for commands in the
+minimum core version required by the application.
+flink:vkGetInstanceProcAddr and flink:vkGetDeviceProcAddr should: be used to
+obtain function pointers for commands in core versions beyond the
+application's minimum required version.
+====
+
+
+[[fundamentals-commandsyntax]]
+== Command Syntax and Duration
+
+The Specification describes Vulkan commands as functions or procedures using
+C99 syntax.
+Language bindings for other languages such as C++ and JavaScript may: allow
+for stricter parameter passing, or object-oriented interfaces.
+
+Vulkan uses the standard C types for the base type of scalar parameters
+(e.g. types from `<stdint.h>`), with exceptions described below, or
+elsewhere in the text when appropriate:
+
+[open,refpage='VkBool32',desc='Vulkan boolean type',type='basetypes',xrefs='VK_TRUE VK_FALSE']
+--
+basetype:VkBool32 represents boolean `True` and `False` values, since C does
+not have a sufficiently portable built-in boolean type:
+
+include::{generated}/api/basetypes/VkBool32.adoc[]
+
+ename:VK_TRUE represents a boolean *True* (unsigned integer 1) value, and
+ename:VK_FALSE a boolean *False* (unsigned integer 0) value.
+
+All values returned from a Vulkan implementation in a basetype:VkBool32 will
+be either ename:VK_TRUE or ename:VK_FALSE.
+
+Applications must: not pass any other values than ename:VK_TRUE or
+ename:VK_FALSE into a Vulkan implementation where a basetype:VkBool32 is
+expected.
+--
+
+[open,refpage='VK_TRUE',desc='Boolean true value',type='consts',xrefs='VkBool32 VK_FALSE']
+--
+ename:VK_TRUE is a constant representing a basetype:VkBool32 *True* value.
+
+include::{generated}/api/enums/VK_TRUE.adoc[]
+--
+
+[open,refpage='VK_FALSE',desc='Boolean false value',type='consts',xrefs='VkBool32 VK_TRUE']
+--
+ename:VK_FALSE is a constant representing a basetype:VkBool32 *False* value.
+
+include::{generated}/api/enums/VK_FALSE.adoc[]
+--
+
+
+[open,refpage='VkDeviceSize',desc='Vulkan device memory size and offsets',type='basetypes']
+--
+basetype:VkDeviceSize represents device memory size and offset values:
+
+include::{generated}/api/basetypes/VkDeviceSize.adoc[]
+--
+
+ifdef::VK_BASE_VERSION_1_0,VK_EXT_buffer_device_address,VK_KHR_buffer_device_address[]
+[open,refpage='VkDeviceAddress',desc='Vulkan device address type',type='basetypes']
+--
+:refpage: VkDeviceAddress
+
+basetype:VkDeviceAddress represents device buffer address values:
+
+include::{generated}/api/basetypes/VkDeviceAddress.adoc[]
+
+ifdef::VK_BASE_VERSION_1_2,VK_EXT_buffer_device_address,VK_KHR_buffer_device_address[]
+.Valid Usage
+****
+  * [[VUID-VkDeviceAddress-size-11364]]
+    A valid basetype:VkDeviceAddress must: be equal to the sum of an address
+    retrieved from a slink:VkBuffer via flink:vkGetBufferDeviceAddress, and
+    any offset in the range [eq]#[0, pname:size)#, where pname:size is the
+    value of slink:VkBufferCreateInfo::pname:size used to create that
+    slink:VkBuffer
+  * [[VUID-{refpage}-None-10894]]
+    If a basetype:VkDeviceAddress was retrieved from a non-sparse buffer,
+    that buffer must: be bound completely and contiguously to a single
+    sname:VkDeviceMemory object
+****
+endif::VK_BASE_VERSION_1_2,VK_EXT_buffer_device_address,VK_KHR_buffer_device_address[]
+
+--
+endif::VK_BASE_VERSION_1_0,VK_EXT_buffer_device_address,VK_KHR_buffer_device_address[]
+
+Commands that create Vulkan objects are of the form ftext:vkCreate* and take
+stext:Vk*CreateInfo structures with the parameters needed to create the
+object.
+These Vulkan objects are destroyed with commands of the form
+ftext:vkDestroy*.
+
+The last in-parameter to each command that creates or destroys a Vulkan
+object is pname:pAllocator.
+ifndef::VKSC_VERSION_1_0[]
+The pname:pAllocator parameter can: be a non-`NULL` value, in which case
+allocations for the given object are delegated to an application provided
+callback.
+Refer to the <<memory-allocation,Memory Allocation>> chapter for further
+details.
+endif::VKSC_VERSION_1_0[]
+ifdef::VKSC_VERSION_1_0[]
+The pname:pAllocator parameter must: be `NULL`.
+Refer to the <<memory-allocation,Memory Allocation>> chapter for further
+details.
+endif::VKSC_VERSION_1_0[]
+
+Commands that allocate Vulkan objects owned by pool objects are of the form
+ftext:vkAllocate*, and take stext:Vk*AllocateInfo structures.
+These Vulkan objects are freed with commands of the form ftext:vkFree*.
+These objects do not take allocators; if host memory is needed, they will
+use the allocator that was specified when their parent pool was created.
+
+Commands are recorded into a command buffer by calling API commands of the
+form ftext:vkCmd*.
+Each such command may: have different restrictions on where it can: be used:
+in a primary and/or secondary command buffer, inside and/or outside a render
+pass, and in one or more of the supported queue types.
+These restrictions are documented together with the definition of each such
+command.
+
+The _duration_ of a Vulkan command refers to the interval between calling
+the command and its return to the caller.
+
+
+[[fundamentals-commandsyntax-results-lifetime]]
+=== Lifetime of Retrieved Results
+
+Information is retrieved from the implementation with commands of the form
+ftext:vkGet* and ftext:vkEnumerate*.
+
+Unless otherwise specified for an individual command, the results are
+_invariant_; that is, they will remain unchanged when retrieved again by
+calling the same command with the same parameters, so long as those
+parameters themselves all remain valid.
+
+
+[[fundamentals-commandsyntax-array-results]]
+=== Array Results
+
+Some query commands of the form ftext:vkGet* and ftext:vkEnumerate* enable
+retrieving multiple results in the form of a return array.
+Such commands typically have two pointer arguments as follows:
+
+  * An element count pointer pointing to an integer variable, conventionally
+    named as ftext:p*Count where ftext:* is the capitalized singular form of
+    the name of the retrieved values.
+  * A pointer to an array where the result array is retrieved,
+    conventionally named as ftext:p* where ftext:* is the capitalized plural
+    form of the name of the retrieved values.
+
+If such commands are called with the array pointer set to `NULL`, then the
+number of retrievable elements is returned in the variable pointed to by the
+element count pointer.
+Otherwise, the element count pointer must: point to a variable set by the
+application to the number of elements in the return array, and on return the
+variable is overwritten with the number of elements actually written to the
+return array.
+If the input element count is less than the number of retrievable array
+elements, the query will write only as many elements to the return array as
+specified by the element count variable set by the application, and the
+command will return ename:VK_INCOMPLETE instead of ename:VK_SUCCESS, to
+indicate that not all retrievable array elements were returned.
+
+[NOTE]
+====
+In practice, this means that applications will typically call such query
+commands twice:
+
+  * First, with the array pointer set to `NULL`, to retrieve the number of
+    retrievable elements.
+  * Second, with the array pointer pointing to an application allocated
+    storage for at least as many elements as indicated by the variable
+    pointed to by the element count pointer, to retrieve at most as many of
+    the retrievable elements.
+====
+
+Query commands that return one or more structures, regardless of whether
+they return a single or an array of structures with or without a pname:pNext
+chain, may: also contain arrays within those structures.
+Such return arrays are typically defined in the form of two members as
+follows:
+
+  * An integer value specifying the element count, conventionally named as
+    ftext:*Count where ftext:* is the singular form of the name of the
+    retrieved values.
+  * A pointer to an array where the result array is retrieved,
+    conventionally named as ftext:p* where ftext:* is the capitalized plural
+    form of the name of the retrieved values.
+
+Analogously to query commands that return multiple results, if the command
+is called with the array pointer member of the output structure in question
+set to `NULL`, then the number of retrievable elements is returned in the
+element count member of that output structure.
+Otherwise, the element count must: specify the number of elements in the
+return array, and on return the element count member is overwritten with the
+number of elements actually written to the return array.
+If the input element count is less than the number of retrievable array
+elements, the query will write only as many elements to the return array as
+specified by the input element count, and the command will return
+ename:VK_INCOMPLETE instead of ename:VK_SUCCESS, if the query command has a
+elink:VkResult return type, to indicate that not all retrievable array
+elements were returned.
+
+[NOTE]
+====
+Applications need to separately track the value they provided as the input
+element count member for such arrays and compare those with the returned
+element counts in order to determine whether the actually returned element
+count is smaller than the size of the return array.
+Another side effect of this is that it is impossible for the application to
+determine if the number of retrievable elements has increased beyond the
+provided input element count so using return arrays in output structures
+should: be limited to _invariant_ array results.
+In practice, this means that applications will typically call such query
+commands multiple times:
+
+  * First, with the array pointer member(s) set to `NULL`, to retrieve the
+    number(s) of retrievable elements.
+  * Second, with the array pointer(s) pointing to an application allocated
+    storage for at least as many elements as indicated by the element count
+    member(s), to retrieve at most as many of the retrievable elements.
+  * Then the process may: need to be repeated for all other newly introduced
+    return arrays in any nested output structures indirectly specified
+    through the previously retrieved result arrays.
+====
+
+Regardless of the type of query command, any array pointer member of an
+output structure must: either be `NULL`, or point to an
+application-allocated array.
+Query commands must: not return a pointer to implementation allocated
+storage in any output structure.
+
+
+[[fundamentals-binaryresults]]
+=== Opaque Binary Data Results
+
+Some query commands of the form ftext:vkGet* retrieve opaque binary data in
+the form of a byte array and have a possible result code of
+ename:VK_ERROR_NOT_ENOUGH_SPACE_KHR.
+Such commands always have two pointer arguments as follows:
+
+  * A binary data size pointer pointing to a code:size_t variable,
+    conventionally named as ftext:p*Size where ftext:* is the capitalized
+    form of the name of the retrieved binary data.
+  * A pointer to a byte array where the binary data is retrieved,
+    conventionally named as ftext:p* where ftext:* is the capitalized form
+    of the name of the retrieved binary data.
+
+If such commands are called with the binary pointer not set to `NULL`, the
+binary size pointer must: point to a variable set by the application to the
+allocated size of the binary pointer.
+These arguments may: also be placed in an extensible structure, in which
+case the binary data size argument is not a pointer.
+
+If the input binary size is less than the total retrievable binary size, the
+query will not write any data to the location pointed to the binary pointer,
+and the command will return ename:VK_ERROR_NOT_ENOUGH_SPACE_KHR instead of
+ename:VK_SUCCESS.
+
+If the return code is ename:VK_SUCCESS or
+ename:VK_ERROR_NOT_ENOUGH_SPACE_KHR, the total size of the binary data that
+can: be retrieved is returned in the variable pointed to by the binary size
+pointer.
+
+If multiple binaries are being retrieved,
+ename:VK_ERROR_NOT_ENOUGH_SPACE_KHR will be returned if any input binary
+sizes are less than their respective total retrievable binary sizes.
+Unless otherwise specified, this command will determine writing data to each
+binary individually based on if their input binary sizes are sufficiently
+sized, following the behavior for single binary retrieval.
+
+For all other error codes, the contents of the return structures are
+undefined:.
+
+[NOTE]
+====
+If ename:VK_ERROR_NOT_ENOUGH_SPACE_KHR is returned with a command that
+returns multiple binaries, the application can: determine which binaries are
+undersized by comparing the total binary size that is returned for each
+binary against the allocated size that was provided to the command.
+====
+
+[NOTE]
+====
+Some binary queries do not behave consistently with this pattern for
+historical reasons, primarily that the ename:VK_ERROR_NOT_ENOUGH_SPACE_KHR
+error code was not defined until after those queries were written.
+
+A NOTE is added to each such query, describing such inconsistent behavior.
+====
+
+
+[[fundamentals-threadingbehavior]]
+== Threading Behavior
+
+Vulkan is intended to provide scalable performance when used on multiple
+host threads.
+All commands support being called concurrently from multiple threads, but
+certain parameters, or components of parameters are defined to be
+_externally synchronized_.
+This means that the caller must: guarantee that no more than one thread is
+using such a parameter at a given time.
+
+More precisely, Vulkan commands use simple stores to update the state of
+Vulkan objects.
+The implementation may: not synchronize accesses to memory parameters or
+object parameters declared as externally synchronized with other accesses.
+If two commands access the same object or memory and at least one of the
+commands declares the object to be externally synchronized, then the caller
+must: guarantee not only that the commands do not execute simultaneously,
+but also that the two commands are separated by an appropriate memory
+barrier (if needed).
+Similarly, if a Vulkan command accesses a non-const memory parameter and the
+application also accesses that memory, or if the application writes to that
+memory and the command accesses it as a const memory parameter, the
+application must: ensure the accesses are properly synchronized with a
+memory barrier if needed.
+
+[NOTE]
+====
+Memory barriers are particularly relevant for hosts based on the ARM CPU
+architecture, which is more weakly ordered than many developers are
+accustomed to from x86/x64 programming.
+Fortunately, most higher-level synchronization primitives (like the pthread
+library) perform memory barriers as a part of mutual exclusion, so mutexing
+Vulkan objects via these primitives will have the desired effect.
+====
+
+Any object parameters that are not labeled as externally synchronized are
+either not mutated by the command or are internally synchronized.
+Additionally, certain objects related to a command's parameters (e.g.
+command pools and descriptor pools) may: be affected by a command, and must:
+also be externally synchronized.
+These implicit parameters are documented as described below.
+
+Parameters of commands that are externally synchronized are listed below.
+
+include::{generated}/hostsynctable/parameters.adoc[]
+
+There are also a few instances where a command can: take in an
+application-allocated list whose contents are externally synchronized
+parameters.
+In these cases, the caller must: guarantee that at most one thread is using
+a given element within the list at a given time.
+These parameters are listed below.
+
+include::{generated}/hostsynctable/parameterlists.adoc[]
+
+In addition, there are some implicit parameters that need to be externally
+synchronized.
+For example, when a pname:commandBuffer parameter needs to be externally
+synchronized, it implies that the pname:commandPool from which that command
+buffer was allocated also needs to be externally synchronized.
+The implicit parameters and their associated object are listed below.
+
+include::{generated}/hostsynctable/implicit.adoc[]
+
+
+[[fundamentals-validusage]]
+== Valid Usage
+
+// preserving old id for permalinking
+[[fundamentals-errors]]
+Valid usage defines a set of conditions which must: be met in order to
+achieve well-defined runtime behavior in an application.
+These conditions depend only on Vulkan state, and the parameters or objects
+whose usage is constrained by the condition.
+
+The core layer assumes applications are using the API correctly.
+Except as documented elsewhere in the Specification, the behavior of the
+core layer to an application using the API incorrectly is undefined:, and
+may: include program termination.
+However, implementations must: ensure that incorrect usage by an application
+does not affect the integrity of the operating system, the Vulkan
+implementation, or other applications in the system using Vulkan.
+In particular, any guarantees made by an operating system about whether
+memory from one process can: be visible to another process or not must: not
+be violated by a Vulkan implementation for *any memory allocation*.
+Vulkan implementations are not required: to make additional security or
+integrity guarantees beyond those provided by the OS unless explicitly
+directed by the application's use of a particular feature or extension.
+
+[NOTE]
+====
+For instance, if an operating system guarantees that data in all its memory
+allocations are set to zero when newly allocated, the Vulkan implementation
+must: make the same guarantees for any allocations it controls (e.g.
+slink:VkDeviceMemory).
+
+Similarly, if an operating system guarantees that use-after-free of host
+allocations will not result in values written by another process becoming
+visible, the same guarantees must: be made by the Vulkan implementation for
+device memory.
+====
+
+ifdef::VK_BASE_VERSION_1_1[]
+If the <<features-protectedMemory, pname:protectedMemory>> feature is
+supported, the implementation provides additional guarantees when invalid
+usage occurs to prevent values in protected memory from being accessed or
+inferred outside of protected operations, as described in
+<<memory-protected-access-rules>>.
+endif::VK_BASE_VERSION_1_1[]
+
+Some valid usage conditions have dependencies on runtime limits or feature
+availability.
+It is possible to validate these conditions against Vulkan's minimum
+supported values for these limits and features, or some subset of other
+known values.
+
+Valid usage conditions do not cover conditions where well-defined behavior
+(including returning an error code) exists.
+
+Valid usage conditions should: apply to the command or structure where
+complete information about the condition would be known during execution of
+an application.
+This is such that a validation layer or linter can: be written directly
+against these statements at the point they are specified.
+
+[NOTE]
+====
+This does lead to some non-obvious places for valid usage statements.
+For instance, the valid values for a structure might depend on a separate
+value in the calling command.
+In this case, the structure itself will not reference this valid usage as it
+is impossible to determine validity from the structure that it is invalid -
+instead this valid usage would be attached to the calling command.
+
+Another example is draw state - the state setters are independent, and can
+cause a legitimately invalid state configuration between draw calls; so the
+valid usage statements are attached to the place where all state needs to be
+valid - at the drawing command.
+====
+
+Valid usage conditions are described in a block labeled "`Valid Usage`"
+following each command or structure they apply to.
+
+
+[[fundamentals-validation]]
+=== Usage Validation
+
+Vulkan is a layered API.
+The lowest layer is the core Vulkan layer, as defined by this Specification.
+The application can: use additional layers above the core for debugging,
+validation, and other purposes.
+
+One of the core principles of Vulkan is that building and submitting command
+buffers should: be highly efficient.
+Thus error checking and validation of state in the core layer is minimal,
+although more rigorous validation can: be enabled through the use of layers.
+
+Validation of correct API usage is left to validation layers.
+Applications should: be developed with validation layers enabled, to help
+catch and eliminate errors.
+ifndef::VKSC_VERSION_1_0[]
+Once validated, released applications should: not enable validation layers
+by default.
+endif::VKSC_VERSION_1_0[]
+
+
+[[fundamentals-implicit-validity]]
+=== Implicit Valid Usage
+
+Some valid usage conditions apply to all commands and structures in the API,
+unless explicitly denoted otherwise for a specific command or structure.
+These conditions are considered _implicit_, and are described in a block
+labeled "`Valid Usage (Implicit)`" following each command or structure they
+apply to.
+Implicit valid usage conditions are described in detail below.
+
+
+[[fundamentals-validusage-handles]]
+==== Valid Usage for Object Handles
+
+Any input parameter to a command that is an object handle must: be a valid
+object handle, unless otherwise specified.
+An object handle is valid if:
+
+  * It has been created or allocated by a previous, successful call to the
+    API.
+    Such calls are noted in the Specification.
+  * It has not been deleted or freed by a previous call to the API.
+    Such calls are noted in the Specification.
+  * Any objects used by that object, either as part of creation or
+    execution, must: also be valid.
+
+The reserved values dlink:VK_NULL_HANDLE and `NULL` can: be used in place of
+valid non-dispatchable handles and dispatchable handles, respectively, when
+_explicitly called out in the Specification_.
+Any command that creates an object successfully must: not return these
+values.
+It is valid to pass these values to ftext:vkDestroy* or ftext:vkFree*
+commands, which will silently ignore these values.
+
+
+[[fundamentals-validusage-pointers]]
+==== Valid Usage for Pointers
+
+Any parameter that is a pointer must: be a _valid pointer_ only if it is
+explicitly called out by a Valid Usage statement.
+
+A pointer is "`valid`" if it points at memory containing values of the
+number and type(s) expected by the command, and all fundamental types
+accessed through the pointer (e.g. as elements of an array or as members of
+a structure) satisfy the alignment requirements of the host processor.
+
+
+[[fundamentals-validusage-strings]]
+==== Valid Usage for Strings
+
+Any parameter that is a pointer to code:char must: be a finite sequence of
+values terminated by a null character, or if _explicitly called out in the
+Specification_, can: be `NULL`.
+
+Strings specified as UTF-8 encoded must: not contain invalid UTF-8
+sequences.
+See <<fundamentals-strings, String Representation>> for additional
+information about strings.
+
+
+[[fundamentals-validusage-enums]]
+==== Valid Usage for Enumerated Types
+
+Any parameter of an enumerated type must: be a valid enumerant for that
+type.
+Use of an enumerant is valid if the following conditions are true:
+
+  * The enumerant is defined as part of the enumerated type.
+  * The enumerant is not a value suffixed with etext:_MAX_ENUM.
+  ** This value exists only to ensure that C `enum` types are 32 bits in
+     size and must: not be used by applications.
+  * If the enumerant is used in a function that has a slink:VkInstance as
+    its first parameter and either:
+  ** it was added by a core version that is supported
+ifdef::VK_BASE_VERSION_1_1[]
+     (as reported by flink:vkEnumerateInstanceVersion)
+endif::VK_BASE_VERSION_1_1[]
+     and the value of slink:VkApplicationInfo::pname:apiVersion is greater
+     than or equal to the version that added it; or
+  ** it was added by an <<extensions, instance extension>> that was enabled
+     for the instance.
+  * If the enumerant is used in a function that has a slink:VkPhysicalDevice
+    object as its first parameter and either:
+  ** it was added by a core version that is supported by that device (as
+     reported by slink:VkPhysicalDeviceProperties::pname:apiVersion);
+  ** it was added by an <<extensions, instance extension>> that was enabled
+     for the instance; or
+  ** it was added by a <<extensions, device extension>> that is supported by
+     that device.
+  * If the enumerant is used in a function that has any other dispatchable
+    object as its first parameter and either:
+  ** it was added by a core version that is supported for the device (as
+     reported by slink:VkPhysicalDeviceProperties::pname:apiVersion); or
+  ** it was added by a <<extensions, device extension>> that was enabled for
+     the device.
+
+ifdef::VK_BASE_VERSION_1_4,VK_KHR_maintenance5[]
+Additionally, if the <<features-maintenance5,pname:maintenance5>> feature is
+supported, any integer value representable in the range valid for the
+defined type is valid when used in a function that has a
+slink:VkPhysicalDevice object as its first parameter.
+Physical device queries will either return results indicating lack of
+support, or ignore unsupported values when used as a bit flag in a
+etext:Vk*Flags* parameter.
+endif::VK_BASE_VERSION_1_4,VK_KHR_maintenance5[]
+
+Any enumerated type returned from a query command or otherwise output from
+Vulkan to the application must: not have a reserved value.
+Reserved values are values not defined by any extension for that enumerated
+type.
+
+[NOTE]
+====
+In some special cases, an enumerant is only meaningful if a feature defined
+by an extension is also enabled, as well as the extension itself.
+The global "`valid enumerant`" rule described here does not address such
+cases.
+====
+
+[NOTE]
+====
+This language is intended to accommodate cases such as "`hidden`" extensions
+known only to driver internals, or layers enabling extensions without
+knowledge of the application, without allowing return of values not defined
+by any extension.
+====
+
+[NOTE]
+====
+Application developers are encouraged to be careful when using `switch`
+statements with Vulkan API enums.
+This is because new extensions can add new values to existing enums.
+Using a `default:` statement within a `switch` may avoid future compilation
+issues.
+
+ifdef::VK_BASE_VERSION_1_2[]
+This is particularly true for enums such as elink:VkDriverId, which may have
+values added that do not belong to a corresponding new extension.
+endif::VK_BASE_VERSION_1_2[]
+====
+
+
+[[fundamentals-validusage-flags]]
+==== Valid Usage for Flags
+
+[open,refpage='VkFlags',desc='Vulkan bitmasks',type='basetypes',xrefs='VkColorComponentFlags VkFlags64']
+--
+A collection of flags is represented by a bitmask using the type
+basetype:VkFlags:
+
+include::{generated}/api/basetypes/VkFlags.adoc[]
+
+Bitmasks are passed to many commands and structures to compactly represent
+options, but basetype:VkFlags is not used directly in the API.
+Instead, a etext:Vk*Flags type which is an alias of basetype:VkFlags, and
+whose name matches the corresponding etext:Vk*FlagBits that are valid for
+that type, is used.
+
+Any etext:Vk*Flags member or parameter used in the API as an input must: be
+a valid combination of bit flags.
+A valid combination is either zero or the bitwise OR of valid bit flags.
+
+An individual bit flag is valid for a etext:Vk*Flags type if it would be a
+<<fundamentals-validusage-enums,valid enumerant>> when used with the
+equivalent etext:Vk*FlagBits type, where the bits type is obtained by taking
+the flag type and replacing the trailing etext:Flags with etext:FlagBits.
+For example, a flag value of type tlink:VkColorComponentFlags must: contain
+only bit flags defined by elink:VkColorComponentFlagBits.
+
+Any etext:Vk*Flags member or parameter returned from a query command or
+otherwise output from Vulkan to the application may: contain bit flags
+undefined: in its corresponding etext:Vk*FlagBits type.
+An application cannot: rely on the state of these unspecified bits.
+
+Only the low-order 31 bits (bit positions zero through 30) are available for
+use as flag bits.
+
+[NOTE]
+====
+This restriction is due to poorly defined behavior by C compilers given a C
+enumerant value of `0x80000000`.
+In some cases adding this enumerant value may increase the size of the
+underlying etext:Vk*FlagBits type, breaking the ABI.
+====
+--
+
+ifdef::VK_BASE_VERSION_1_3,VK_KHR_format_feature_flags2,VK_KHR_synchronization2[]
+[open,refpage='VkFlags64',desc='Vulkan 64-bit bitmasks',type='basetypes',xrefs='VkFlags']
+--
+A collection of 64-bit flags is represented by a bitmask using the type
+basetype:VkFlags64:
+
+include::{generated}/api/basetypes/VkFlags64.adoc[]
+
+When the 31 bits available in basetype:VkFlags are insufficient, the
+basetype:VkFlags64 type can be passed to commands and structures to
+represent up to 64 options.
+basetype:VkFlags64 is not used directly in the API.
+Instead, a etext:Vk*Flags2 type which is an alias of basetype:VkFlags64, and
+whose name matches the corresponding etext:Vk*FlagBits2 that are valid for
+that type, is used.
+
+Any etext:Vk*Flags2 member or parameter used in the API as an input must: be
+a valid combination of bit flags.
+A valid combination is either zero or the bitwise OR of valid bit flags.
+
+An individual bit flag is valid for a etext:Vk*Flags2 type if it would be a
+<<fundamentals-validusage-enums,valid enumerant>> when used with the
+equivalent etext:Vk*FlagBits2 type, where the bits type is obtained by
+taking the flag type and replacing the trailing etext:Flags2 with
+etext:FlagBits2.
+For example, a flag value of type tlink:VkAccessFlags2 must: contain only
+bit flags defined by elink:VkAccessFlagBits2.
+
+Any etext:Vk*Flags2 member or parameter returned from a query command or
+otherwise output from Vulkan to the application may: contain bit flags
+undefined: in its corresponding etext:Vk*FlagBits2 type.
+An application cannot: rely on the state of these unspecified bits.
+
+[NOTE]
+====
+Both the etext:Vk*FlagBits2 type, and the individual bits defined for that
+type, are defined as `uint64_t` integers in the C API.
+This is in contrast to the 32-bit types, where the etext:Vk*FlagBits type is
+defined as a C `enum` and the individual bits as enumerants belonging to
+that `enum`.
+As a result, there is less compile time type checking possible for the
+64-bit types.
+This is unavoidable since there is no sufficiently portable way to define a
+64-bit `enum` type in C99.
+====
+--
+endif::VK_BASE_VERSION_1_3,VK_KHR_format_feature_flags2,VK_KHR_synchronization2[]
+
+
+[[fundamentals-effective-flags]]
+===== Effective Flags
+
+When the effective value of a bitmask command parameter or structure member
+is determined by an extending structure providing a 64-bit version of the
+bitflags, that effective value is used in all specification language,
+including valid usage statements, referring to the original parameter.
+
+Examples of such extending structures include (this list is not complete):
+
+ifdef::VK_BASE_VERSION_1_4[* slink:VkBufferUsageFlags2CreateInfo]
+ifdef::VK_KHR_extended_flags[* slink:VkImageUsageFlags2CreateInfoKHR]
+
+[NOTE]
+====
+When a 64-bit version of a flags type is defined, the implementation must:
+always represent those flags internally as 64 bits, whether they are
+specified through the 32-bit or 64-bit APIs.
+====
+
+
+[[fundamentals-validusage-sType]]
+==== Valid Usage for Structure Types
+
+Any parameter that is a structure containing a pname:sType member must: have
+a value of ptext:sType which is a valid elink:VkStructureType value matching
+the type of the structure.
+
+
+[[fundamentals-validusage-pNext]]
+==== Valid Usage for Structure Pointer Chains
+
+Any parameter that is a structure containing a code:void* ptext:pNext member
+must: have a value of pname:pNext that is either `NULL`, or is a pointer to
+a valid _extending structure_, containing ptext:sType and ptext:pNext
+members as described in the <<vulkan-styleguide,Vulkan Documentation and
+Extensions>> document in the section "`Extending Structures`".
+The set of structures connected by ptext:pNext pointers is referred to as a
+_pname:pNext chain_.
+
+Each structure included in the pname:pNext chain must: be defined at runtime
+by either:
+
+  * a core version which is supported
+  * an extension which is enabled
+ifdef::VK_BASE_VERSION_1_1,VK_KHR_get_physical_device_properties2[]
+  * a supported device extension in the case of physical-device-level
+functionality added by the device extension
+endif::VK_BASE_VERSION_1_1,VK_KHR_get_physical_device_properties2[]
+
+Each type of extending structure must: not appear more than once in a
+ptext:pNext chain, including any
+<<extendingvulkan-compatibility-aliases,aliases>>.
+This general rule may be explicitly overridden for specific structures.
+
+Any component of the implementation (the loader, any enabled layers, and
+drivers) must: skip over, without processing (other than reading the
+pname:sType and pname:pNext members) any extending structures in the chain
+not defined by core versions or extensions supported by that component.
+
+As a convenience to implementations and layers needing to iterate through a
+structure pointer chain, the Vulkan API provides two _base structures_.
+These structures allow for some type safety, and can be used by Vulkan API
+functions that operate on generic inputs and outputs.
+
+[open,refpage='VkBaseInStructure',desc='Base structure for a read-only pointer chain',type='structs']
+--
+The sname:VkBaseInStructure structure is defined as:
+
+include::{generated}/api/structs/VkBaseInStructure.adoc[]
+
+  * pname:sType is the structure type of the structure being iterated
+    through.
+  * pname:pNext is `NULL` or a pointer to the next structure in a structure
+    chain.
+
+sname:VkBaseInStructure can be used to facilitate iterating through a
+read-only structure pointer chain.
+--
+
+[open,refpage='VkBaseOutStructure',desc='Base structure for a read-only pointer chain',type='structs']
+--
+The sname:VkBaseOutStructure structure is defined as:
+
+include::{generated}/api/structs/VkBaseOutStructure.adoc[]
+
+  * pname:sType is the structure type of the structure being iterated
+    through.
+  * pname:pNext is `NULL` or a pointer to the next structure in a structure
+    chain.
+
+sname:VkBaseOutStructure can be used to facilitate iterating through a
+structure pointer chain that returns data back to the application.
+--
+
+
+[[fundamentals-validusage-nested-structs]]
+==== Valid Usage for Nested Structures
+
+The above conditions also apply recursively to members of structures
+provided as input to a command, either as a direct argument to the command,
+or themselves a member of another structure.
+
+Specifics on valid usage of each command are covered in their individual
+sections.
+
+
+[[fundamentals-validusage-extensions]]
+==== Valid Usage for Extensions
+
+Instance-level functionality or behavior added by an <<extensions, instance
+extension>> to the API must: not be used unless that extension is supported
+by the instance as determined by
+flink:vkEnumerateInstanceExtensionProperties, and that extension is enabled
+in slink:VkInstanceCreateInfo.
+
+Physical-device-level functionality or behavior added by an <<extensions,
+instance extension>> to the API must: not be used unless that extension is
+supported by the instance as determined by
+flink:vkEnumerateInstanceExtensionProperties, and that extension is enabled
+in slink:VkInstanceCreateInfo.
+
+ifdef::VK_BASE_VERSION_1_1,VK_KHR_get_physical_device_properties2[]
+Physical-device-level functionality or behavior added by a <<extensions,
+device extension>> to the API must: not be used unless the conditions
+described in <<initialization-phys-dev-extensions, Extending Physical Device
+From Device Extensions>> are met.
+endif::VK_BASE_VERSION_1_1,VK_KHR_get_physical_device_properties2[]
+
+Device-level functionality added by a <<extensions, device extension>> that
+is dispatched from a slink:VkDevice, or from a child object of a
+slink:VkDevice must: not be used unless that extension is supported by the
+device as determined by flink:vkEnumerateDeviceExtensionProperties, and that
+extension is enabled in slink:VkDeviceCreateInfo.
+
+
+[[fundamentals-validusage-versions]]
+==== Valid Usage for Newer Core Versions
+
+ifdef::VK_BASE_VERSION_1_1[]
+
+Instance-level functionality or behavior added by a <<versions, new core
+version>> of the API must: not be used unless it is supported by the
+instance as determined by flink:vkEnumerateInstanceVersion and the specified
+version of slink:VkApplicationInfo::pname:apiVersion.
+
+endif::VK_BASE_VERSION_1_1[]
+
+Physical-device-level functionality or behavior added by a <<versions, new
+core version>> of the API must: not be used unless it is supported by the
+physical device as determined by
+slink:VkPhysicalDeviceProperties::pname:apiVersion and the specified version
+of slink:VkApplicationInfo::pname:apiVersion.
+
+Device-level functionality or behavior added by a <<versions, new core
+version>> of the API must: not be used unless it is supported by the device
+as determined by slink:VkPhysicalDeviceProperties::pname:apiVersion and the
+specified version of slink:VkApplicationInfo::pname:apiVersion.
+
+
+[[fundamentals-returncodes]]
+== `VkResult` Return Codes
+
+[open,refpage='VkResult',desc='Vulkan command return codes',type='enums']
+--
+While the core Vulkan API is not designed to capture incorrect usage, some
+circumstances still require return codes.
+Commands in Vulkan return their status via return codes that are in one of
+two categories:
+
+  * Successful completion codes are returned when a command needs to
+    communicate success or status information.
+    All successful completion codes are non-negative values.
+  * Runtime error codes are returned when a command needs to communicate a
+    failure that could only be detected at runtime.
+    All runtime error codes are negative values.
+
+All return codes in Vulkan are reported via elink:VkResult return values.
+The possible codes are:
+
+include::{generated}/api/enums/VkResult.adoc[]
+
+[[fundamentals-successcodes]]
+[float]
+=== Success Codes
+
+  * ename:VK_SUCCESS Command successfully completed
+  * ename:VK_NOT_READY A fence or query has not yet completed
+  * ename:VK_TIMEOUT A wait operation has not completed in the specified
+    time
+  * ename:VK_EVENT_SET An event is signaled
+  * ename:VK_EVENT_RESET An event is unsignaled
+  * ename:VK_INCOMPLETE A return array was too small for the result
+ifdef::VK_KHR_swapchain[]
+  * ename:VK_SUBOPTIMAL_KHR A swapchain no longer matches the surface
+    properties exactly, but can: still be used to present to the surface
+    successfully.
+endif::VK_KHR_swapchain[]
+ifdef::VK_KHR_deferred_host_operations[]
+  * ename:VK_THREAD_IDLE_KHR A deferred operation is not complete but there
+    is currently no work for this thread to do at the time of this call.
+  * ename:VK_THREAD_DONE_KHR A deferred operation is not complete but there
+    is no work remaining to assign to additional threads.
+  * ename:VK_OPERATION_DEFERRED_KHR A deferred operation was requested and
+    at least some of the work was deferred.
+  * ename:VK_OPERATION_NOT_DEFERRED_KHR A deferred operation was requested
+    and no operations were deferred.
+endif::VK_KHR_deferred_host_operations[]
+ifdef::VK_COMPUTE_VERSION_1_3,VK_EXT_pipeline_creation_cache_control[]
+  * ename:VK_PIPELINE_COMPILE_REQUIRED A requested pipeline creation would
+    have required compilation, but the application requested compilation to
+    not be performed.
+endif::VK_COMPUTE_VERSION_1_3,VK_EXT_pipeline_creation_cache_control[]
+ifdef::VK_KHR_pipeline_binary[]
+  * ename:VK_PIPELINE_BINARY_MISSING_KHR The application attempted to create
+    a pipeline binary by querying an internal cache, but the internal cache
+    entry did not exist.
+endif::VK_KHR_pipeline_binary[]
+ifdef::VK_EXT_shader_object[]
+  * ename:VK_INCOMPATIBLE_SHADER_BINARY_EXT The provided binary shader code
+    is not compatible with this device.
++
+[NOTE]
+====
+In the initial version of the `apiext:VK_EXT_shader_object` extension, this
+return code was named ename:VK_ERROR_INCOMPATIBLE_SHADER_BINARY_EXT and
+improperly described as an error code.
+The name has been changed, but the old name is retained as an alias for
+compatibility with old code.
+====
+endif::VK_EXT_shader_object[]
+
+[[fundamentals-errorcodes]]
+[float]
+=== Error Codes
+
+  * ename:VK_ERROR_OUT_OF_HOST_MEMORY A host memory allocation has failed.
+  * ename:VK_ERROR_OUT_OF_DEVICE_MEMORY A device memory allocation has
+    failed.
+  * ename:VK_ERROR_INITIALIZATION_FAILED Initialization of an object could
+    not be completed for implementation-specific reasons.
+  * ename:VK_ERROR_DEVICE_LOST The logical or physical device has been lost.
+    See <<devsandqueues-lost-device,Lost Device>>
+  * ename:VK_ERROR_MEMORY_MAP_FAILED Mapping of a memory object has failed.
+  * ename:VK_ERROR_LAYER_NOT_PRESENT A requested layer is not present or
+    could not be loaded.
+  * ename:VK_ERROR_EXTENSION_NOT_PRESENT A requested extension is not
+    supported.
+  * ename:VK_ERROR_FEATURE_NOT_PRESENT A requested feature is not supported.
+  * ename:VK_ERROR_INCOMPATIBLE_DRIVER The requested version of Vulkan is
+    not supported by the driver or is otherwise incompatible for
+    implementation-specific reasons.
+  * ename:VK_ERROR_TOO_MANY_OBJECTS Too many objects of the type have
+    already been created.
+  * ename:VK_ERROR_FORMAT_NOT_SUPPORTED A requested format is not supported
+    on this device.
+  * ename:VK_ERROR_FRAGMENTED_POOL A pool allocation has failed due to
+    fragmentation of the pool's memory.
+    This must: only be returned if no attempt to allocate host or device
+    memory was made to accommodate the new allocation.
+ifdef::VK_BASE_VERSION_1_1,VK_KHR_maintenance1[]
+    This should: be returned in preference to
+    ename:VK_ERROR_OUT_OF_POOL_MEMORY, but only if the implementation is
+    certain that the pool allocation failure was due to fragmentation.
+endif::VK_BASE_VERSION_1_1,VK_KHR_maintenance1[]
+ifdef::VK_KHR_surface[]
+  * ename:VK_ERROR_SURFACE_LOST_KHR A surface is no longer available.
+  * ename:VK_ERROR_NATIVE_WINDOW_IN_USE_KHR The requested window is already
+    in use by Vulkan or another API in a manner which prevents it from being
+    used again.
+endif::VK_KHR_surface[]
+ifdef::VK_KHR_swapchain[]
+  * ename:VK_ERROR_OUT_OF_DATE_KHR A surface has changed in such a way that
+    it is no longer compatible with the swapchain, and further presentation
+    requests using the swapchain will fail.
+    Applications must: query the new surface properties and recreate their
+    swapchain if they wish to continue presenting to the surface.
+endif::VK_KHR_swapchain[]
+ifdef::VK_KHR_display_swapchain[]
+  * ename:VK_ERROR_INCOMPATIBLE_DISPLAY_KHR The display used by a swapchain
+    does not use the same presentable image layout, or is incompatible in a
+    way that prevents sharing an image.
+endif::VK_KHR_display_swapchain[]
+ifdef::VK_NV_glsl_shader[]
+  * ename:VK_ERROR_INVALID_SHADER_NV One or more shaders failed to compile
+    or link.
+    More details are reported back to the application via
+    `apiext:VK_EXT_debug_report` if enabled.
+endif::VK_NV_glsl_shader[]
+ifdef::VK_BASE_VERSION_1_1,VK_KHR_maintenance1[]
+  * ename:VK_ERROR_OUT_OF_POOL_MEMORY A pool memory allocation has failed.
+    This must: only be returned if no attempt to allocate host or device
+    memory was made to accommodate the new allocation.
+    If the failure was definitely due to fragmentation of the pool,
+    ename:VK_ERROR_FRAGMENTED_POOL should: be returned instead.
+endif::VK_BASE_VERSION_1_1,VK_KHR_maintenance1[]
+ifdef::VK_BASE_VERSION_1_1,VK_KHR_external_memory,VK_KHR_external_semaphore,VK_KHR_external_fence[]
+  * ename:VK_ERROR_INVALID_EXTERNAL_HANDLE An external handle is not a valid
+    handle of the specified type.
+endif::VK_BASE_VERSION_1_1,VK_KHR_external_memory,VK_KHR_external_semaphore,VK_KHR_external_fence[]
+ifdef::VK_COMPUTE_VERSION_1_2,VK_EXT_descriptor_indexing[]
+  * ename:VK_ERROR_FRAGMENTATION A descriptor pool creation has failed due
+    to fragmentation.
+endif::VK_COMPUTE_VERSION_1_2,VK_EXT_descriptor_indexing[]
+ifdef::VK_EXT_buffer_device_address[]
+  * ename:VK_ERROR_INVALID_DEVICE_ADDRESS_EXT A buffer creation failed
+    because the requested address is not available.
+endif::VK_EXT_buffer_device_address[]
+ifdef::VK_BASE_VERSION_1_2,VK_EXT_buffer_device_address,VK_KHR_buffer_device_address[]
+  * ename:VK_ERROR_INVALID_OPAQUE_CAPTURE_ADDRESS A buffer creation
+ifdef::VK_BASE_VERSION_1_2,VK_KHR_buffer_device_address[]
+    or memory allocation
+endif::VK_BASE_VERSION_1_2,VK_KHR_buffer_device_address[]
+    failed because the requested address is not available.
+ifdef::VK_KHR_ray_tracing_pipeline[]
+    A shader group handle assignment failed because the requested shader
+    group handle information is no longer valid.
+endif::VK_KHR_ray_tracing_pipeline[]
+endif::VK_BASE_VERSION_1_2,VK_EXT_buffer_device_address,VK_KHR_buffer_device_address[]
+ifdef::VK_EXT_full_screen_exclusive[]
+  * ename:VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT An operation on a
+    swapchain created with
+    ename:VK_FULL_SCREEN_EXCLUSIVE_APPLICATION_CONTROLLED_EXT failed as it
+    did not have exclusive full-screen access.
+    This may: occur due to implementation-dependent reasons, outside of the
+    application's control.
+endif::VK_EXT_full_screen_exclusive[]
+ifdef::VK_EXT_present_timing[]
+  * ename:VK_ERROR_PRESENT_TIMING_QUEUE_FULL_EXT A present operation on a
+    swapchain created with ename:VK_SWAPCHAIN_CREATE_PRESENT_TIMING_BIT_EXT
+    failed due to insufficient space in the swapchain's internal results
+    queue to hold requested present timing data.
+endif::VK_EXT_present_timing[]
+  * ename:VK_ERROR_VALIDATION_FAILED A command failed because invalid usage
+    was detected by the implementation or a validation layer.
+    This may: result in the command not being dispatched to the ICD.
+ifdef::VKSC_VERSION_1_0[]
+  * ename:VK_ERROR_INVALID_PIPELINE_CACHE_DATA The supplied pipeline cache
+    data was not valid for the current implementation.
+  * ename:VK_ERROR_NO_PIPELINE_MATCH The implementation did not find a match
+    in the pipeline cache for the specified pipeline, or
+    slink:VkPipelineOfflineCreateInfo was not provided to the
+    ftext:vkCreate*Pipelines function.
+ifdef::hidden[]
+// tag::scaddition[]
+  * extending elink:VkResult
+  ** ename:VK_ERROR_VALIDATION_FAILED <<SCID-1>>
+  ** ename:VK_ERROR_INVALID_PIPELINE_CACHE_DATA <<SCID-1>>
+  ** ename:VK_ERROR_NO_PIPELINE_MATCH <<SCID-1>>
+// end::scaddition[]
+endif::hidden[]
+endif::VKSC_VERSION_1_0[]
+ifdef::VK_EXT_image_compression_control[]
+  * ename:VK_ERROR_COMPRESSION_EXHAUSTED_EXT An image creation failed
+    because internal resources required for compression are exhausted.
+    This must: only be returned when fixed-rate compression is requested.
+endif::VK_EXT_image_compression_control[]
+ifdef::VK_KHR_video_queue[]
+  * ename:VK_ERROR_IMAGE_USAGE_NOT_SUPPORTED_KHR The requested
+    tlink:VkImageUsageFlags are not supported.
+  * ename:VK_ERROR_VIDEO_PICTURE_LAYOUT_NOT_SUPPORTED_KHR The requested
+    video picture layout is not supported.
+  * ename:VK_ERROR_VIDEO_PROFILE_OPERATION_NOT_SUPPORTED_KHR A video profile
+    operation specified via
+    slink:VkVideoProfileInfoKHR::pname:videoCodecOperation is not supported.
+  * ename:VK_ERROR_VIDEO_PROFILE_FORMAT_NOT_SUPPORTED_KHR Format parameters
+    in a requested slink:VkVideoProfileInfoKHR chain are not supported.
+  * ename:VK_ERROR_VIDEO_PROFILE_CODEC_NOT_SUPPORTED_KHR Codec-specific
+    parameters in a requested slink:VkVideoProfileInfoKHR chain are not
+    supported.
+  * ename:VK_ERROR_VIDEO_STD_VERSION_NOT_SUPPORTED_KHR The specified video
+    Std header version is not supported.
+endif::VK_KHR_video_queue[]
+ifdef::VK_KHR_video_encode_queue[]
+  * ename:VK_ERROR_INVALID_VIDEO_STD_PARAMETERS_KHR The specified Video Std
+    parameters do not adhere to the syntactic or semantic requirements of
+    the used video compression standard, or values derived from parameters
+    according to the rules defined by the used video compression standard do
+    not adhere to the capabilities of the video compression standard or the
+    implementation.
+endif::VK_KHR_video_encode_queue[]
+ifdef::VK_BASE_VERSION_1_4,VK_KHR_global_priority,VK_EXT_global_priority[]
+  * ename:VK_ERROR_NOT_PERMITTED The driver implementation has denied a
+    request to acquire a priority above the default priority
+    (ename:VK_QUEUE_GLOBAL_PRIORITY_MEDIUM_EXT) because the application does
+    not have sufficient privileges.
+endif::VK_BASE_VERSION_1_4,VK_KHR_global_priority,VK_EXT_global_priority[]
+ifdef::VK_KHR_pipeline_binary[]
+  * ename:VK_ERROR_NOT_ENOUGH_SPACE_KHR The application did not provide
+    enough space to return all the required data.
+endif::VK_KHR_pipeline_binary[]
+  * ename:VK_ERROR_UNKNOWN An unknown error has occurred; either the
+    application has provided invalid input, or an implementation failure has
+    occurred.
+
+If a command returns a runtime error, unless otherwise specified any output
+parameters will have undefined: contents, except that if the output
+parameter is a structure with pname:sType and pname:pNext fields, those
+fields will be unmodified.
+Any structures chained from pname:pNext will also have undefined: contents,
+except that pname:sType and pname:pNext will be unmodified.
+
+etext:VK_ERROR_OUT_OF_*_MEMORY errors do not modify any currently existing
+Vulkan objects.
+Objects that have already been successfully created can: still be used by
+the application.
+ifdef::VKSC_VERSION_1_0[]
+If
+slink:VkPhysicalDeviceVulkanSC10Properties::pname:deviceNoDynamicHostAllocations
+is ename:VK_TRUE, ename:VK_ERROR_OUT_OF_HOST_MEMORY must: not be returned
+from any physical or logical device command which explicitly disallows it.
+ifdef::hidden[]
+// tag::scdeviation[]
+  * If
+    slink:VkPhysicalDeviceVulkanSC10Properties::pname:deviceNoDynamicHostAllocations
+    is ename:VK_TRUE, ename:VK_ERROR_OUT_OF_HOST_MEMORY must: not be
+    returned by physical or logical device commands which explicitly
+    disallow it <<SCID-4>>.
+// end::scdeviation[]
+endif::hidden[]
+endif::VKSC_VERSION_1_0[]
+
+[NOTE]
+====
+As a general rule, ftext:Free, ftext:Release, and ftext:Reset commands do
+not return ename:VK_ERROR_OUT_OF_HOST_MEMORY, while any other command with a
+return code may: return it.
+Any exceptions from this rule are described for those commands.
+====
+
+ename:VK_ERROR_UNKNOWN will be returned by an implementation when an
+unexpected error occurs that cannot be attributed to valid behavior of the
+application and implementation.
+Under these conditions, it may: be returned from any command returning a
+elink:VkResult.
+
+[NOTE]
+====
+ename:VK_ERROR_UNKNOWN is not expected to ever be returned if the
+application behavior is valid, and if the implementation is bug-free.
+If ename:VK_ERROR_UNKNOWN is returned, the application should be checked
+against the latest validation layers to verify correct behavior as much as
+possible.
+If no issues are identified it could be an implementation issue, and the
+implementor should be contacted for support.
+====
+
+Any command returning a elink:VkResult may: return
+ename:VK_ERROR_VALIDATION_FAILED if a violation of valid usage is detected.
+
+Performance-critical commands generally do not have return codes.
+If a runtime error occurs in such commands, the implementation will defer
+reporting the error until a specified point.
+For commands that record into command buffers (ftext:vkCmd*) runtime errors
+are reported by fname:vkEndCommandBuffer.
+
+ifdef::VKSC_VERSION_1_0[]
+[NOTE]
+====
+Implementations can also use <<fault-handling>> to report runtime errors
+where suitable return values are not available or to provide more prompt
+notification of an error.
+====
+endif::VKSC_VERSION_1_0[]
+--
+
+
+[[fundamentals-numerics]]
+== Numeric Representation and Computation
+
+Implementations normally perform computations in floating-point, and must:
+meet the range and precision requirements defined under "`Floating-Point
+Computation`" below.
+
+These requirements only apply to computations performed in Vulkan operations
+outside of shader execution, such as texture image specification and
+sampling, and per-fragment operations.
+Range and precision requirements during shader execution differ, and are
+specified by the <<spirvenv-precision-operation, Precision and Operation of
+SPIR-V Instructions>> section.
+
+In some cases, the representation and/or precision of operations is
+implicitly limited by the specified format of vertex or texel data consumed
+by Vulkan.
+Specific floating-point formats are described later in this section.
+
+
+[[fundamentals-floating-point]]
+=== Floating-Point Computation
+
+Most floating-point computation is performed in SPIR-V shader modules.
+The properties of computation within shaders are constrained as defined by
+the <<spirvenv-precision-operation, Precision and Operation of SPIR-V
+Instructions>> section.
+
+Some floating-point computation is performed outside of shaders, such as
+viewport and depth range calculations.
+For these computations, we do not specify how floating-point numbers are to
+be represented, or the details of how operations on them are performed, but
+only place minimal requirements on representation and precision as described
+in the remainder of this section.
+
+We require simply that numbers' floating-point parts contain enough bits and
+that their exponent fields are large enough so that individual results of
+floating-point operations are accurate to about 1 part in 10^5^.
+The maximum representable magnitude for all floating-point values must: be
+at least 2^32^.
+
+  {empty}:: [eq]#x {times} 0 = 0 {times} x = 0# for any non-infinite and
+            non-[eq]#NaN# [eq]#x#.
+  {empty}:: [eq]#1 {times} x = x {times} 1 = x#.
+  {empty}:: [eq]#x {plus} 0 = 0 {plus} x = x#.
+  {empty}:: [eq]#0^0^ = 1#.
+
+Occasionally, further requirements will be specified.
+Most single-precision floating-point formats meet these requirements.
+
+The special values [eq]#Inf# and [eq]#-Inf# encode values with magnitudes
+too large to be represented; the special value [eq]#NaN# encodes "`Not A
+Number`" values resulting from undefined: arithmetic operations such as
+[eq]#0 / 0#.
+Implementations may: support [eq]#Inf# and [eq]#NaN# in their floating-point
+computations.
+Any computation which does not support either [eq]#Inf# or [eq]#NaN#, for
+which that value is an input or output will yield an undefined: value.
+
+
+[[fundamentals-fp-conversion]]
+=== Floating-Point Format Conversions
+
+When a value is converted to a defined floating-point representation, finite
+values falling between two representable finite values are rounded to one or
+the other.
+The rounding mode is not defined.
+Finite values whose magnitude is larger than that of any representable
+finite value may be rounded either to the closest representable finite value
+or to the appropriately signed infinity.
+For unsigned destination formats any negative values are converted to zero.
+Positive infinity is converted to positive infinity; negative infinity is
+converted to negative infinity in signed formats and to zero in unsigned
+formats; and any [eq]#NaN# is converted to a [eq]#NaN#.
+
+
+[[fundamentals-fp16]]
+=== 16-Bit Floating-Point Numbers
+
+16-bit floating-point numbers are defined in the "`16-bit floating-point
+numbers`" section of the <<data-format,Khronos Data Format Specification>>.
+
+
+[[fundamentals-fp11]]
+=== Unsigned 11-Bit Floating-Point Numbers
+
+Unsigned 11-bit floating-point numbers are defined in the "`Unsigned 11-bit
+floating-point numbers`" section of the <<data-format,Khronos Data Format
+Specification>>.
+
+
+[[fundamentals-fp10]]
+=== Unsigned 10-Bit Floating-Point Numbers
+
+Unsigned 10-bit floating-point numbers are defined in the "`Unsigned 10-bit
+floating-point numbers`" section of the <<data-format,Khronos Data Format
+Specification>>.
+
+
+[[fundamentals-bool]]
+=== 8-bit booleans
+
+An 8-bit boolean uses the following representation for `true` and `false`:
+
+* Zero to represent `false`
+* Any non-zero value to represent `true`
+
+
+[[fundamentals-general]]
+=== General Requirements
+
+Any representable floating-point value in the appropriate format is legal as
+input to a Vulkan command that requires floating-point data.
+The result of providing a value that is not a floating-point number to such
+a command is unspecified, but must: not lead to Vulkan interruption or
+termination.
+For example, providing a negative zero (where applicable) or a denormalized
+number to a Vulkan command must: yield deterministic results, while
+providing a [eq]#NaN# or [eq]#Inf# yields unspecified results.
+
+Some calculations require division.
+In such cases (including implied divisions performed by vector
+normalization), division by zero produces an unspecified result but must:
+not lead to Vulkan interruption or termination.
+
+
+[[fundamentals-fixedconv]]
+== Fixed-Point Data Conversions
+
+When generic vertex attributes and pixel color or depth _components_ are
+represented as integers, they are often (but not always) considered to be
+_normalized_.
+Normalized integer values are treated specially when being converted to and
+from floating-point values, and are usually referred to as _normalized
+fixed-point_.
+
+In the remainder of this section, [eq]#b# denotes the bit width of the
+fixed-point integer representation.
+When the integer is one of the types defined by the API, [eq]#b# is the bit
+width of that type.
+When the integer comes from an <<resources-images,image>> containing color
+or depth component texels, [eq]#b# is the number of bits allocated to that
+component in its <<formats,specified image format>>.
+
+The signed and unsigned fixed-point representations are assumed to be
+[eq]#b#-bit binary two's-complement integers and binary unsigned integers,
+respectively.
+
+
+[[fundamentals-fixedfpconv]]
+=== Conversion From Normalized Fixed-Point to Floating-Point
+
+Unsigned normalized fixed-point integers represent numbers in the range
+[eq]#[0,1]#.
+The conversion from an unsigned normalized fixed-point value [eq]#c# to the
+corresponding floating-point value [eq]#f# is defined as
+
+[latexmath]
+++++
+f = { c \over { 2^b - 1 } }
+++++
+
+Signed normalized fixed-point integers represent numbers in the range
+[eq]#[-1,1]#.
+The conversion from a signed normalized fixed-point value [eq]#c# to the
+corresponding floating-point value [eq]#f# is performed using
+
+[latexmath]
+++++
+f = \max\left( {c \over {2^{b-1} - 1}}, -1.0 \right)
+++++
+
+Only the range [eq]#[-2^b-1^ {plus} 1, 2^b-1^ - 1]# is used to represent
+signed fixed-point values in the range [eq]#[-1,1]#.
+For example, if [eq]#b = 8#, then the integer value [eq]#-127# corresponds
+to [eq]#-1.0# and the value 127 corresponds to [eq]#1.0#.
+This equation is used everywhere that signed normalized fixed-point values
+are converted to floating-point.
+
+Note that while zero is exactly expressible in this representation, one
+value ([eq]#-128# in the example) is outside the representable range, and
+implementations must: clamp it to [eq]#-1.0#.
+Where the value is subject to further processing by the implementation, e.g.
+during texture filtering, values less than [eq]#-1.0# may: be used but the
+result must: be clamped before the value is returned to shaders.
+
+
+[[fundamentals-fpfixedconv]]
+=== Conversion From Floating-Point to Normalized Fixed-Point
+
+The conversion from a floating-point value [eq]#f# to the corresponding
+unsigned normalized fixed-point value [eq]#c# is defined by first clamping
+[eq]#f# to the range [eq]#[0,1]#, then computing
+
+  {empty}:: [eq]#c = convertFloatToUint(f {times} (2^b^ - 1), b)#
+
+where [eq]#convertFloatToUint(r,b)# returns one of the two unsigned binary
+integer values with exactly [eq]#b# bits which are closest to the
+floating-point value [eq]#r#.
+Implementations should: round to nearest.
+If [eq]#r# is equal to an integer, then that integer value must: be
+returned.
+In particular, if [eq]#f# is equal to 0.0 or 1.0, then [eq]#c# must: be
+assigned 0 or [eq]#2^b^ - 1#, respectively.
+
+The conversion from a floating-point value [eq]#f# to the corresponding
+signed normalized fixed-point value [eq]#c# is performed by clamping [eq]#f#
+to the range [eq]#[-1,1]#, then computing
+
+  {empty}:: [eq]#c = convertFloatToInt(f {times} (2^b-1^ - 1), b)#
+
+where [eq]#convertFloatToInt(r,b)# returns one of the two signed
+two's-complement binary integer values with exactly [eq]#b# bits which are
+closest to the floating-point value [eq]#r#.
+Implementations should: round to nearest.
+If [eq]#r# is equal to an integer, then that integer value must: be
+returned.
+In particular, if [eq]#f# is equal to -1.0, 0.0, or 1.0, then [eq]#c# must:
+be assigned [eq]#-(2^b-1^ - 1)#, 0, or [eq]#2^b-1^ - 1#, respectively.
+
+This equation is used everywhere that floating-point values are converted to
+signed normalized fixed-point.
+
+
+[[fundamentals-strings]]
+== String Representation
+
+Strings passed into and returned from Vulkan API commands are usually
+defined to be null-terminated and UTF-8 encoded.
+
+[NOTE]
+====
+Exceptions to this rule exist only when strings are defined or used by
+operating system APIs where that OS has a different convention.
+ifdef::VK_KHR_external_memory_win32[]
+For example, slink:VkExportMemoryWin32HandleInfoKHR::pname:name is a
+null-terminated UTF-16 encoded string used in conjunction with Windows
+handles.
+endif::VK_KHR_external_memory_win32[]
+====
+
+When a UTF-8 string is *returned from* a Vulkan API query, it is returned in
+a fixed-length buffer of C code:char.
+For example, a string returned in
+slink:VkPhysicalDeviceProperties::pname:deviceName has maximum length
+ename:VK_MAX_PHYSICAL_DEVICE_NAME_SIZE, and a string returned in
+slink:VkExtensionProperties::pname:extensionName has maximum length
+ename:VK_MAX_EXTENSION_NAME_SIZE.
+The string, *including* its null terminator, will always fit completely
+within this buffer.
+If the string is shorter than the buffer size, the contents of code:char in
+the buffer following the null terminator are undefined:.
+
+When a UTF-8 string is *passed into* a Vulkan API, such as
+slink:VkDeviceCreateInfo::pname:ppEnabledExtensionNames, there is no
+explicit limit on the length of that string.
+However, the string must: contain a valid UTF-8 encoded string and must: be
+null-terminated.
+
+
+[[fundamentals-common-objects]]
+== Common Object Types
+
+Some types of Vulkan objects are used in many different structures and
+command parameters, and are described here.
+These types include _offsets_, _extents_, and _rectangles_.
+
+
+=== Offsets
+
+Offsets are used to describe a pixel location within an image or
+framebuffer, as an (x,y) location for two-dimensional images, or an (x,y,z)
+location for three-dimensional images.
+
+[open,refpage='VkOffset2D',desc='Structure specifying a two-dimensional offset',type='structs']
+--
+A two-dimensional offset is defined by the structure:
+
+include::{generated}/api/structs/VkOffset2D.adoc[]
+
+  * pname:x is the x offset.
+  * pname:y is the y offset.
+
+include::{generated}/validity/structs/VkOffset2D.adoc[]
+--
+
+[open,refpage='VkOffset3D',desc='Structure specifying a three-dimensional offset',type='structs']
+--
+A three-dimensional offset is defined by the structure:
+
+include::{generated}/api/structs/VkOffset3D.adoc[]
+
+  * pname:x is the x offset.
+  * pname:y is the y offset.
+  * pname:z is the z offset.
+
+include::{generated}/validity/structs/VkOffset3D.adoc[]
+--
+
+
+=== Extents
+
+Extents are used to describe the size of a rectangular region of pixels
+within an image or framebuffer, as (width,height) for two-dimensional
+images, or as (width,height,depth) for three-dimensional images.
+
+[open,refpage='VkExtent2D',desc='Structure specifying a two-dimensional extent',type='structs']
+--
+A two-dimensional extent is defined by the structure:
+
+include::{generated}/api/structs/VkExtent2D.adoc[]
+
+  * pname:width is the width of the extent.
+  * pname:height is the height of the extent.
+
+include::{generated}/validity/structs/VkExtent2D.adoc[]
+--
+
+[open,refpage='VkExtent3D',desc='Structure specifying a three-dimensional extent',type='structs']
+--
+A three-dimensional extent is defined by the structure:
+
+include::{generated}/api/structs/VkExtent3D.adoc[]
+
+  * pname:width is the width of the extent.
+  * pname:height is the height of the extent.
+  * pname:depth is the depth of the extent.
+
+include::{generated}/validity/structs/VkExtent3D.adoc[]
+--
+
+
+=== Rectangles
+
+[open,refpage='VkRect2D',desc='Structure specifying a two-dimensional subregion',type='structs']
+--
+Rectangles are used to describe a specified rectangular region of pixels
+within an image or framebuffer.
+Rectangles include both an offset and an extent of the same dimensionality,
+as described above.
+Two-dimensional rectangles are defined by the structure
+
+include::{generated}/api/structs/VkRect2D.adoc[]
+
+  * pname:offset is a slink:VkOffset2D specifying the rectangle offset.
+  * pname:extent is a slink:VkExtent2D specifying the rectangle extent.
+
+include::{generated}/validity/structs/VkRect2D.adoc[]
+--
+
+ifdef::VK_EXT_descriptor_heap[]
+=== Host Address Ranges
+[open,refpage='VkHostAddressRangeEXT',desc='Structure specifying a host address range',type='structs']
+--
+A host address range indicates a range of host memory.
+
+include::{generated}/api/structs/VkHostAddressRangeEXT.adoc[]
+
+  * pname:address is a host memory address.
+  * pname:size is the size of the range.
+
+include::{generated}/validity/structs/VkHostAddressRangeEXT.adoc[]
+--
+
+[open,refpage='VkHostAddressRangeConstEXT',desc='Structure specifying a constant host address range',type='structs']
+--
+A constant host address range indicates a range of host memory that cannot
+be altered.
+
+include::{generated}/api/structs/VkHostAddressRangeConstEXT.adoc[]
+
+  * pname:address is a read-only host memory address.
+  * pname:size is the size of the range.
+
+include::{generated}/validity/structs/VkHostAddressRangeConstEXT.adoc[]
+--
+
+endif::VK_EXT_descriptor_heap[]
+
+ifdef::VK_KHR_device_address_commands,VK_EXT_descriptor_heap,VK_KHR_copy_memory_indirect[]
+=== Device Address Ranges
+
+ifdef::VK_KHR_device_address_commands,VK_EXT_descriptor_heap[]
+[open,refpage='VkDeviceAddressRangeKHR',desc='Structure specifying a device address range',type='structs']
+--
+:refpage: VkDeviceAddressRangeKHR
+
+A device address range indicates a sized range of device memory.
+
+include::{generated}/api/structs/VkDeviceAddressRangeKHR.adoc[]
+
+ifdef::VK_EXT_descriptor_heap[]
+include::{generated}/api/structs/VkDeviceAddressRangeEXT.adoc[]
+endif::VK_EXT_descriptor_heap[]
+
+  * pname:address is 0 or a basetype:VkDeviceAddress specifying the start of
+    the range.
+  * pname:size is a basetype:VkDeviceSize specifying the size of the range.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/device_address_range_common.adoc[]
+****
+
+include::{generated}/validity/structs/VkDeviceAddressRangeKHR.adoc[]
+--
+endif::VK_KHR_device_address_commands,VK_EXT_descriptor_heap[]
+
+ifdef::VK_KHR_device_address_commands,VK_KHR_copy_memory_indirect[]
+[open,refpage='VkStridedDeviceAddressRangeKHR',desc='Structure specifying a device address range with a stride',type='structs']
+--
+:refpage: VkStridedDeviceAddressRangeKHR
+
+A strided device address range is defined by the structure:
+
+include::{generated}/api/structs/VkStridedDeviceAddressRangeKHR.adoc[]
+
+  * pname:address is a basetype:VkDeviceAddress specifying the start of the
+    range.
+  * pname:size is a basetype:VkDeviceSize specifying the size of the range.
+  * pname:stride is a basetype:VkDeviceSize specifying the stride of
+    elements over the range.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/device_address_range_common.adoc[]
+  * [[VUID-VkStridedDeviceAddressRangeKHR-stride-10957]]
+    pname:stride must: be less than or equal to pname:size
+****
+
+include::{generated}/validity/structs/VkStridedDeviceAddressRangeKHR.adoc[]
+--
+
+ifdef::VK_KHR_device_address_commands[]
+Many Vulkan commands need additional information about an address range;
+this may: be provided by the following flags.
+
+[open,refpage='VkAddressCommandFlagBitsKHR',desc='Bitmask specifying address copy parameters',type='enums']
+--
+Bits which can: be set in a tlink:VkAddressCommandFlagsKHR mask are:
+
+include::{generated}/api/enums/VkAddressCommandFlagBitsKHR.adoc[]
+
+  * ename:VK_ADDRESS_COMMAND_PROTECTED_BIT_KHR specifies that an address
+    range is allocated from protected memory.
+  * ename:VK_ADDRESS_COMMAND_FULLY_BOUND_BIT_KHR specifies that an address
+    range will be fully bound to physical memory when accessed.
+  * ename:VK_ADDRESS_COMMAND_STORAGE_BUFFER_USAGE_BIT_KHR specifies that all
+    buffers containing any part of an address range were created with the
+    ename:VK_BUFFER_USAGE_STORAGE_BUFFER_BIT usage.
+  * ename:VK_ADDRESS_COMMAND_UNKNOWN_STORAGE_BUFFER_USAGE_BIT_KHR specifies
+    that whether buffers containing an any part of an address range were
+    created with ename:VK_BUFFER_USAGE_STORAGE_BUFFER_BIT usage or not is
+    unknown.
+ifdef::VK_EXT_transform_feedback[]
+  * ename:VK_ADDRESS_COMMAND_TRANSFORM_FEEDBACK_BUFFER_USAGE_BIT_KHR
+    specifies that all buffers containing any part of an address range are
+    allocated with the
+    ename:VK_BUFFER_USAGE_TRANSFORM_FEEDBACK_BUFFER_BIT_EXT usage.
+  * ename:VK_ADDRESS_COMMAND_UNKNOWN_TRANSFORM_FEEDBACK_BUFFER_USAGE_BIT_KHR
+    specifies that whether buffers containing an any part of an address
+    range were created with
+    ename:VK_BUFFER_USAGE_TRANSFORM_FEEDBACK_BUFFER_BIT_EXT usage or not is
+    unknown.
+endif::VK_EXT_transform_feedback[]
+
+If neither ename:VK_ADDRESS_COMMAND_STORAGE_BUFFER_USAGE_BIT_KHR nor
+ename:VK_ADDRESS_COMMAND_UNKNOWN_STORAGE_BUFFER_USAGE_BIT_KHR are specified,
+the address range must: not be aliased with any buffer allocated with the
+ename:VK_BUFFER_USAGE_STORAGE_BUFFER_BIT.
+ifdef::VK_EXT_transform_feedback[]
+If neither ename:VK_ADDRESS_COMMAND_TRANSFORM_FEEDBACK_BUFFER_USAGE_BIT_KHR
+nor ename:VK_ADDRESS_COMMAND_UNKNOWN_TRANSFORM_FEEDBACK_BUFFER_USAGE_BIT_KHR
+are specified, the address range must: not be aliased with any buffer
+allocated with the ename:VK_BUFFER_USAGE_TRANSFORM_FEEDBACK_BUFFER_BIT_EXT.
+endif::VK_EXT_transform_feedback[]
+
+[NOTE]
+====
+Buffers can return overlapping address ranges if they are bound to
+overlapping ranges of a slink:VkDeviceMemory object.
+Applications should ensure that if they do this kind of aliasing, that they
+consistently either include or do not include
+ename:VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
+ifdef::VK_EXT_transform_feedback[and ename:VK_BUFFER_USAGE_TRANSFORM_FEEDBACK_BUFFER_BIT_EXT]
+on aliased buffers when considering these flags.
+====
+--
+
+[open,refpage='VkAddressCommandFlagsKHR',desc='Bitmask of VkAddressCommandFlagBitsKHR',type='flags']
+--
+include::{generated}/api/flags/VkAddressCommandFlagsKHR.adoc[]
+
+tname:VkAddressCommandFlagsKHR is a bitmask type for setting a mask of zero
+or more elink:VkAddressCommandFlagBitsKHR.
+--
+endif::VK_KHR_device_address_commands[]
+endif::VK_KHR_device_address_commands,VK_KHR_copy_memory_indirect[]
+endif::VK_KHR_device_address_commands,VK_EXT_descriptor_heap,VK_KHR_copy_memory_indirect[]
+
+
+// VkStructureType is pretty long,
+// so keep it as a last chapter section for readability.
+=== Structure Types
+
+[open,refpage='VkStructureType',desc='Vulkan structure types (pname:sType)',type='enums']
+--
+Each value corresponds to a particular structure with a pname:sType member
+with a matching name.
+As a general rule, the name of each elink:VkStructureType value is obtained
+by taking the name of the structure, stripping the leading etext:Vk,
+prefixing each capital letter except the first with etext:_, converting the
+entire resulting string to upper case, and prefixing it with
+etext:VK_STRUCTURE_TYPE_.
+For example, structures of type slink:VkImageCreateInfo correspond to a
+elink:VkStructureType value of ename:VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+and thus a structure of this type must: have its pname:sType member set to
+this value before it is passed to the API.
+
+The values ename:VK_STRUCTURE_TYPE_LOADER_INSTANCE_CREATE_INFO and
+ename:VK_STRUCTURE_TYPE_LOADER_DEVICE_CREATE_INFO are reserved for internal
+use by the loader, and do not have corresponding Vulkan structures in this
+Specification.
+
+Structure types supported by the Vulkan API include:
+
+include::{generated}/api/enums/VkStructureType.adoc[]
+
+ifdef::VKSC_VERSION_1_0[]
+ifdef::hidden[]
+// tag::scremoved[]
+  * elink:VkStructureType (legacy aliases)
+  ** etext:VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VARIABLE_POINTER_FEATURES
+     <<SCID-8>>
+  ** etext:VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DRAW_PARAMETER_FEATURES
+     <<SCID-8>>
+  ** etext:VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES2_EXT <<SCID-8>>
+// end::scremoved[]
+endif::hidden[]
+endif::VKSC_VERSION_1_0[]
+--
+
+
+[[fundamentals-api-name-aliases]]
+== API Name Aliases
+
+A small number of APIs did not follow the <<vulkan-styleguide, naming
+conventions>> when initially defined.
+For consistency, when we discover an API name that violates the naming
+conventions, we rename it in the Specification, XML, and header files.
+For backwards compatibility, the original (incorrect) name is retained as a
+"`typo alias`".
+The alias is legacy and should not be used, but will be retained
+indefinitely.
+
+[NOTE]
+====
+etext:VK_STENCIL_FRONT_AND_BACK is an example of a _typo alias_.
+It was initially defined as part of elink:VkStencilFaceFlagBits.
+Once the naming inconsistency was noticed, it was renamed to
+ename:VK_STENCIL_FACE_FRONT_AND_BACK, and the old name was aliased to the
+correct name.
+====

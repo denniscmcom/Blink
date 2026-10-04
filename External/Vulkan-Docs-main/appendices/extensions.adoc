@@ -1,0 +1,62 @@
+// Copyright 2015-2026 The Khronos Group Inc.
+//
+// SPDX-License-Identifier: CC-BY-4.0
+
+[appendix]
+[[extensions]]
+= Layers & Extensions (Informative)
+
+Extensions to the Vulkan API can: be defined by authors, groups of authors,
+and the Khronos Vulkan
+ifdef::VKSC_VERSION_1_0[Safety Critical]
+Working Group.
+The online Registry of extensions is available at URL
+
+ifndef::VKSC_VERSION_1_0[https://registry.khronos.org/vulkan/]
+ifdef::VKSC_VERSION_1_0[https://registry.khronos.org/vulkansc/]
+
+Authors creating extensions and layers must: follow the mandatory procedures
+described in the <<vulkan-styleguide, Vulkan Documentation and Extensions>>
+document when creating extensions and layers.
+
+The version of the Vulkan specification published
+ifndef::VKSC_VERSION_1_0[]
+on the https://docs.vulkan.org/[Vulkan Documentation] site and
+endif::VKSC_VERSION_1_0[]
+in the Registry includes all registered and published extensions.
+It is also possible to build the specification with an arbitrary set of
+extensions included, and the specification you are viewing may not include
+all extensions.
+
+In the remainder of this appendix, extensions are grouped as Khronos `KHR`,
+multivendor `EXT`, and then alphabetically by author ID.
+Within each group, extensions are listed in alphabetical order by their
+name.
+
+
+== Extension Dependencies
+
+Extensions which have dependencies on specific core versions or on other
+extensions will list such dependencies.
+
+For core versions, the specified version must: be supported at runtime.
+All extensions implicitly require support for Vulkan 1.0.
+
+For a device extension, use of any device-level functionality defined by
+that extension requires that any extensions that extension depends on be
+enabled.
+
+For any extension, use of any instance-level functionality defined by that
+extension requires only that any extensions that extension depends on be
+supported at runtime.
+
+
+== Extension Interactions
+
+Some extensions define APIs which are only supported when other extensions
+or core versions are supported at runtime.
+Such interactions are noted as "`API Interactions`".
+
+include::{generated}/meta/current_extensions_appendix.adoc[]
+include::{generated}/meta/provisional_extensions_appendix.adoc[]
+include::{generated}/meta/deprecated_extensions_appendix.adoc[]

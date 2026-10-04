@@ -6,13 +6,12 @@ target_sources(BlkEngine
 		FILES
 			Directional_Light.hpp
 			Point_Light.hpp
-			Mesh_Instance.hpp
+			Mesh_Ref.hpp
 			Node.hpp
+			Terrain_Ref.hpp
 			Graph.hpp
 			Transform.hpp
 	PRIVATE
 		Graph.cpp
-		Mesh_Instance.cpp
-		Node.cpp
 		Transform.cpp
 )

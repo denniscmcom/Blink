@@ -367,6 +367,7 @@ blk::create_context(Allocator* allocator, HWND window)
 	device_required_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
 	device_required_features.pNext = &device_required_vulkan_11_features;
 	device_required_features.features.samplerAnisotropy = VK_TRUE;
+	device_required_features.features.geometryShader = VK_TRUE;
 
 	VkDeviceQueueCreateInfo device_queue_create_info = {};
 	device_queue_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;

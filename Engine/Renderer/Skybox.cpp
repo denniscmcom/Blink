@@ -11,9 +11,6 @@
 
 namespace
 {
-/// The color a skybox LUT is cleared to when `World_Settings` disables the pass that fills it.
-constexpr VkClearColorValue BLACK_CLEAR_COLOR = {};
-
 /// The whole of a skybox LUT. They all have a single mip level and a single array layer.
 constexpr VkImageSubresourceRange LUT_SUBRESOURCE_RANGE = {
 	.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -25,7 +22,12 @@ constexpr VkImageSubresourceRange LUT_SUBRESOURCE_RANGE = {
 }  // namespace
 
 void
-blk::clear_skybox_lut(VkCommandBuffer command_buffer, VkImage image, VkPipelineStageFlags2 destination_stage)
+blk::clear_skybox_lut(
+	VkCommandBuffer command_buffer,
+	VkImage image,
+	const VkClearColorValue& clear_color,
+	VkPipelineStageFlags2 destination_stage
+)
 {
 	// The old layout is `VK_IMAGE_LAYOUT_UNDEFINED` because we are about to overwrite every texel, so whatever the
 	// image holds does not have to survive the transition.
@@ -46,7 +48,7 @@ blk::clear_skybox_lut(VkCommandBuffer command_buffer, VkImage image, VkPipelineS
 		command_buffer,
 		image,
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-		&BLACK_CLEAR_COLOR,
+		&clear_color,
 		1,
 		&LUT_SUBRESOURCE_RANGE
 	);

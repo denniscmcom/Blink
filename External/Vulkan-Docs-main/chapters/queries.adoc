@@ -1,0 +1,3531 @@
+// Copyright 2015-2026 The Khronos Group Inc.
+// Copyright (c) 2018-2020 Intel Corporation
+// SPDX-License-Identifier: CC-BY-4.0
+
+[[queries]]
+= Queries
+
+_Queries_ provide a mechanism to return information about the processing of
+a sequence of Vulkan commands.
+Query operations are asynchronous, and as such, their results are not
+returned immediately.
+Instead, their results, and their availability status are stored in a
+<<queries-pools, Query Pool>>.
+The state of these queries can: be read back on the host, or copied to a
+buffer object on the device.
+
+The supported query types are:
+
+ifdef::VK_GRAPHICS_VERSION_1_0[  * <<queries-occlusion,Occlusion Queries>>]
+ifdef::VK_COMPUTE_VERSION_1_0[  * <<queries-pipestats,Pipeline Statistics Queries>>]
+  * <<queries-timestamps, Timestamp Queries>>
+ifdef::VK_KHR_video_queue[  * <<queries-result-status-only, Result Status Queries>>]
+ifdef::VK_KHR_video_encode_queue[  * <<queries-video-encode-feedback, Video Encode Feedback Queries>>]
+ifdef::VK_KHR_performance_query[  * <<queries-performance, Performance Queries>>]
+ifdef::VK_EXT_transform_feedback[  * <<queries-transform-feedback, Transform Feedback Queries>>]
+ifdef::VK_INTEL_performance_query[  * <<queries-performance-intel, Intel Performance Queries>>]
+ifdef::VK_EXT_mesh_shader[  * <<queries-mesh-shader, Mesh Shader Queries>>]
+ifdef::VK_QCOM_elapsed_timer_query[  * <<queries-elapsed-timer, Elapsed Timer Queries>>]
+
+ifdef::VK_KHR_acceleration_structure,VK_NV_ray_tracing[]
+Several additional queries with specific purposes associated with ray
+tracing are available if the corresponding extensions are supported, as
+described for elink:VkQueryType.
+endif::VK_KHR_acceleration_structure,VK_NV_ray_tracing[]
+
+
+[[queries-pools]]
+== Query Pools
+
+[open,refpage='VkQueryPool',desc='Opaque handle to a query pool object',type='handles']
+--
+Queries are managed using _query pool_ objects.
+Each query pool is a collection of a specific number of queries of a
+particular type.
+
+ifdef::VKSC_VERSION_1_0[]
+ifdef::hidden[]
+// tag::scremoved[]
+  * fname:vkDestroyQueryPool <<SCID-4>>
+// end::scremoved[]
+endif::hidden[]
+
+Query pools cannot: be destroyed <<SCID-4>>.
+
+If <<limits-deviceDestroyFreesMemory,
+slink:VkPhysicalDeviceVulkanSC10Properties::pname:deviceDestroyFreesMemory>>
+is ename:VK_TRUE, the memory is returned to the system when the device is
+destroyed.
+Otherwise, it may: not be returned to the system until the process is
+terminated.
+
+endif::VKSC_VERSION_1_0[]
+
+Query pools are represented by sname:VkQueryPool handles:
+
+include::{generated}/api/handles/VkQueryPool.adoc[]
+--
+
+[open,refpage='vkCreateQueryPool',desc='Create a new query pool object',type='protos']
+--
+:refpage: vkCreateQueryPool
+:objectnameplural: query pools
+:objectnamecamelcase: queryPool
+:objectnamestruct: VkDeviceObjectReservationCreateInfo
+:objectcount: 1
+
+To create a query pool, call:
+
+include::{generated}/api/protos/vkCreateQueryPool.adoc[]
+
+  * pname:device is the logical device that creates the query pool.
+  * pname:pCreateInfo is a pointer to a slink:VkQueryPoolCreateInfo
+    structure containing the number and type of queries to be managed by the
+    pool.
+  * pname:pAllocator controls host memory allocation as described in the
+    <<memory-allocation, Memory Allocation>> chapter.
+  * pname:pQueryPool is a pointer to a slink:VkQueryPool handle in which the
+    resulting query pool object is returned.
+
+include::{chapters}/commonvalidity/no_dynamic_allocations_common.adoc[]
+
+.Valid Usage
+****
+  * [[VUID-vkCreateQueryPool-device-09663]]
+    pname:device must: support at least one queue family with one of the
+ifdef::VK_KHR_video_encode_queue[]
+    ename:VK_QUEUE_VIDEO_ENCODE_BIT_KHR,
+endif::VK_KHR_video_encode_queue[]
+ifdef::VK_KHR_video_decode_queue[]
+    ename:VK_QUEUE_VIDEO_DECODE_BIT_KHR,
+endif::VK_KHR_video_decode_queue[]
+    ename:VK_QUEUE_COMPUTE_BIT, or ename:VK_QUEUE_GRAPHICS_BIT capabilities
+ifdef::VKSC_VERSION_1_0[]
+include::{chapters}/commonvalidity/memory_reservation_request_count_common.adoc[]
+endif::VKSC_VERSION_1_0[]
+****
+
+include::{generated}/validity/protos/vkCreateQueryPool.adoc[]
+--
+
+[open,refpage='VkQueryPoolCreateInfo',desc='Structure specifying parameters of a newly created query pool',type='structs']
+--
+The sname:VkQueryPoolCreateInfo structure is defined as:
+
+include::{generated}/api/structs/VkQueryPoolCreateInfo.adoc[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:flags is a bitmask of elink:VkQueryPoolCreateFlagBits
+  * pname:queryType is a elink:VkQueryType value specifying the type of
+    queries managed by the pool.
+  * pname:queryCount is the number of queries managed by the pool.
+  * pname:pipelineStatistics
+ifdef::VK_COMPUTE_VERSION_1_0[]
+    is a bitmask of elink:VkQueryPipelineStatisticFlagBits specifying which
+    counters will be returned in queries on the new pool, as described below
+    in <<queries-pipestats>>.
+    pname:pipelineStatistics is ignored if pname:queryType is not
+    ename:VK_QUERY_TYPE_PIPELINE_STATISTICS.
+endif::VK_COMPUTE_VERSION_1_0[]
+ifndef::VK_COMPUTE_VERSION_1_0[]
+    is unused and ignored.
+endif::VK_COMPUTE_VERSION_1_0[]
+
+
+.Valid Usage
+****
+  * [[VUID-VkQueryPoolCreateInfo-queryType-00791]]
+    If the <<features-pipelineStatisticsQuery,
+    pname:pipelineStatisticsQuery>> feature is not enabled, pname:queryType
+    must: not be ename:VK_QUERY_TYPE_PIPELINE_STATISTICS
+ifdef::VK_QCOM_elapsed_timer_query[]
+  * [[VUID-VkQueryPoolCreateInfo-queryType-12416]]
+    If the <<features-elapsedTimerQuery,elapsedTimerQuery>> feature is not
+    enabled, pname:queryType must: not be
+    ename:VK_QUERY_TYPE_TIME_ELAPSED_QCOM
+endif::VK_QCOM_elapsed_timer_query[]
+ifdef::VK_EXT_mesh_shader[]
+  * [[VUID-VkQueryPoolCreateInfo-meshShaderQueries-07068]]
+    If the <<features-meshShaderQueries, pname:meshShaderQueries>> feature
+    is not enabled, pname:queryType must: not be
+    ename:VK_QUERY_TYPE_MESH_PRIMITIVES_GENERATED_EXT
+  * [[VUID-VkQueryPoolCreateInfo-meshShaderQueries-07069]]
+    If the <<features-meshShaderQueries, pname:meshShaderQueries>> feature
+    is not enabled, and pname:queryType is
+    ename:VK_QUERY_TYPE_PIPELINE_STATISTICS, pname:pipelineStatistics must:
+    not contain
+    ename:VK_QUERY_PIPELINE_STATISTIC_TASK_SHADER_INVOCATIONS_BIT_EXT or
+    ename:VK_QUERY_PIPELINE_STATISTIC_MESH_SHADER_INVOCATIONS_BIT_EXT
+endif::VK_EXT_mesh_shader[]
+ifdef::VK_COMPUTE_VERSION_1_0[]
+  * [[VUID-VkQueryPoolCreateInfo-queryType-00792]]
+    If pname:queryType is ename:VK_QUERY_TYPE_PIPELINE_STATISTICS,
+    pname:pipelineStatistics must: be a valid combination of
+    elink:VkQueryPipelineStatisticFlagBits values
+  * [[VUID-VkQueryPoolCreateInfo-queryType-09534]]
+    If pname:queryType is ename:VK_QUERY_TYPE_PIPELINE_STATISTICS,
+    pname:pipelineStatistics must: not be zero
+endif::VK_COMPUTE_VERSION_1_0[]
+ifdef::VK_KHR_performance_query[]
+  * [[VUID-VkQueryPoolCreateInfo-queryType-03222]]
+    If pname:queryType is ename:VK_QUERY_TYPE_PERFORMANCE_QUERY_KHR, the
+    pname:pNext chain must: include a
+    slink:VkQueryPoolPerformanceCreateInfoKHR structure
+endif::VK_KHR_performance_query[]
+  * [[VUID-VkQueryPoolCreateInfo-queryCount-02763]]
+    pname:queryCount must: be greater than 0
+ifdef::VKSC_VERSION_1_0[]
+  * [[VUID-VkQueryPoolCreateInfo-queryType-05046]]
+    If pname:queryType is ename:VK_QUERY_TYPE_OCCLUSION then
+    pname:queryCount must: be less than or equal to the maximum of all
+    slink:VkDeviceObjectReservationCreateInfo::pname:maxOcclusionQueriesPerPool
+    values specified when pname:device was created
+  * [[VUID-VkQueryPoolCreateInfo-queryType-05047]]
+    If pname:queryType is ename:VK_QUERY_TYPE_PIPELINE_STATISTICS then
+    pname:queryCount must: be less than or equal to the maximum of all
+    slink:VkDeviceObjectReservationCreateInfo::pname:maxPipelineStatisticsQueriesPerPool
+    values specified when pname:device was created
+  * [[VUID-VkQueryPoolCreateInfo-queryType-05048]]
+    If pname:queryType is ename:VK_QUERY_TYPE_TIMESTAMP then
+    pname:queryCount must: be less than or equal to the maximum of all
+    slink:VkDeviceObjectReservationCreateInfo::pname:maxTimestampQueriesPerPool
+    values specified when pname:device was created
+ifdef::VK_KHR_performance_query[]
+  * [[VUID-VkQueryPoolCreateInfo-queryType-05049]]
+    If pname:queryType is ename:VK_QUERY_TYPE_PERFORMANCE_QUERY_KHR then
+    pname:queryCount must: be less than or equal to the maximum of all
+    slink:VkPerformanceQueryReservationInfoKHR::pname:maxPerformanceQueriesPerPool
+    values specified when pname:device was created
+endif::VK_KHR_performance_query[]
+endif::VKSC_VERSION_1_0[]
+ifdef::VK_KHR_video_queue[]
+  * [[VUID-VkQueryPoolCreateInfo-queryType-11839]]
+    If pname:queryType is ename:VK_QUERY_TYPE_RESULT_STATUS_ONLY_KHR, then
+    at least one of the queue families of the device must: support
+    <<queries-result-status-only,result status queries>>, as indicated by
+    slink:VkQueueFamilyQueryResultStatusPropertiesKHR::pname:queryResultStatusSupport
+endif::VK_KHR_video_queue[]
+ifdef::VK_KHR_video_decode_vp9[]
+  * [[VUID-VkQueryPoolCreateInfo-pNext-10779]]
+    If the pname:pNext chain includes a slink:VkVideoProfileInfoKHR
+    structure and its pname:videoCodecOperation member is
+    ename:VK_VIDEO_CODEC_OPERATION_DECODE_VP9_BIT_KHR, then the
+    <<features-videoDecodeVP9,pname:videoDecodeVP9>> feature must: be
+    enabled
+endif::VK_KHR_video_decode_vp9[]
+ifdef::VK_KHR_video_encode_queue[]
+  * [[VUID-VkQueryPoolCreateInfo-queryType-07133]]
+    If pname:queryType is ename:VK_QUERY_TYPE_VIDEO_ENCODE_FEEDBACK_KHR,
+    then the pname:pNext chain must: include a slink:VkVideoProfileInfoKHR
+    structure with pname:videoCodecOperation specifying an encode operation
+  * [[VUID-VkQueryPoolCreateInfo-queryType-07906]]
+    If pname:queryType is ename:VK_QUERY_TYPE_VIDEO_ENCODE_FEEDBACK_KHR,
+    then the pname:pNext chain must: include a
+    slink:VkQueryPoolVideoEncodeFeedbackCreateInfoKHR structure
+  * [[VUID-VkQueryPoolCreateInfo-queryType-07907]]
+    If pname:queryType is ename:VK_QUERY_TYPE_VIDEO_ENCODE_FEEDBACK_KHR, and
+    the pname:pNext chain includes a slink:VkVideoProfileInfoKHR structure
+    and a slink:VkQueryPoolVideoEncodeFeedbackCreateInfoKHR structure, then
+    slink:VkQueryPoolVideoEncodeFeedbackCreateInfoKHR::pname:encodeFeedbackFlags
+    must: not contain any bits that are not set in
+    slink:VkVideoEncodeCapabilitiesKHR::pname:supportedEncodeFeedbackFlags,
+    as returned by flink:vkGetPhysicalDeviceVideoCapabilitiesKHR for the
+    <<video-profiles,video profile>> described by
+    slink:VkVideoProfileInfoKHR and its pname:pNext chain
+ifdef::VK_KHR_video_encode_feedback2[]
+  * [[VUID-VkQueryPoolCreateInfo-queryType-12437]]
+    If pname:queryType is ename:VK_QUERY_TYPE_VIDEO_ENCODE_FEEDBACK_KHR and
+    the pname:pNext chain includes a
+    slink:VkQueryPoolVideoEncodeFeedbackCreateInfoKHR structure with its
+    pname:encodeFeedbackFlags member containing
+    ename:VK_VIDEO_ENCODE_FEEDBACK_AVERAGE_QUANTIZATION_BIT_KHR,
+    ename:VK_VIDEO_ENCODE_FEEDBACK_MIN_QUANTIZATION_BIT_KHR,
+    ename:VK_VIDEO_ENCODE_FEEDBACK_MAX_QUANTIZATION_BIT_KHR,
+    ename:VK_VIDEO_ENCODE_FEEDBACK_INTRA_PIXELS_BIT_KHR,
+    ename:VK_VIDEO_ENCODE_FEEDBACK_INTER_PIXELS_BIT_KHR,
+    ename:VK_VIDEO_ENCODE_FEEDBACK_SKIPPED_PIXELS_BIT_KHR, or
+    ename:VK_VIDEO_ENCODE_FEEDBACK_PICTURE_PARTITION_COUNT_BIT_KHR, then
+    <<features-videoEncodeFeedback2,pname:videoEncodeFeedback2>> must: be
+    enabled
+  * [[VUID-VkQueryPoolCreateInfo-queryType-12438]]
+    If pname:queryType is ename:VK_QUERY_TYPE_VIDEO_ENCODE_FEEDBACK_KHR and
+    the pname:pNext chain includes a
+    slink:VkQueryPoolVideoEncodePerPartitionFeedbackCreateInfoKHR structure
+    with a non-zero pname:maxPerPartitionFeedbackEntries member, then
+    <<features-videoEncodeFeedback2,pname:videoEncodeFeedback2>> must: be
+    enabled
+  * [[VUID-VkQueryPoolCreateInfo-queryType-12439]]
+    If pname:queryType is ename:VK_QUERY_TYPE_VIDEO_ENCODE_FEEDBACK_KHR and
+    the pname:pNext chain includes a
+    slink:VkQueryPoolVideoEncodePerPartitionFeedbackCreateInfoKHR structure
+    with a non-zero pname:maxPerPartitionFeedbackEntries member, then
+    slink:VkQueryPoolVideoEncodePerPartitionFeedbackCreateInfoKHR::pname:perPartitionEncodeFeedbackFlags
+    must: not be zero
+  * [[VUID-VkQueryPoolCreateInfo-queryType-12440]]
+    If pname:queryType is ename:VK_QUERY_TYPE_VIDEO_ENCODE_FEEDBACK_KHR and
+    the pname:pNext chain includes a
+    slink:VkQueryPoolVideoEncodePerPartitionFeedbackCreateInfoKHR structure,
+    then its pname:maxPerPartitionFeedbackEntries must: be less than or
+    equal to
+    slink:VkVideoEncodeFeedback2CapabilitiesKHR::pname:maxPerPartitionFeedbackEntries,
+    as returned by flink:vkGetPhysicalDeviceVideoCapabilitiesKHR for the
+    <<video-profiles,video profile>> described by
+    slink:VkVideoProfileInfoKHR and its pname:pNext chain
+  * [[VUID-VkQueryPoolCreateInfo-queryType-12441]]
+    If pname:queryType is ename:VK_QUERY_TYPE_VIDEO_ENCODE_FEEDBACK_KHR and
+    the pname:pNext chain includes a
+    slink:VkQueryPoolVideoEncodePerPartitionFeedbackCreateInfoKHR structure,
+    then its pname:perPartitionEncodeFeedbackFlags must: not contain any
+    bits that are not set in
+    slink:VkVideoEncodeFeedback2CapabilitiesKHR::pname:supportedPerPartitionEncodeFeedbackFlags,
+    as returned by flink:vkGetPhysicalDeviceVideoCapabilitiesKHR for the
+    <<video-profiles,video profile>> described by
+    slink:VkVideoProfileInfoKHR and its pname:pNext chain
+endif::VK_KHR_video_encode_feedback2[]
+endif::VK_KHR_video_encode_queue[]
+ifdef::VK_KHR_video_encode_av1[]
+  * [[VUID-VkQueryPoolCreateInfo-pNext-10248]]
+    If the pname:pNext chain includes a slink:VkVideoProfileInfoKHR
+    structure and its pname:videoCodecOperation member is
+    ename:VK_VIDEO_CODEC_OPERATION_ENCODE_AV1_BIT_KHR, then the
+    <<features-videoEncodeAV1,pname:videoEncodeAV1>> feature must: be
+    enabled
+endif::VK_KHR_video_encode_av1[]
+ifdef::VK_VALVE_video_encode_rgb_conversion[]
+  * [[VUID-VkQueryPoolCreateInfo-pNext-10918]]
+    If the pname:pNext chain includes a
+    slink:VkVideoEncodeProfileRgbConversionInfoVALVE structure, then the
+    <<features-videoEncodeRgbConversion, pname:videoEncodeRgbConversion>>
+    feature must: be enabled
+endif::VK_VALVE_video_encode_rgb_conversion[]
+****
+
+include::{generated}/validity/structs/VkQueryPoolCreateInfo.adoc[]
+--
+
+[open,refpage='VkQueryPoolCreateFlagBits',desc='Bitmask specifying query pool properties',type='enums']
+--
+Bits which can: be set in slink:VkQueryPoolCreateInfo::pname:flags,
+specifying options for query pools, are:
+
+include::{generated}/api/enums/VkQueryPoolCreateFlagBits.adoc[]
+
+ifdef::VK_KHR_maintenance9[]
+  * ename:VK_QUERY_POOL_CREATE_RESET_BIT_KHR specifies that queries in the
+    query pool are initialized on creation and do not need to be reset
+    before first use.
+endif::VK_KHR_maintenance9[]
+
+ifndef::VK_KHR_maintenance9[]
+[NOTE]
+====
+All bits for this type are defined by extensions, and none of those
+extensions are enabled in this build of the specification.
+====
+endif::VK_KHR_maintenance9[]
+--
+
+[open,refpage='VkQueryPoolCreateFlags',desc='Bitmask of VkQueryPoolCreateFlagBits',type='flags']
+--
+include::{generated}/api/flags/VkQueryPoolCreateFlags.adoc[]
+
+tname:VkQueryPoolCreateFlags is a bitmask type for setting a mask of zero or
+more elink:VkQueryPoolCreateFlagBits.
+--
+
+ifdef::VK_KHR_performance_query[]
+[open,refpage='VkQueryPoolPerformanceCreateInfoKHR',desc='Structure specifying parameters of a newly created performance query pool',type='structs']
+--
+The sname:VkQueryPoolPerformanceCreateInfoKHR structure is defined as:
+
+include::{generated}/api/structs/VkQueryPoolPerformanceCreateInfoKHR.adoc[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:queueFamilyIndex is the queue family index to create this
+    performance query pool for.
+  * pname:counterIndexCount is the length of the pname:pCounterIndices
+    array.
+  * pname:pCounterIndices is a pointer to an array of indices into the
+    flink:vkEnumeratePhysicalDeviceQueueFamilyPerformanceQueryCountersKHR::pname:pCounters
+    to enable in this performance query pool.
+
+.Valid Usage
+****
+  * [[VUID-VkQueryPoolPerformanceCreateInfoKHR-queueFamilyIndex-03236]]
+    pname:queueFamilyIndex must: be a valid queue family index of the device
+  * [[VUID-VkQueryPoolPerformanceCreateInfoKHR-performanceCounterQueryPools-03237]]
+    The <<features-performanceCounterQueryPools,
+    pname:performanceCounterQueryPools>> feature must: be enabled
+  * [[VUID-VkQueryPoolPerformanceCreateInfoKHR-pCounterIndices-03321]]
+    Each element of pname:pCounterIndices must: be in the range of counters
+    reported by
+    fname:vkEnumeratePhysicalDeviceQueueFamilyPerformanceQueryCountersKHR
+    for the queue family specified in pname:queueFamilyIndex
+****
+
+include::{generated}/validity/structs/VkQueryPoolPerformanceCreateInfoKHR.adoc[]
+--
+
+[open,refpage='vkGetPhysicalDeviceQueueFamilyPerformanceQueryPassesKHR',desc='Reports the number of passes require for a performance query pool type',type='protos']
+--
+To query the number of passes required to query a performance query pool on
+a physical device, call:
+
+include::{generated}/api/protos/vkGetPhysicalDeviceQueueFamilyPerformanceQueryPassesKHR.adoc[]
+
+  * pname:physicalDevice is the handle to the physical device whose queue
+    family performance query counter properties will be queried.
+  * pname:pPerformanceQueryCreateInfo is a pointer to a
+    sname:VkQueryPoolPerformanceCreateInfoKHR of the performance query that
+    is to be created.
+  * pname:pNumPasses is a pointer to an integer related to the number of
+    passes required to query the performance query pool, as described below.
+
+The pname:pPerformanceQueryCreateInfo member
+sname:VkQueryPoolPerformanceCreateInfoKHR::pname:queueFamilyIndex must: be a
+queue family of pname:physicalDevice.
+The number of passes required to capture the counters specified in the
+pname:pPerformanceQueryCreateInfo member
+sname:VkQueryPoolPerformanceCreateInfoKHR::pname:pCounters is returned in
+pname:pNumPasses.
+
+include::{generated}/validity/protos/vkGetPhysicalDeviceQueueFamilyPerformanceQueryPassesKHR.adoc[]
+--
+endif::VK_KHR_performance_query[]
+
+ifndef::VKSC_VERSION_1_0[]
+[open,refpage='vkDestroyQueryPool',desc='Destroy a query pool object',type='protos']
+--
+To destroy a query pool, call:
+
+include::{generated}/api/protos/vkDestroyQueryPool.adoc[]
+
+  * pname:device is the logical device that destroys the query pool.
+  * pname:queryPool is the query pool to destroy.
+  * pname:pAllocator controls host memory allocation as described in the
+    <<memory-allocation, Memory Allocation>> chapter.
+
+.Valid Usage
+****
+  * [[VUID-vkDestroyQueryPool-queryPool-00793]]
+    All submitted commands that refer to pname:queryPool must: have
+    completed execution
+  * [[VUID-vkDestroyQueryPool-queryPool-00794]]
+    If sname:VkAllocationCallbacks were provided when pname:queryPool was
+    created, a compatible set of callbacks must: be provided here
+  * [[VUID-vkDestroyQueryPool-queryPool-00795]]
+    If no sname:VkAllocationCallbacks were provided when pname:queryPool was
+    created, pname:pAllocator must: be `NULL`
+****
+
+[NOTE]
+====
+Applications can: verify that pname:queryPool can: be destroyed by checking
+that fname:vkGetQueryPoolResults() without the
+ename:VK_QUERY_RESULT_PARTIAL_BIT flag returns ename:VK_SUCCESS for all
+queries that are used in command buffers submitted for execution.
+====
+
+include::{generated}/validity/protos/vkDestroyQueryPool.adoc[]
+--
+endif::VKSC_VERSION_1_0[]
+
+[open,refpage='VkQueryType',desc='Specify the type of queries managed by a query pool',type='enums']
+--
+Possible values of slink:VkQueryPoolCreateInfo::pname:queryType, specifying
+the type of queries managed by the pool, are:
+
+include::{generated}/api/enums/VkQueryType.adoc[]
+
+  * ename:VK_QUERY_TYPE_OCCLUSION specifies an <<queries-occlusion,
+    occlusion query>>.
+  * ename:VK_QUERY_TYPE_PIPELINE_STATISTICS specifies a <<queries-pipestats,
+    pipeline statistics query>>.
+  * ename:VK_QUERY_TYPE_TIMESTAMP specifies a <<queries-timestamps,
+    timestamp query>>.
+ifdef::VK_KHR_performance_query[]
+  * ename:VK_QUERY_TYPE_PERFORMANCE_QUERY_KHR specifies a
+    <<queries-performance, performance query>>.
+endif::VK_KHR_performance_query[]
+ifdef::VK_EXT_transform_feedback[]
+  * ename:VK_QUERY_TYPE_TRANSFORM_FEEDBACK_STREAM_EXT specifies a
+    <<queries-transform-feedback, transform feedback query>>.
+endif::VK_EXT_transform_feedback[]
+ifdef::VK_EXT_primitives_generated_query[]
+  * ename:VK_QUERY_TYPE_PRIMITIVES_GENERATED_EXT specifies a
+    <<queries-primitives-generated, primitives generated query>>.
+endif::VK_EXT_primitives_generated_query[]
+ifdef::VK_KHR_acceleration_structure[]
+  * ename:VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR specifies
+    a <<acceleration-structure-copying, acceleration structure size query>>
+    for use with flink:vkCmdWriteAccelerationStructuresPropertiesKHR or
+    flink:vkWriteAccelerationStructuresPropertiesKHR.
+  * ename:VK_QUERY_TYPE_ACCELERATION_STRUCTURE_SERIALIZATION_SIZE_KHR
+    specifies a <<acceleration-structure-copying, serialization acceleration
+    structure size query>>.
+endif::VK_KHR_acceleration_structure[]
+ifdef::VK_KHR_ray_tracing_maintenance1[]
+  * ename:VK_QUERY_TYPE_ACCELERATION_STRUCTURE_SIZE_KHR specifies an
+    <<acceleration-structure-copying, acceleration structure size query>>
+    for use with flink:vkCmdWriteAccelerationStructuresPropertiesKHR or
+    flink:vkWriteAccelerationStructuresPropertiesKHR.
+  * ename:VK_QUERY_TYPE_ACCELERATION_STRUCTURE_SERIALIZATION_BOTTOM_LEVEL_POINTERS_KHR
+    specifies a <<serialized-as-header, serialization acceleration structure
+    pointer count query>>.
+endif::VK_KHR_ray_tracing_maintenance1[]
+ifdef::VK_NV_ray_tracing[]
+  * ename:VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_NV specifies
+    an <<acceleration-structure-copying, acceleration structure size query>>
+    for use with flink:vkCmdWriteAccelerationStructuresPropertiesNV.
+endif::VK_NV_ray_tracing[]
+ifdef::VK_INTEL_performance_query[]
+  * ename:VK_QUERY_TYPE_PERFORMANCE_QUERY_INTEL specifies a
+    <<queries-performance-intel, Intel performance query>>.
+endif::VK_INTEL_performance_query[]
+ifdef::VK_KHR_video_queue[]
+  * ename:VK_QUERY_TYPE_RESULT_STATUS_ONLY_KHR specifies a
+    <<queries-result-status-only, result status query>>.
+endif::VK_KHR_video_queue[]
+ifdef::VK_KHR_video_encode_queue[]
+  * ename:VK_QUERY_TYPE_VIDEO_ENCODE_FEEDBACK_KHR specifies a
+    <<queries-video-encode-feedback, video encode feedback query>>.
+endif::VK_KHR_video_encode_queue[]
+ifdef::VK_EXT_mesh_shader[]
+  * ename:VK_QUERY_TYPE_MESH_PRIMITIVES_GENERATED_EXT specifies a
+    <<queries-mesh-shader, generated mesh primitives query>>.
+endif::VK_EXT_mesh_shader[]
+ifdef::VK_QCOM_elapsed_timer_query[]
+  * ename:VK_QUERY_TYPE_TIME_ELAPSED_QCOM specifies an
+    <<queries-elapsed-timer, elapsed timer query>>.
+endif::VK_QCOM_elapsed_timer_query[]
+ifdef::VK_EXT_opacity_micromap[]
+  * ename:VK_QUERY_TYPE_MICROMAP_SERIALIZATION_SIZE_EXT specifies a micromap
+    query to get the size required by a serialized micromap.
+  * ename:VK_QUERY_TYPE_MICROMAP_COMPACTED_SIZE_EXT specifies a micromap
+    query to get the size required by a compacted micromap.
+endif::VK_EXT_opacity_micromap[]
+--
+
+
+[[queries-operation]]
+== Query Operation
+
+The operation of queries is controlled by the commands
+flink:vkCmdBeginQuery, flink:vkCmdEndQuery,
+ifdef::VK_EXT_transform_feedback[]
+flink:vkCmdBeginQueryIndexedEXT, flink:vkCmdEndQueryIndexedEXT,
+endif::VK_EXT_transform_feedback[]
+flink:vkCmdResetQueryPool, flink:vkCmdCopyQueryPoolResults,
+ifdef::VK_KHR_acceleration_structure[]
+flink:vkCmdWriteAccelerationStructuresPropertiesKHR,
+endif::VK_KHR_acceleration_structure[]
+ifdef::VK_NV_ray_tracing[]
+flink:vkCmdWriteAccelerationStructuresPropertiesNV,
+endif::VK_NV_ray_tracing[]
+ifdef::VK_EXT_opacity_micromap[]
+flink:vkCmdWriteMicromapsPropertiesEXT,
+endif::VK_EXT_opacity_micromap[]
+ifdef::VK_KHR_device_address_commands[flink:vkCmdCopyQueryPoolResultsToMemoryKHR,]
+ifdef::VK_BASE_VERSION_1_3,VK_KHR_synchronization2[]
+flink:vkCmdWriteTimestamp2,
+endif::VK_BASE_VERSION_1_3,VK_KHR_synchronization2[]
+and flink:vkCmdWriteTimestamp.
+
+In order for a sname:VkCommandBuffer to record query management commands,
+the queue family for which its sname:VkCommandPool was created must: support
+the appropriate type of operations (graphics, compute) suitable for the
+query type of a given query pool.
+
+Each query in a query pool has a status that is either _unavailable_ or
+_available_, and also has state to store the numerical results of a query
+operation of the type requested when the query pool was created.
+Resetting a query via flink:vkCmdResetQueryPool
+ifdef::VK_BASE_VERSION_1_2,VK_EXT_host_query_reset[]
+or flink:vkResetQueryPool
+endif::VK_BASE_VERSION_1_2,VK_EXT_host_query_reset[]
+sets the status to unavailable and makes the numerical results undefined:.
+A query is made available by the operation of flink:vkCmdEndQuery,
+ifdef::VK_EXT_transform_feedback[]
+flink:vkCmdEndQueryIndexedEXT,
+endif::VK_EXT_transform_feedback[]
+ifdef::VK_KHR_acceleration_structure[]
+flink:vkCmdWriteAccelerationStructuresPropertiesKHR,
+endif::VK_KHR_acceleration_structure[]
+ifdef::VK_NV_ray_tracing[]
+flink:vkCmdWriteAccelerationStructuresPropertiesNV,
+endif::VK_NV_ray_tracing[]
+ifdef::VK_EXT_opacity_micromap[]
+flink:vkCmdWriteMicromapsPropertiesEXT,
+endif::VK_EXT_opacity_micromap[]
+ifdef::VK_BASE_VERSION_1_3,VK_KHR_synchronization2[]
+flink:vkCmdWriteTimestamp2,
+endif::VK_BASE_VERSION_1_3,VK_KHR_synchronization2[]
+or flink:vkCmdWriteTimestamp.
+Both the availability status and numerical results can: be retrieved by
+calling either flink:vkGetQueryPoolResults or
+flink:vkCmdCopyQueryPoolResults.
+
+After query pool creation,
+ifdef::VK_KHR_maintenance9[]
+where ename:VK_QUERY_POOL_CREATE_RESET_BIT_KHR was not set in
+slink:VkQueryPoolCreateInfo::pname:flags
+endif::VK_KHR_maintenance9[]
+each query is in an uninitialized state and must: be reset before it is
+used.
+Queries must: also be reset between uses.
+
+ifdef::VK_BASE_VERSION_1_1,VK_KHR_device_group[]
+
+If a logical device includes multiple physical devices, then each command
+that writes a query must: execute on a single physical device, and any call
+to flink:vkCmdBeginQuery must: execute the corresponding flink:vkCmdEndQuery
+command on the same physical device.
+
+endif::VK_BASE_VERSION_1_1,VK_KHR_device_group[]
+
+[open,refpage='vkCmdResetQueryPool',desc='Reset queries in a query pool',type='protos']
+--
+:refpage: vkCmdResetQueryPool
+
+To reset a range of queries in a query pool on a queue, call:
+
+include::{generated}/api/protos/vkCmdResetQueryPool.adoc[]
+
+  * pname:commandBuffer is the command buffer into which this command will
+    be recorded.
+  * pname:queryPool is the handle of the query pool managing the queries
+    being reset.
+  * pname:firstQuery is the initial query index to reset.
+  * pname:queryCount is the number of queries to reset.
+
+When executed on a queue, this command sets the status of query indices
+[eq]#[pname:firstQuery, pname:firstQuery {plus} pname:queryCount - 1]# to
+unavailable.
+
+This command defines an execution dependency between other query commands
+that reference the same query.
+
+The first <<synchronization-dependencies-scopes, synchronization scope>>
+includes all commands which reference the queries in pname:queryPool
+indicated by pname:firstQuery and pname:queryCount that occur earlier in
+<<synchronization-submission-order,submission order>>.
+
+The second <<synchronization-dependencies-scopes, synchronization scope>>
+includes all commands which reference the queries in pname:queryPool
+indicated by pname:firstQuery and pname:queryCount that occur later in
+<<synchronization-submission-order,submission order>>.
+
+The operation of this command happens after the first scope and happens
+before the second scope.
+
+ifdef::VK_KHR_performance_query[]
+If the pname:queryType used to create pname:queryPool was
+ename:VK_QUERY_TYPE_PERFORMANCE_QUERY_KHR, this command sets the status of
+query indices [eq]#[pname:firstQuery, pname:firstQuery {plus}
+pname:queryCount - 1]# to unavailable for each pass of pname:queryPool, as
+indicated by a call to
+flink:vkGetPhysicalDeviceQueueFamilyPerformanceQueryPassesKHR.
+
+[NOTE]
+====
+Because fname:vkCmdResetQueryPool resets all the passes of the indicated
+queries, applications must not record a fname:vkCmdResetQueryPool command
+for a pname:queryPool created with ename:VK_QUERY_TYPE_PERFORMANCE_QUERY_KHR
+in a command buffer that needs to be submitted multiple times as indicated
+by a call to flink:vkGetPhysicalDeviceQueueFamilyPerformanceQueryPassesKHR.
+Otherwise applications will never be able to complete the recorded queries.
+====
+endif::VK_KHR_performance_query[]
+
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/query_pool_count_common.adoc[]
+  * [[VUID-vkCmdResetQueryPool-None-02841]]
+    All queries used by the command must: not be active
+ifdef::VK_KHR_performance_query[]
+  * [[VUID-vkCmdResetQueryPool-firstQuery-02862]]
+    If pname:queryPool was created with
+    ename:VK_QUERY_TYPE_PERFORMANCE_QUERY_KHR, this command must: not be
+    recorded in a command buffer that, either directly or through secondary
+    command buffers, also contains begin commands for a query from the set
+    of queries [eq]#[pname:firstQuery, pname:firstQuery {plus}
+    pname:queryCount - 1]#
+endif::VK_KHR_performance_query[]
+****
+
+include::{generated}/validity/protos/vkCmdResetQueryPool.adoc[]
+--
+
+ifdef::VK_BASE_VERSION_1_2,VK_EXT_host_query_reset[]
+[open,refpage='vkResetQueryPool',desc='Reset queries in a query pool',type='protos']
+--
+:refpage: vkResetQueryPool
+
+To reset a range of queries in a query pool on the host, call:
+
+ifdef::VK_BASE_VERSION_1_2[]
+include::{generated}/api/protos/vkResetQueryPool.adoc[]
+endif::VK_BASE_VERSION_1_2[]
+
+ifdef::VK_EXT_host_query_reset[]
+include::{generated}/api/protos/vkResetQueryPoolEXT.adoc[]
+endif::VK_EXT_host_query_reset[]
+
+  * pname:device is the logical device that owns the query pool.
+  * pname:queryPool is the handle of the query pool managing the queries
+    being reset.
+  * pname:firstQuery is the initial query index to reset.
+  * pname:queryCount is the number of queries to reset.
+
+This command sets the status of query indices [eq]#[pname:firstQuery,
+pname:firstQuery {plus} pname:queryCount - 1]# to unavailable.
+
+ifdef::VK_KHR_performance_query[]
+If pname:queryPool is ename:VK_QUERY_TYPE_PERFORMANCE_QUERY_KHR this command
+sets the status of query indices [eq]#[pname:firstQuery, pname:firstQuery
+{plus} pname:queryCount - 1]# to unavailable for each pass.
+endif::VK_KHR_performance_query[]
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/query_pool_count_common.adoc[]
+  * [[VUID-vkResetQueryPool-None-02665]]
+    The <<features-hostQueryReset, pname:hostQueryReset>> feature must: be
+    enabled
+  * [[VUID-vkResetQueryPool-firstQuery-02741]]
+    Submitted commands that refer to the range specified by pname:firstQuery
+    and pname:queryCount in pname:queryPool must: have completed execution
+  * [[VUID-vkResetQueryPool-firstQuery-02742]]
+    The range of queries specified by pname:firstQuery and pname:queryCount
+    in pname:queryPool must: not be in use by calls to
+    flink:vkGetQueryPoolResults or fname:vkResetQueryPool in other threads
+****
+
+include::{generated}/validity/protos/vkResetQueryPool.adoc[]
+--
+endif::VK_BASE_VERSION_1_2,VK_EXT_host_query_reset[]
+
+Once queries are reset and ready for use, query commands can: be issued to a
+command buffer.
+ifdef::VK_COMPUTE_VERSION_1_0[]
+Pipeline statistics queries count pipeline stage invocations,
+ifdef::VK_GRAPHICS_VERSION_1_0[occlusion queries count drawn samples,]
+ifdef::VK_QCOM_elapsed_timer_query[elapsed timer queries count elapsed time]
+resulting from commands that are recorded between a flink:vkCmdBeginQuery
+command and a flink:vkCmdEndQuery command within a specified command buffer,
+effectively scoping a set of dispatching
+ifdef::VK_GRAPHICS_VERSION_1_0[and/or drawing]
+commands.
+endif::VK_COMPUTE_VERSION_1_0[]
+Timestamp queries write timestamps to a query pool.
+ifdef::VK_KHR_performance_query[]
+Performance queries record performance counters to a query pool.
+endif::VK_KHR_performance_query[]
+
+A query must: begin and end in the same command buffer, although if it is a
+primary command buffer, and the <<features-inheritedQueries,
+pname:inheritedQueries>> feature is enabled, it can: execute secondary
+command buffers during the query operation.
+For a secondary command buffer to be executed while an occlusion query or
+pipeline statistics query is active, it must: set the
+pname:occlusionQueryEnable, pname:queryFlags, and/or
+pname:pipelineStatistics members of slink:VkCommandBufferInheritanceInfo to
+conservative values, as described in the <<commandbuffers-recording, Command
+Buffer Recording>> section.
+ifdef::VK_GRAPHICS_VERSION_1_0[]
+A query must: either begin and end inside the same subpass of a render pass
+instance, or must: both begin and end outside of a render pass instance
+(i.e. contain entire render pass instances).
+endif::VK_GRAPHICS_VERSION_1_0[]
+
+ifdef::VK_GRAPHICS_VERSION_1_1,VK_KHR_multiview[]
+
+If queries are used while executing a render pass instance that has
+multiview enabled, the query uses [eq]#N# consecutive query indices in the
+query pool (starting at pname:query) where [eq]#N# is the number of bits set
+in the view mask in the subpass the query is used in.
+How the numerical results of the query are distributed among the queries is
+implementation-dependent.
+For example, some implementations may: write each view's results to a
+distinct query, while other implementations may: write the total result to
+the first query and write zero to the other queries.
+However, the sum of the results in all the queries must: accurately reflect
+the total result of the query summed over all views.
+Applications can: sum the results from all the queries to compute the total
+result.
+
+Queries used with multiview rendering must: not span subpasses, i.e. they
+must: begin and end in the same subpass.
+
+endif::VK_GRAPHICS_VERSION_1_1,VK_KHR_multiview[]
+
+ifdef::VK_KHR_video_queue[]
+A query must: either begin and end inside the same video coding scope, or
+must: both begin and end outside of a video coding scope and must: not
+contain entire video coding scopes.
+endif::VK_KHR_video_queue[]
+
+[open,refpage='vkCmdBeginQuery',desc='Begin a query',type='protos',xrefs='vkCmdEndQuery vkCmdBeginQueryIndexedEXT vkCmdEndQueryIndexedEXT']
+--
+:refpage: vkCmdBeginQuery
+
+To begin a query, call:
+
+include::{generated}/api/protos/vkCmdBeginQuery.adoc[]
+
+  * pname:commandBuffer is the command buffer into which this command will
+    be recorded.
+  * pname:queryPool is the query pool that will manage the results of the
+    query.
+  * pname:query is the query index within the query pool that will contain
+    the results.
+  * pname:flags is a bitmask of elink:VkQueryControlFlagBits specifying
+    constraints on the types of queries that can: be performed.
+
+ifdef::VK_GRAPHICS_VERSION_1_0[]
+If the pname:queryType of the pool is ename:VK_QUERY_TYPE_OCCLUSION and
+pname:flags contains ename:VK_QUERY_CONTROL_PRECISE_BIT, an implementation
+must: return a result that matches the actual number of samples passed.
+This is described in more detail in <<queries-occlusion,Occlusion Queries>>.
+endif::VK_GRAPHICS_VERSION_1_0[]
+
+ifdef::VK_EXT_transform_feedback[]
+Calling fname:vkCmdBeginQuery is equivalent to calling
+flink:vkCmdBeginQueryIndexedEXT with the pname:index parameter set to zero.
+endif::VK_EXT_transform_feedback[]
+
+[[queries-operation-active]]
+After beginning a query, that query is considered _active_ within the
+command buffer it was called in until that same query is ended.
+Queries active in a primary command buffer when secondary command buffers
+are executed are considered active for those secondary command buffers.
+
+ifdef::VK_KHR_video_queue[]
+Furthermore, if the query is started within a video coding scope, the
+following command buffer states are initialized for the query type:
+
+  * [[queries-operation-active-query-index]] The _active_query_index_ is set
+    to the value specified by pname:query.
+  * [[queries-operation-last-activatable-query-index]] The _last activatable
+    query index_ is also set to the value specified by pname:query.
+
+Each <<video-coding,video coding operation>> stores a result to the query
+corresponding to the current active query index, followed by incrementing
+the active query index.
+If the active query index gets incremented past the last activatable query
+index, issuing any further video coding operations results in undefined:
+behavior.
+
+[NOTE]
+====
+In practice, this means that currently no more than a single video coding
+operation must: be issued between a begin and end query pair.
+====
+
+endif::VK_KHR_video_queue[]
+
+This command defines an execution dependency between other query commands
+that reference the same query.
+
+The first <<synchronization-dependencies-scopes, synchronization scope>>
+includes all commands which reference the queries in pname:queryPool
+indicated by pname:query that occur earlier in
+<<synchronization-submission-order,submission order>>.
+
+The second <<synchronization-dependencies-scopes, synchronization scope>>
+includes all commands which reference the queries in pname:queryPool
+indicated by pname:query that occur later in
+<<synchronization-submission-order,submission order>>.
+
+The operation of this command happens after the first scope and happens
+before the second scope.
+
+ifdef::VK_QCOM_elapsed_timer_query[]
+If the pname:queryType of the pool is ename:VK_QUERY_TYPE_TIME_ELAPSED_QCOM,
+this command also defines an execution dependency on commands that were
+submitted before it, and starting the timer.
+
+The first synchronization scope includes all commands that occur earlier in
+submission order.
+
+The second synchronization scope includes only the starting of the timer.
+endif::VK_QCOM_elapsed_timer_query[]
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/query_begin_common.adoc[]
+  * [[VUID-vkCmdBeginQuery-queryPool-01922]]
+    pname:queryPool must: have been created with a pname:queryType that
+    differs from that of any queries that are
+    <<queries-operation-active,active>> within pname:commandBuffer
+ifdef::VK_EXT_mesh_shader[]
+  * [[VUID-vkCmdBeginQuery-queryType-07070]]
+    If the pname:queryType used to create pname:queryPool was
+    ename:VK_QUERY_TYPE_MESH_PRIMITIVES_GENERATED_EXT the
+    sname:VkCommandPool that pname:commandBuffer was allocated from must:
+    support graphics operations
+endif::VK_EXT_mesh_shader[]
+ifdef::VK_EXT_transform_feedback[]
+  * [[VUID-vkCmdBeginQuery-queryType-02327]]
+    If the pname:queryType used to create pname:queryPool was
+    ename:VK_QUERY_TYPE_TRANSFORM_FEEDBACK_STREAM_EXT the
+    sname:VkCommandPool that pname:commandBuffer was allocated from must:
+    support graphics operations
+  * [[VUID-vkCmdBeginQuery-queryType-02328]]
+    If the pname:queryType used to create pname:queryPool was
+    ename:VK_QUERY_TYPE_TRANSFORM_FEEDBACK_STREAM_EXT then
+    sname:VkPhysicalDeviceTransformFeedbackPropertiesEXT::pname:transformFeedbackQueries
+    must: be supported
+endif::VK_EXT_transform_feedback[]
+ifdef::VK_EXT_primitives_generated_query[]
+  * [[VUID-vkCmdBeginQuery-queryType-06687]]
+    If the pname:queryType used to create pname:queryPool was
+    ename:VK_QUERY_TYPE_PRIMITIVES_GENERATED_EXT the sname:VkCommandPool
+    that pname:commandBuffer was allocated from must: support graphics
+    operations
+  * [[VUID-vkCmdBeginQuery-queryType-06688]]
+    If the pname:queryType used to create pname:queryPool was
+    ename:VK_QUERY_TYPE_PRIMITIVES_GENERATED_EXT then
+    <<features-primitivesGeneratedQuery, pname:primitivesGeneratedQuery>>
+    must: be enabled
+endif::VK_EXT_primitives_generated_query[]
+include::{chapters}/commonvalidity/performance_query_begin_common.adoc[]
+****
+
+include::{generated}/validity/protos/vkCmdBeginQuery.adoc[]
+--
+
+ifdef::VK_EXT_transform_feedback[]
+[open,refpage='vkCmdBeginQueryIndexedEXT',desc='Begin an indexed query',type='protos',xrefs='vkCmdBeginQuery vkCmdEndQuery vkCmdEndQueryIndexedEXT']
+--
+:refpage: vkCmdBeginQueryIndexedEXT
+
+To begin an indexed query, call:
+
+include::{generated}/api/protos/vkCmdBeginQueryIndexedEXT.adoc[]
+
+  * pname:commandBuffer is the command buffer into which this command will
+    be recorded.
+  * pname:queryPool is the query pool that will manage the results of the
+    query.
+  * pname:query is the query index within the query pool that will contain
+    the results.
+  * pname:flags is a bitmask of elink:VkQueryControlFlagBits specifying
+    constraints on the types of queries that can: be performed.
+  * pname:index is the query type specific index.
+    When the query type is ename:VK_QUERY_TYPE_TRANSFORM_FEEDBACK_STREAM_EXT
+ifdef::VK_EXT_primitives_generated_query[]
+    or ename:VK_QUERY_TYPE_PRIMITIVES_GENERATED_EXT,
+endif::VK_EXT_primitives_generated_query[]
+    the index represents the vertex stream.
+
+The fname:vkCmdBeginQueryIndexedEXT command operates the same as the
+flink:vkCmdBeginQuery command, except that it also accepts a query type
+specific pname:index parameter.
+
+This command defines an execution dependency between other query commands
+that reference the same query index.
+
+The first <<synchronization-dependencies-scopes, synchronization scope>>
+includes all commands which reference the queries in pname:queryPool
+indicated by pname:query and pname:index that occur earlier in
+<<synchronization-submission-order,submission order>>.
+
+The second <<synchronization-dependencies-scopes, synchronization scope>>
+includes all commands which reference the queries in pname:queryPool
+indicated by pname:query and pname:index that occur later in
+<<synchronization-submission-order,submission order>>.
+
+The operation of this command happens after the first scope and happens
+before the second scope.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/query_begin_common.adoc[]
+  * [[VUID-vkCmdBeginQueryIndexedEXT-queryPool-04753]]
+    If the pname:queryPool was created with the same pname:queryType as that
+    of another <<queries-operation-active,active>> query within
+    pname:commandBuffer, then pname:index must: not match the index used for
+    the active query
+  * [[VUID-vkCmdBeginQueryIndexedEXT-queryType-02338]]
+    If the pname:queryType used to create pname:queryPool was
+    ename:VK_QUERY_TYPE_TRANSFORM_FEEDBACK_STREAM_EXT the
+    sname:VkCommandPool that pname:commandBuffer was allocated from must:
+    support graphics operations
+  * [[VUID-vkCmdBeginQueryIndexedEXT-queryType-02339]]
+    If the pname:queryType used to create pname:queryPool was
+    ename:VK_QUERY_TYPE_TRANSFORM_FEEDBACK_STREAM_EXT the pname:index
+    parameter must: be less than
+    sname:VkPhysicalDeviceTransformFeedbackPropertiesEXT::pname:maxTransformFeedbackStreams
+  * [[VUID-vkCmdBeginQueryIndexedEXT-queryType-06692]]
+    If the pname:queryType used to create pname:queryPool was not
+    ename:VK_QUERY_TYPE_TRANSFORM_FEEDBACK_STREAM_EXT
+ifdef::VK_EXT_primitives_generated_query[]
+    and not ename:VK_QUERY_TYPE_PRIMITIVES_GENERATED_EXT,
+endif::VK_EXT_primitives_generated_query[]
+    the pname:index must: be zero
+ifdef::VK_EXT_primitives_generated_query[]
+  * [[VUID-vkCmdBeginQueryIndexedEXT-queryType-06689]]
+    If the pname:queryType used to create pname:queryPool was
+    ename:VK_QUERY_TYPE_PRIMITIVES_GENERATED_EXT the sname:VkCommandPool
+    that pname:commandBuffer was allocated from must: support graphics
+    operations
+  * [[VUID-vkCmdBeginQueryIndexedEXT-queryType-06690]]
+    If the pname:queryType used to create pname:queryPool was
+    ename:VK_QUERY_TYPE_PRIMITIVES_GENERATED_EXT the pname:index parameter
+    must: be less than
+    sname:VkPhysicalDeviceTransformFeedbackPropertiesEXT::pname:maxTransformFeedbackStreams
+  * [[VUID-vkCmdBeginQueryIndexedEXT-queryType-06691]]
+    If the pname:queryType used to create pname:queryPool was
+    ename:VK_QUERY_TYPE_PRIMITIVES_GENERATED_EXT and the
+    <<features-primitivesGeneratedQueryWithNonZeroStreams,
+    pname:primitivesGeneratedQueryWithNonZeroStreams>> feature is not
+    enabled, the pname:index parameter must: be zero
+  * [[VUID-vkCmdBeginQueryIndexedEXT-queryType-06693]]
+    If the pname:queryType used to create pname:queryPool was
+    ename:VK_QUERY_TYPE_PRIMITIVES_GENERATED_EXT then
+    <<features-primitivesGeneratedQuery, pname:primitivesGeneratedQuery>>
+    must: be enabled
+endif::VK_EXT_primitives_generated_query[]
+  * [[VUID-vkCmdBeginQueryIndexedEXT-queryType-02341]]
+    If the pname:queryType used to create pname:queryPool was
+    ename:VK_QUERY_TYPE_TRANSFORM_FEEDBACK_STREAM_EXT then
+    sname:VkPhysicalDeviceTransformFeedbackPropertiesEXT::pname:transformFeedbackQueries
+    must: be supported
+ifdef::VK_EXT_mesh_shader[]
+  * [[VUID-vkCmdBeginQueryIndexedEXT-queryType-07071]]
+    The pname:queryType used to create pname:queryPool must: not be
+    ename:VK_QUERY_TYPE_MESH_PRIMITIVES_GENERATED_EXT
+endif::VK_EXT_mesh_shader[]
+include::{chapters}/commonvalidity/performance_query_begin_common.adoc[]
+****
+
+include::{generated}/validity/protos/vkCmdBeginQueryIndexedEXT.adoc[]
+--
+endif::VK_EXT_transform_feedback[]
+
+[open,refpage='VkQueryControlFlagBits',desc='Bitmask specifying constraints on a query',type='enums']
+--
+Bits which can: be set in flink:vkCmdBeginQuery::pname:flags, specifying
+constraints on the types of queries that can: be performed, are:
+
+include::{generated}/api/enums/VkQueryControlFlagBits.adoc[]
+
+  * ename:VK_QUERY_CONTROL_PRECISE_BIT specifies the precision of
+    <<queries-occlusion, occlusion queries>>.
+--
+
+[open,refpage='VkQueryControlFlags',desc='Bitmask of VkQueryControlFlagBits',type='flags']
+--
+include::{generated}/api/flags/VkQueryControlFlags.adoc[]
+
+tname:VkQueryControlFlags is a bitmask type for setting a mask of zero or
+more elink:VkQueryControlFlagBits.
+--
+
+[open,refpage='vkCmdEndQuery',desc='Ends a query',type='protos',xrefs='vkCmdBeginQuery vkCmdBeginQueryIndexedEXT vkCmdEndQueryIndexedEXT']
+--
+:refpage: vkCmdEndQuery
+
+To end a query after the set of desired commands is recorded, call:
+
+include::{generated}/api/protos/vkCmdEndQuery.adoc[]
+
+  * pname:commandBuffer is the command buffer into which this command will
+    be recorded.
+  * pname:queryPool is the query pool that is managing the results of the
+    query.
+  * pname:query is the query index within the query pool where the result is
+    stored.
+
+The command completes the query in pname:queryPool identified by
+pname:query, and marks it as available.
+
+This command defines an execution dependency between other query commands
+that reference the same query.
+
+The first <<synchronization-dependencies-scopes, synchronization scope>>
+includes all commands which reference the queries in pname:queryPool
+indicated by pname:query that occur earlier in
+<<synchronization-submission-order,submission order>>.
+
+The second <<synchronization-dependencies-scopes, synchronization scope>>
+includes only the operation of this command.
+
+ifdef::VK_QCOM_elapsed_timer_query[]
+If the pname:queryType of the pool is ename:VK_QUERY_TYPE_TIME_ELAPSED_QCOM,
+this command also defines an execution dependency on commands that were
+submitted before it, and ending the timer.
+
+The first synchronization scope includes all commands that occur earlier in
+submission order.
+
+The second synchronization scope includes only the ending of the timer.
+endif::VK_QCOM_elapsed_timer_query[]
+
+ifdef::VK_EXT_transform_feedback[]
+Calling fname:vkCmdEndQuery is equivalent to calling
+flink:vkCmdEndQueryIndexedEXT with the pname:index parameter set to zero.
+endif::VK_EXT_transform_feedback[]
+
+
+.Valid Usage
+****
+  * [[VUID-vkCmdEndQuery-None-01923]]
+    All queries used by the command must: be
+    <<queries-operation-active,active>>
+  * [[VUID-vkCmdEndQuery-query-00810]]
+    pname:query must: be less than the number of queries in pname:queryPool
+ifdef::VK_BASE_VERSION_1_1[]
+  * [[VUID-vkCmdEndQuery-commandBuffer-01886]]
+    pname:commandBuffer must: not be a protected command buffer
+endif::VK_BASE_VERSION_1_1[]
+ifdef::VK_GRAPHICS_VERSION_1_1,VK_KHR_multiview[]
+  * [[VUID-vkCmdEndQuery-query-00812]]
+    If fname:vkCmdEndQuery is called within a render pass instance, the sum
+    of pname:query and the number of bits set in the current subpass's view
+    mask must: be less than or equal to the number of queries in
+    pname:queryPool
+endif::VK_GRAPHICS_VERSION_1_1,VK_KHR_multiview[]
+ifdef::VK_KHR_performance_query[]
+  * [[VUID-vkCmdEndQuery-queryPool-03227]]
+    If pname:queryPool was created with a pname:queryType of
+    ename:VK_QUERY_TYPE_PERFORMANCE_QUERY_KHR and one or more of the
+    counters used to create pname:queryPool was
+    ename:VK_PERFORMANCE_COUNTER_SCOPE_COMMAND_BUFFER_KHR, the
+    flink:vkCmdEndQuery must: be the last recorded command in
+    pname:commandBuffer
+  * [[VUID-vkCmdEndQuery-queryPool-03228]]
+    If pname:queryPool was created with a pname:queryType of
+    ename:VK_QUERY_TYPE_PERFORMANCE_QUERY_KHR and one or more of the
+    counters used to create pname:queryPool was
+    ename:VK_PERFORMANCE_COUNTER_SCOPE_RENDER_PASS_KHR, the
+    flink:vkCmdEndQuery must: not be recorded within a render pass instance
+endif::VK_KHR_performance_query[]
+include::{chapters}/commonvalidity/query_end_common.adoc[]
+****
+
+include::{generated}/validity/protos/vkCmdEndQuery.adoc[]
+--
+
+ifdef::VK_EXT_transform_feedback[]
+[open,refpage='vkCmdEndQueryIndexedEXT',desc='Ends a query',type='protos',xrefs='vkCmdBeginQuery vkCmdEndQuery vkCmdBeginQueryIndexedEXT']
+--
+:refpage: vkCmdEndQueryIndexedEXT
+
+To end an indexed query after the set of desired drawing or dispatching
+commands is recorded, call:
+
+include::{generated}/api/protos/vkCmdEndQueryIndexedEXT.adoc[]
+
+  * pname:commandBuffer is the command buffer into which this command will
+    be recorded.
+  * pname:queryPool is the query pool that is managing the results of the
+    query.
+  * pname:query is the query index within the query pool where the result is
+    stored.
+  * pname:index is the query type specific index.
+
+The command completes the query in pname:queryPool identified by pname:query
+and pname:index, and marks it as available.
+
+The fname:vkCmdEndQueryIndexedEXT command operates the same as the
+flink:vkCmdEndQuery command, except that it also accepts a query type
+specific pname:index parameter.
+
+This command defines an execution dependency between other query commands
+that reference the same query index.
+
+The first <<synchronization-dependencies-scopes, synchronization scope>>
+includes all commands which reference the queries in pname:queryPool
+indicated by pname:query that occur earlier in
+<<synchronization-submission-order,submission order>>.
+
+The second <<synchronization-dependencies-scopes, synchronization scope>>
+includes only the operation of this command.
+
+.Valid Usage
+****
+  * [[VUID-vkCmdEndQueryIndexedEXT-None-02342]]
+    All queries used by the command must: be
+    <<queries-operation-active,active>>
+  * [[VUID-vkCmdEndQueryIndexedEXT-query-02343]]
+    pname:query must: be less than the number of queries in pname:queryPool
+ifdef::VK_BASE_VERSION_1_1[]
+  * [[VUID-vkCmdEndQueryIndexedEXT-commandBuffer-02344]]
+    pname:commandBuffer must: not be a protected command buffer
+endif::VK_BASE_VERSION_1_1[]
+ifdef::VK_GRAPHICS_VERSION_1_1,VK_KHR_multiview[]
+  * [[VUID-vkCmdEndQueryIndexedEXT-query-02345]]
+    If fname:vkCmdEndQueryIndexedEXT is called within a render pass
+    instance, the sum of pname:query and the number of bits set in the
+    current subpass's view mask must: be less than or equal to the number of
+    queries in pname:queryPool
+endif::VK_GRAPHICS_VERSION_1_1,VK_KHR_multiview[]
+  * [[VUID-vkCmdEndQueryIndexedEXT-queryType-06694]]
+    If the pname:queryType used to create pname:queryPool was
+    ename:VK_QUERY_TYPE_TRANSFORM_FEEDBACK_STREAM_EXT
+ifdef::VK_EXT_primitives_generated_query[]
+    or ename:VK_QUERY_TYPE_PRIMITIVES_GENERATED_EXT,
+endif::VK_EXT_primitives_generated_query[]
+    the pname:index parameter must: be less than
+    sname:VkPhysicalDeviceTransformFeedbackPropertiesEXT::pname:maxTransformFeedbackStreams
+  * [[VUID-vkCmdEndQueryIndexedEXT-queryType-06695]]
+    If the pname:queryType used to create pname:queryPool was not
+    ename:VK_QUERY_TYPE_TRANSFORM_FEEDBACK_STREAM_EXT
+ifdef::VK_EXT_primitives_generated_query[]
+    and not ename:VK_QUERY_TYPE_PRIMITIVES_GENERATED_EXT,
+endif::VK_EXT_primitives_generated_query[]
+    the pname:index must: be zero
+  * [[VUID-vkCmdEndQueryIndexedEXT-queryType-06696]]
+    If the pname:queryType used to create pname:queryPool was
+    ename:VK_QUERY_TYPE_TRANSFORM_FEEDBACK_STREAM_EXT
+ifdef::VK_EXT_primitives_generated_query[]
+    or ename:VK_QUERY_TYPE_PRIMITIVES_GENERATED_EXT,
+endif::VK_EXT_primitives_generated_query[]
+    pname:index must: equal the pname:index used to begin the query
+include::{chapters}/commonvalidity/query_end_common.adoc[]
+****
+
+include::{generated}/validity/protos/vkCmdEndQueryIndexedEXT.adoc[]
+--
+endif::VK_EXT_transform_feedback[]
+
+[[queries-operation-memorylayout]]
+An application can: retrieve results either by requesting they be written
+into application-provided memory, or by requesting they be copied into a
+sname:VkBuffer.
+In either case, the layout in memory is defined as follows:
+
+  * The first query's result is written starting at the first byte requested
+    by the command, and each subsequent query's result begins pname:stride
+    bytes later.
+  * Each query writes results in a tightly packed array of result values as
+    follows:
+ifdef::VK_GRAPHICS_VERSION_1_0[]
+  ** Occlusion queries write one unsigned integer value - the number of
+     samples passed.
+endif::VK_GRAPHICS_VERSION_1_0[]
+ifdef::VK_COMPUTE_VERSION_1_0[]
+  ** Pipeline statistics queries write one unsigned integer value for each
+     bit that is enabled in the pname:pipelineStatistics when the pool is
+     created, and the statistics values are written in bit order starting
+     from the least significant bit.
+endif::VK_COMPUTE_VERSION_1_0[]
+  ** Timestamp queries write one unsigned integer value.
+ifdef::VK_QCOM_elapsed_timer_query[]
+  ** Elapsed timer queries write one integer value - the elapsed time
+     between fname:vkCmdBeginQuery and fname:vkCmdEndQuery.
+endif::VK_QCOM_elapsed_timer_query[]
+ifdef::VK_KHR_performance_query[]
+  ** Performance queries write one slink:VkPerformanceCounterResultKHR value
+     for each slink:VkPerformanceCounterKHR in the query.
+endif::VK_KHR_performance_query[]
+ifdef::VK_EXT_transform_feedback[]
+  ** Transform feedback queries write two unsigned integer values; the first
+     integer is the number of primitives successfully written to the
+     corresponding transform feedback buffer and the second is the number of
+     primitives output to the vertex stream, regardless of whether they were
+     successfully captured or not.
+     In other words, if the transform feedback buffer was sized too small
+     for the number of primitives output by the vertex stream, the first
+     integer represents the number of primitives actually written and the
+     second is the number that would have been written if all the transform
+     feedback buffers associated with that vertex stream were large enough.
+endif::VK_EXT_transform_feedback[]
+ifdef::VK_EXT_primitives_generated_query[]
+  ** Primitives generated queries write one unsigned integer value: the
+     number of primitives output to the vertex stream, regardless of whether
+     transform feedback is active or not, or whether they were successfully
+     captured by transform feedback or not.
+     This is identical to the second integer result value produced by
+     transform feedback queries if transform feedback is active.
+endif::VK_EXT_primitives_generated_query[]
+ifdef::VK_EXT_mesh_shader[]
+  ** Mesh shader queries write a single unsigned integer.
+endif::VK_EXT_mesh_shader[]
+ifdef::VK_KHR_video_encode_queue[]
+  ** Video encode feedback queries write one or more signed or unsigned
+     integer values for each bit that is enabled in
+     slink:VkQueryPoolVideoEncodeFeedbackCreateInfoKHR::pname:encodeFeedbackFlags
+     when the pool is created, and the feedback values are written in bit
+     order starting from the least significant bit, as described
+     <<queries-video-encode-feedback,here>>.
+endif::VK_KHR_video_encode_queue[]
+  * If ename:VK_QUERY_RESULT_WITH_AVAILABILITY_BIT is specified, an
+    additional unsigned integer result value is written indicating whether
+    the query's result is available, with any non-zero value indicating that
+    it is available.
+ifdef::VK_KHR_video_queue[]
+  * If ename:VK_QUERY_RESULT_WITH_STATUS_BIT_KHR is specified, an additional
+    signed integer result value is written indicating the status of the
+    query result.
+    Positive values indicate success, negative values indicate failure, and
+    zero indicates that the result is not yet available.
+    Specific error codes are as defined in the elink:VkQueryResultStatusKHR
+    enumeration.
+endif::VK_KHR_video_queue[]
+ifdef::VK_KHR_video_encode_feedback2[]
+  * Depending on the query type, additional results are written for each
+    query in a tightly packed array of result values as follows:
+  ** If <<queries-video-encode-per-partition-feedback,per picture partition
+     feedback>> is requested, video encode feedback queries write one or
+     more integer values after the primary query results for each encoded
+     picture partition for each bit that is enabled in
+     slink:VkQueryPoolVideoEncodePerPartitionFeedbackCreateInfoKHR::pname:perPartitionEncodeFeedbackFlags
+     when the pool is created.
+     The feedback values are written in picture-partition-major order and,
+     for each encoded picture partition but at most for
+     slink:VkQueryPoolVideoEncodePerPartitionFeedbackCreateInfoKHR::pname:maxPerPartitionFeedbackEntries
+     number of picture partitions, in bit order starting from the least
+     significant bit.
++
+[NOTE]
+====
+Per picture partition feedback values follow all primary query results,
+including the availability or result status written as the final element of
+the primary query results in response to
+ename:VK_QUERY_RESULT_WITH_AVAILABILITY_BIT or
+ename:VK_QUERY_RESULT_WITH_STATUS_BIT_KHR, respectively.
+Implementations will never write more per picture partition results than the
+pname:maxPerPartitionFeedbackEntries requested when the query pool was
+created.
+====
+endif::VK_KHR_video_encode_feedback2[]
+  * The bit width of all integer result values written by all query types is
+    either 32- or 64-bits, as requested by the command.
+ifdef::VK_KHR_performance_query[]
+    The only exceptions are the slink:VkPerformanceCounterResultKHR values
+    written by performance queries whose type is determined by the
+    pname:unit member of the corresponding slink:VkPerformanceCounterKHR.
+endif::VK_KHR_performance_query[]
+  * If more than one query is retrieved and pname:stride is not at least as
+    large as the size of the array of values corresponding to a single
+    query, the values written to memory are undefined:.
+
+[open,refpage='vkGetQueryPoolResults',desc='Copy results of queries in a query pool to a host memory region',type='protos']
+--
+:refpage: vkGetQueryPoolResults
+
+To retrieve status and results for a set of queries, call:
+
+include::{generated}/api/protos/vkGetQueryPoolResults.adoc[]
+
+  * pname:device is the logical device that owns the query pool.
+  * pname:queryPool is the query pool managing the queries containing the
+    desired results.
+  * pname:firstQuery is the initial query index.
+  * pname:queryCount is the number of queries to read.
+  * pname:dataSize is the size in bytes of the buffer pointed to by
+    pname:pData.
+  * pname:pData is a pointer to an application-allocated buffer where the
+    results will be written
+  * pname:stride is the stride in bytes between results for individual
+    queries within pname:pData.
+  * pname:flags is a bitmask of elink:VkQueryResultFlagBits specifying how
+    and when results are returned.
+
+Any results written for a query are written according to
+<<queries-operation-memorylayout,a layout dependent on the query type>>.
+
+If no bits are set in pname:flags, and all requested queries are in the
+available state, results are written as an array of 32-bit unsigned integer
+values.
+Behavior when not all queries are available is described
+<<queries-wait-bit-not-set, below>>.
+
+If ename:VK_QUERY_RESULT_WITH_AVAILABILITY_BIT is set, results for all
+queries in pname:queryPool identified by pname:firstQuery and
+pname:queryCount are copied to pname:pData, along with an extra availability
+ifdef::VK_KHR_video_queue[or status]
+value written directly after the results of each query and interpreted as an
+unsigned integer.
+A value of zero indicates that the results are not yet available, otherwise
+the query is complete and results are available.
+The size of the availability
+ifdef::VK_KHR_video_queue[or status]
+values is 64 bits if ename:VK_QUERY_RESULT_64_BIT is set in pname:flags.
+Otherwise, it is 32 bits.
+
+ifdef::VK_KHR_video_queue[]
+If ename:VK_QUERY_RESULT_WITH_STATUS_BIT_KHR is set, results for all queries
+in pname:queryPool identified by pname:firstQuery and pname:queryCount are
+copied to pname:pData, along with an extra status value written directly
+after the results of each query and interpreted as a signed integer.
+A value of zero indicates that the results are not yet available.
+Positive values indicate that the operations within the query completed
+successfully, and the query results are valid.
+Negative values indicate that the operations within the query completed
+unsuccessfully.
+
+elink:VkQueryResultStatusKHR defines specific meaning for values returned
+here, though implementations are free to return other values.
+
+If the status value written is negative, indicating that the operations
+within the query completed unsuccessfully, then all other results written by
+this command are undefined: unless otherwise specified for any of the
+results of the used query type.
+endif::VK_KHR_video_queue[]
+
+[NOTE]
+====
+If ename:VK_QUERY_RESULT_WITH_AVAILABILITY_BIT
+ifdef::VK_KHR_video_queue[or ename:VK_QUERY_RESULT_WITH_STATUS_BIT_KHR]
+is set, the layout of data in the buffer is a __(result,availability)__
+ifdef::VK_KHR_video_queue[or __(result,status)__]
+pair for each query returned, and pname:stride is the stride between each
+pair.
+====
+
+Results for any available query written by this command are final and
+represent the final result of the query.
+If ename:VK_QUERY_RESULT_PARTIAL_BIT is set, then for any query that is
+unavailable, an intermediate result between zero and the final result value
+is written for that query.
+Otherwise, any result written by this command is undefined:.
+
+If ename:VK_QUERY_RESULT_64_BIT is set, results and, if returned,
+availability
+ifdef::VK_KHR_video_queue[or status]
+values for all queries are written as an array of 64-bit values.
+ifdef::VK_KHR_performance_query[]
+If the pname:queryPool was created with
+ename:VK_QUERY_TYPE_PERFORMANCE_QUERY_KHR, results for each query are
+written as an array of the type indicated by
+slink:VkPerformanceCounterKHR::pname:storage for the counter being queried.
+endif::VK_KHR_performance_query[]
+Otherwise, results and availability
+ifdef::VK_KHR_video_queue[or status]
+values are written as an array of 32-bit values.
+If an unsigned integer query's value overflows the result type, the value
+may: either wrap or saturate.
+ifdef::VK_KHR_maintenance7[]
+If the <<features-maintenance7,pname:maintenance7>> feature is enabled, for
+an unsigned integer query, the 32-bit result value must: be equal to the 32
+least significant bits of the equivalent 64-bit result value.
+endif::VK_KHR_maintenance7[]
+ifdef::VK_KHR_performance_query[]
+If a signed integer query's value overflows the result type, the value is
+undefined:.
+If a floating-point query's value is not representable as the result type,
+the value is undefined:.
+endif::VK_KHR_performance_query[]
+
+If ename:VK_QUERY_RESULT_WAIT_BIT is set, this command defines an execution
+dependency with any earlier commands that writes one of the identified
+queries.
+The first <<synchronization-dependencies-scopes, synchronization scope>>
+includes all instances of flink:vkCmdEndQuery,
+ifdef::VK_EXT_transform_feedback[]
+flink:vkCmdEndQueryIndexedEXT,
+endif::VK_EXT_transform_feedback[]
+ifdef::VK_KHR_acceleration_structure[]
+flink:vkCmdWriteAccelerationStructuresPropertiesKHR,
+endif::VK_KHR_acceleration_structure[]
+ifdef::VK_NV_ray_tracing[]
+flink:vkCmdWriteAccelerationStructuresPropertiesNV,
+endif::VK_NV_ray_tracing[]
+ifdef::VK_EXT_opacity_micromap[]
+flink:vkCmdWriteMicromapsPropertiesEXT,
+endif::VK_EXT_opacity_micromap[]
+ifdef::VK_BASE_VERSION_1_3,VK_KHR_synchronization2[]
+flink:vkCmdWriteTimestamp2,
+endif::VK_BASE_VERSION_1_3,VK_KHR_synchronization2[]
+and flink:vkCmdWriteTimestamp that reference any query in pname:queryPool
+indicated by pname:firstQuery and pname:queryCount.
+The second <<synchronization-dependencies-scopes, synchronization scope>>
+includes the host operations of this command.
+
+[[queries-wait-bit-not-set]]
+If ename:VK_QUERY_RESULT_WAIT_BIT is not set, fname:vkGetQueryPoolResults
+may: return ename:VK_NOT_READY if there are queries in the unavailable
+state.
+
+[NOTE]
+====
+Applications must: take care to ensure that use of the
+ename:VK_QUERY_RESULT_WAIT_BIT bit has the desired effect.
+
+For example, if a query has been used previously and a command buffer
+records the commands fname:vkCmdResetQueryPool, fname:vkCmdBeginQuery, and
+fname:vkCmdEndQuery for that query, then the query will remain in the
+available state until
+ifdef::VK_BASE_VERSION_1_2,VK_EXT_host_query_reset[]
+fname:vkResetQueryPool is called or
+endif::VK_BASE_VERSION_1_2,VK_EXT_host_query_reset[]
+the fname:vkCmdResetQueryPool command executes on a queue.
+Applications can: use fences or events to ensure that a query has already
+been reset before checking for its results or availability status.
+Otherwise, a stale value could be returned from a previous use of the query.
+
+The above also applies when ename:VK_QUERY_RESULT_WAIT_BIT is used in
+combination with ename:VK_QUERY_RESULT_WITH_AVAILABILITY_BIT.
+In this case, the returned availability status may: reflect the result of a
+previous use of the query unless
+ifdef::VK_BASE_VERSION_1_2,VK_EXT_host_query_reset[]
+fname:vkResetQueryPool is called or
+endif::VK_BASE_VERSION_1_2,VK_EXT_host_query_reset[]
+the fname:vkCmdResetQueryPool command has been executed since the last use
+of the query.
+
+ifdef::VK_KHR_video_queue[]
+A similar situation can arise with the
+ename:VK_QUERY_RESULT_WITH_STATUS_BIT_KHR flag.
+endif::VK_KHR_video_queue[]
+====
+
+[NOTE]
+====
+Applications can: double-buffer query pool usage, with a pool per frame, and
+reset queries at the end of the frame in which they are read.
+====
+
+include::{chapters}/commonvalidity/no_dynamic_allocations_common.adoc[]
+
+.Valid Usage
+****
+:flags: flags
+include::{chapters}/commonvalidity/query_pool_count_common.adoc[]
+include::{chapters}/commonvalidity/query_results_common.adoc[]
+  * [[VUID-vkGetQueryPoolResults-None-09401]]
+    All queries used by the command must: not be uninitialized
+  * [[VUID-vkGetQueryPoolResults-flags-02828]]
+    If ename:VK_QUERY_RESULT_64_BIT is not set in pname:flags
+ifdef::VK_KHR_performance_query[]
+    and the pname:queryType used to create pname:queryPool was not
+    ename:VK_QUERY_TYPE_PERFORMANCE_QUERY_KHR,
+endif::VK_KHR_performance_query[]
+    then pname:pData must: be aligned to a multiple of `4`
+  * [[VUID-vkGetQueryPoolResults-queryCount-12251]]
+    If pname:queryCount is greater than 1, ename:VK_QUERY_RESULT_64_BIT is
+    not set in pname:flags
+ifdef::VK_KHR_performance_query[]
+    and the pname:queryType used to create pname:queryPool was not
+    ename:VK_QUERY_TYPE_PERFORMANCE_QUERY_KHR,
+endif::VK_KHR_performance_query[]
+    then pname:stride must: be a multiple of `4`
+  * [[VUID-vkGetQueryPoolResults-flags-00815]]
+    If ename:VK_QUERY_RESULT_64_BIT is set in pname:flags then pname:pData
+    must: be aligned to a multiple of `8`
+  * [[VUID-vkGetQueryPoolResults-queryCount-12252]]
+    If pname:queryCount is greater than 1 and ename:VK_QUERY_RESULT_64_BIT
+    is set in pname:flags, then pname:stride must: be a multiple of `8`
+  * [[VUID-vkGetQueryPoolResults-stride-08993]]
+    If pname:queryCount is greater than 1 and
+    ename:VK_QUERY_RESULT_WITH_AVAILABILITY_BIT is set, pname:stride must:
+    be large enough to contain the unsigned integer representing
+    availability
+ifdef::VK_KHR_video_queue[or status]
+    in addition to the query result
+ifdef::VK_KHR_performance_query[]
+  * [[VUID-vkGetQueryPoolResults-queryType-03229]]
+    If the pname:queryType used to create pname:queryPool was
+    ename:VK_QUERY_TYPE_PERFORMANCE_QUERY_KHR, then pname:pData must: be
+    aligned to a multiple of the size of slink:VkPerformanceCounterResultKHR
+  * [[VUID-vkGetQueryPoolResults-queryCount-12253]]
+    If pname:queryCount is greater than 1 and the pname:queryType used to
+    create pname:queryPool was ename:VK_QUERY_TYPE_PERFORMANCE_QUERY_KHR,
+    then pname:stride must: be a multiple of the size of
+    slink:VkPerformanceCounterResultKHR
+  * [[VUID-vkGetQueryPoolResults-queryType-04519]]
+    If pname:queryCount is greater than 1 and the pname:queryType used to
+    create pname:queryPool was ename:VK_QUERY_TYPE_PERFORMANCE_QUERY_KHR,
+    then pname:stride must: be large enough to contain the
+    slink:VkQueryPoolPerformanceCreateInfoKHR::pname:counterIndexCount used
+    to create pname:queryPool times the size of
+    slink:VkPerformanceCounterResultKHR
+endif::VK_KHR_performance_query[]
+  * [[VUID-vkGetQueryPoolResults-dataSize-00817]]
+    pname:dataSize must: be large enough to contain the result of each
+    query, as described <<queries-operation-memorylayout,here>>
+****
+
+include::{generated}/validity/protos/vkGetQueryPoolResults.adoc[]
+--
+
+[open,refpage='VkQueryResultFlagBits',desc='Bitmask specifying how and when query results are returned',type='enums']
+--
+Bits which can: be set in flink:vkGetQueryPoolResults::pname:flags and
+flink:vkCmdCopyQueryPoolResults::pname:flags, specifying how and when
+results are returned, are:
+
+include::{generated}/api/enums/VkQueryResultFlagBits.adoc[]
+
+  * ename:VK_QUERY_RESULT_64_BIT specifies the results will be written as an
+    array of 64-bit unsigned integer values.
+    If this bit is not set, the results will be written as an array of
+    32-bit unsigned integer values.
+  * ename:VK_QUERY_RESULT_WAIT_BIT specifies that Vulkan will wait for each
+    query's status to become available before retrieving its results.
+  * ename:VK_QUERY_RESULT_WITH_AVAILABILITY_BIT specifies that the
+    availability status accompanies the results.
+  * ename:VK_QUERY_RESULT_PARTIAL_BIT specifies that returning partial
+    results is acceptable.
+ifdef::VK_KHR_video_queue[]
+  * ename:VK_QUERY_RESULT_WITH_STATUS_BIT_KHR specifies that the last value
+    returned in the query is a elink:VkQueryResultStatusKHR value.
+    See <<queries-result-status-only, result status query>> for information
+    on how an application can determine whether the use of this flag bit is
+    supported.
+endif::VK_KHR_video_queue[]
+--
+
+[open,refpage='VkQueryResultFlags',desc='Bitmask of VkQueryResultFlagBits',type='flags']
+--
+include::{generated}/api/flags/VkQueryResultFlags.adoc[]
+
+tname:VkQueryResultFlags is a bitmask type for setting a mask of zero or
+more elink:VkQueryResultFlagBits.
+--
+
+ifdef::VK_KHR_video_queue[]
+[open,refpage='VkQueryResultStatusKHR',desc='Specific status codes for operations',type='enums']
+--
+[[query-result-status-codes]]
+Specific status codes that can: be returned from a query are:
+
+include::{generated}/api/enums/VkQueryResultStatusKHR.adoc[]
+
+  * ename:VK_QUERY_RESULT_STATUS_NOT_READY_KHR specifies that the query
+    result is not yet available.
+  * ename:VK_QUERY_RESULT_STATUS_ERROR_KHR specifies that operations did not
+    complete successfully.
+  * ename:VK_QUERY_RESULT_STATUS_COMPLETE_KHR specifies that operations
+    completed successfully and the query result is available.
+ifdef::VK_KHR_video_encode_queue[]
+  * ename:VK_QUERY_RESULT_STATUS_INSUFFICIENT_BITSTREAM_BUFFER_RANGE_KHR
+    specifies that a video encode operation did not complete successfully
+    due to the destination video bitstream buffer range not being
+    sufficiently large to fit the encoded bitstream data.
+endif::VK_KHR_video_encode_queue[]
+--
+endif::VK_KHR_video_queue[]
+
+ifdef::VK_KHR_device_address_commands[]
+[open,refpage='vkCmdCopyQueryPoolResultsToMemoryKHR',desc='Copy the results of queries in a query pool to a memory range',type='protos']
+--
+:refpage: vkCmdCopyQueryPoolResultsToMemoryKHR
+
+To copy query statuses and numerical results directly to buffer memory,
+call:
+
+include::{generated}/api/protos/vkCmdCopyQueryPoolResultsToMemoryKHR.adoc[]
+
+  * pname:commandBuffer is the command buffer into which this command will
+    be recorded.
+  * pname:queryPool is the query pool managing the queries containing the
+    desired results.
+  * pname:firstQuery is the initial query index.
+  * pname:queryCount is the number of queries.
+    pname:firstQuery and pname:queryCount together define a range of
+    queries.
+  * pname:pDstRange is a pointer to a slink:VkStridedDeviceAddressRangeKHR
+    describing a range of memory addressed with a stride that will receive
+    the results of the copy command.
+  * pname:dstFlags is a tlink:VkAddressCommandFlagsKHR value defining the
+    flags for the destination address range.
+  * pname:queryResultFlags is a bitmask of elink:VkQueryResultFlagBits
+    specifying how and when results are returned.
+
+Any results written for a query are written according to
+<<queries-operation-memorylayout,a layout dependent on the query type>>.
+
+Results for any query in pname:queryPool identified by pname:firstQuery and
+pname:queryCount that is available are copied to pname:pDstRange.
+
+If ename:VK_QUERY_RESULT_WITH_AVAILABILITY_BIT is set, results for all
+queries in pname:queryPool identified by pname:firstQuery and
+pname:queryCount are copied to pname:pDstRange, along with an extra
+availability value written directly after the results of each query and
+interpreted as an unsigned integer.
+A value of zero indicates that the results are not yet available, otherwise
+the query is complete and results are available.
+
+ifdef::VK_KHR_video_queue[]
+If ename:VK_QUERY_RESULT_WITH_STATUS_BIT_KHR is set, results for all queries
+in pname:queryPool identified by pname:firstQuery and pname:queryCount are
+copied to pname:pDstRange, along with an extra status value written directly
+after the results of each query and interpreted as a signed integer.
+A value of zero indicates that the results are not yet available.
+Positive values indicate that the operations within the query completed
+successfully, and the query results are valid.
+Negative values indicate that the operations within the query completed
+unsuccessfully.
+
+elink:VkQueryResultStatusKHR defines specific meaning for values returned
+here, though implementations are free to return other values.
+
+If the status value written is negative, indicating that the operations
+within the query completed unsuccessfully, then all other results written by
+this command are undefined: unless otherwise specified for any of the
+results of the used query type.
+endif::VK_KHR_video_queue[]
+
+Results for any available query written by this command are final and
+represent the final result of the query.
+If ename:VK_QUERY_RESULT_PARTIAL_BIT is set, then for any query that is
+unavailable, an intermediate result between zero and the final result value
+is written for that query.
+Otherwise, any result written by this command is undefined:.
+
+If ename:VK_QUERY_RESULT_64_BIT is set, results and availability
+ifdef::VK_KHR_video_queue[or status]
+values for all queries are written as an array of 64-bit values.
+ifdef::VK_KHR_performance_query[]
+If the pname:queryPool was created with
+ename:VK_QUERY_TYPE_PERFORMANCE_QUERY_KHR, results for each query are
+written as an array of the type indicated by
+slink:VkPerformanceCounterKHR::pname:storage for the counter being queried.
+endif::VK_KHR_performance_query[]
+Otherwise, results and availability
+ifdef::VK_KHR_video_queue[or status]
+values are written as an array of 32-bit values.
+If an unsigned integer query's value overflows the result type, the value
+may: either wrap or saturate.
+ifdef::VK_KHR_maintenance7[]
+If the <<features-maintenance7,pname:maintenance7>> feature is enabled, for
+an unsigned integer query, the 32-bit result value must: be equal to the 32
+least significant bits of the equivalent 64-bit result value.
+endif::VK_KHR_maintenance7[]
+ifdef::VK_KHR_performance_query[]
+If a signed integer query's value overflows the result type, the value is
+undefined:.
+If a floating-point query's value is not representable as the result type,
+the value is undefined:.
+endif::VK_KHR_performance_query[]
+
+This command defines an execution dependency between other query commands
+that reference the same query.
+
+The first <<synchronization-dependencies-scopes, synchronization scope>>
+includes all commands which reference the queries in pname:queryPool
+indicated by pname:query that occur earlier in
+<<synchronization-submission-order,submission order>>.
+If pname:flags does not include ename:VK_QUERY_RESULT_WAIT_BIT,
+ifdef::VK_EXT_transform_feedback[]
+flink:vkCmdEndQueryIndexedEXT,
+endif::VK_EXT_transform_feedback[]
+ifdef::VK_VERSION_1_3,VK_KHR_synchronization2[]
+flink:vkCmdWriteTimestamp2,
+endif::VK_VERSION_1_3,VK_KHR_synchronization2[]
+flink:vkCmdEndQuery, and flink:vkCmdWriteTimestamp are excluded from this
+scope.
+
+The second <<synchronization-dependencies-scopes, synchronization scope>>
+includes all commands which reference the queries in pname:queryPool
+indicated by pname:query that occur later in
+<<synchronization-submission-order,submission order>>.
+
+The operation of this command happens after the first scope and happens
+before the second scope.
+
+fname:vkCmdCopyQueryPoolResultsToMemoryKHR is considered to be a transfer
+operation, and its writes to buffer memory must: be synchronized using
+ename:VK_PIPELINE_STAGE_TRANSFER_BIT and ename:VK_ACCESS_TRANSFER_WRITE_BIT
+before using the results.
+
+.Valid Usage
+****
+:addressRange: pDstRange
+:addressFlags: dstFlags
+:flags: queryResultFlags
+include::{chapters}/commonvalidity/address_flags_common.adoc[]
+include::{chapters}/commonvalidity/query_pool_count_common.adoc[]
+include::{chapters}/commonvalidity/query_results_common.adoc[]
+  * [[VUID-vkCmdCopyQueryPoolResultsToMemoryKHR-None-13076]]
+    All queries used by the command must: not be uninitialized when the
+    command is executed
+  * [[VUID-vkCmdCopyQueryPoolResultsToMemoryKHR-flags-13077]]
+    If ename:VK_QUERY_RESULT_64_BIT is not set in pname:flags then
+    pname:pDstRange->address and pname:pDstRange->stride must: be multiples
+    of 4
+  * [[VUID-vkCmdCopyQueryPoolResultsToMemoryKHR-flags-13078]]
+    If ename:VK_QUERY_RESULT_64_BIT is set in pname:flags then
+    pname:pDstRange->address and pname:pDstRange->stride must: be multiples
+    of 8
+  * [[VUID-vkCmdCopyQueryPoolResultsToMemoryKHR-pDstRange-13079]]
+    pname:pDstRange->size must: be large enough to contain the result of
+    each query, as described <<queries-operation-memorylayout,here>>
+  * [[VUID-vkCmdCopyQueryPoolResultsToMemoryKHR-pDstRange-13080]]
+    The buffer from which the range defined by pname:pDstRange was queried
+    must: have been created with ename:VK_BUFFER_USAGE_TRANSFER_DST_BIT
+    usage flag
+ifdef::VK_KHR_performance_query[]
+  * [[VUID-vkCmdCopyQueryPoolResultsToMemoryKHR-queryType-13081]]
+    If the pname:queryType used to create pname:queryPool was
+    ename:VK_QUERY_TYPE_PERFORMANCE_QUERY_KHR,
+    slink:VkPhysicalDevicePerformanceQueryPropertiesKHR::pname:allowCommandBufferQueryCopies
+    must: be ename:VK_TRUE
+endif::VK_KHR_performance_query[]
+ifdef::VK_INTEL_performance_query[]
+  * [[VUID-vkCmdCopyQueryPoolResultsToMemoryKHR-queryType-13082]]
+    fname:vkCmdCopyQueryPoolResultsToMemoryKHR must: not be called if the
+    pname:queryType used to create pname:queryPool was
+    ename:VK_QUERY_TYPE_PERFORMANCE_QUERY_INTEL
+endif::VK_INTEL_performance_query[]
+  * [[VUID-vkCmdCopyQueryPoolResultsToMemoryKHR-None-13083]]
+    All queries used by the command must: not be active
+  * [[VUID-vkCmdCopyQueryPoolResultsToMemoryKHR-None-13084]]
+    All queries used by the command must: have been made _available_ by
+    prior executed commands
+  * [[VUID-vkCmdCopyQueryPoolResultsToMemoryKHR-dstFlags-13085]]
+    pname:dstFlags must: not include
+    ename:VK_ADDRESS_COMMAND_PROTECTED_BIT_KHR
+****
+
+include::{generated}/validity/protos/vkCmdCopyQueryPoolResultsToMemoryKHR.adoc[]
+--
+endif::VK_KHR_device_address_commands[]
+
+[open,refpage='vkCmdCopyQueryPoolResults',desc='Copy the results of queries in a query pool to a buffer object',type='protos']
+--
+:refpage: vkCmdCopyQueryPoolResults
+
+To copy query statuses and numerical results directly to buffer memory,
+call:
+
+include::{generated}/api/protos/vkCmdCopyQueryPoolResults.adoc[]
+
+  * pname:commandBuffer is the command buffer into which this command will
+    be recorded.
+  * pname:queryPool is the query pool managing the queries containing the
+    desired results.
+  * pname:firstQuery is the initial query index.
+  * pname:queryCount is the number of queries.
+    pname:firstQuery and pname:queryCount together define a range of
+    queries.
+  * pname:dstBuffer is a slink:VkBuffer object that will receive the results
+    of the copy command.
+  * pname:dstOffset is an offset into pname:dstBuffer.
+  * pname:stride is the stride in bytes between results for individual
+    queries within pname:dstBuffer.
+    The required size of the backing memory for pname:dstBuffer is
+    determined as described above for flink:vkGetQueryPoolResults.
+  * pname:flags is a bitmask of elink:VkQueryResultFlagBits specifying how
+    and when results are returned.
+
+Any results written for a query are written according to
+<<queries-operation-memorylayout,a layout dependent on the query type>>.
+
+Results for any query in pname:queryPool identified by pname:firstQuery and
+pname:queryCount that is available are copied to pname:dstBuffer.
+
+If ename:VK_QUERY_RESULT_WITH_AVAILABILITY_BIT is set, results for all
+queries in pname:queryPool identified by pname:firstQuery and
+pname:queryCount are copied to pname:dstBuffer, along with an extra
+availability value written directly after the results of each query and
+interpreted as an unsigned integer.
+A value of zero indicates that the results are not yet available, otherwise
+the query is complete and results are available.
+
+ifdef::VK_KHR_video_queue[]
+If ename:VK_QUERY_RESULT_WITH_STATUS_BIT_KHR is set, results for all queries
+in pname:queryPool identified by pname:firstQuery and pname:queryCount are
+copied to pname:dstBuffer, along with an extra status value written directly
+after the results of each query and interpreted as a signed integer.
+A value of zero indicates that the results are not yet available.
+Positive values indicate that the operations within the query completed
+successfully, and the query results are valid.
+Negative values indicate that the operations within the query completed
+unsuccessfully.
+
+elink:VkQueryResultStatusKHR defines specific meaning for values returned
+here, though implementations are free to return other values.
+
+If the status value written is negative, indicating that the operations
+within the query completed unsuccessfully, then all other results written by
+this command are undefined: unless otherwise specified for any of the
+results of the used query type.
+endif::VK_KHR_video_queue[]
+
+Results for any available query written by this command are final and
+represent the final result of the query.
+If ename:VK_QUERY_RESULT_PARTIAL_BIT is set, then for any query that is
+unavailable, an intermediate result between zero and the final result value
+is written for that query.
+Otherwise, any result written by this command is undefined:.
+
+If ename:VK_QUERY_RESULT_64_BIT is set, results and availability
+ifdef::VK_KHR_video_queue[or status]
+values for all queries are written as an array of 64-bit values.
+ifdef::VK_KHR_performance_query[]
+If the pname:queryPool was created with
+ename:VK_QUERY_TYPE_PERFORMANCE_QUERY_KHR, results for each query are
+written as an array of the type indicated by
+slink:VkPerformanceCounterKHR::pname:storage for the counter being queried.
+endif::VK_KHR_performance_query[]
+Otherwise, results and availability
+ifdef::VK_KHR_video_queue[or status]
+values are written as an array of 32-bit values.
+If an unsigned integer query's value overflows the result type, the value
+may: either wrap or saturate.
+ifdef::VK_KHR_maintenance7[]
+If the <<features-maintenance7,pname:maintenance7>> feature is enabled, for
+an unsigned integer query, the 32-bit result value must: be equal to the 32
+least significant bits of the equivalent 64-bit result value.
+endif::VK_KHR_maintenance7[]
+ifdef::VK_KHR_performance_query[]
+If a signed integer query's value overflows the result type, the value is
+undefined:.
+If a floating-point query's value is not representable as the result type,
+the value is undefined:.
+endif::VK_KHR_performance_query[]
+
+This command defines an execution dependency between other query commands
+that reference the same query.
+
+The first <<synchronization-dependencies-scopes, synchronization scope>>
+includes all commands which reference the queries in pname:queryPool
+indicated by pname:query that occur earlier in
+<<synchronization-submission-order,submission order>>.
+If pname:flags does not include ename:VK_QUERY_RESULT_WAIT_BIT,
+flink:vkCmdEndQuery,
+ifdef::VK_EXT_transform_feedback[]
+flink:vkCmdEndQueryIndexedEXT,
+endif::VK_EXT_transform_feedback[]
+ifdef::VK_KHR_acceleration_structure[]
+flink:vkCmdWriteAccelerationStructuresPropertiesKHR,
+endif::VK_KHR_acceleration_structure[]
+ifdef::VK_NV_ray_tracing[]
+flink:vkCmdWriteAccelerationStructuresPropertiesNV,
+endif::VK_NV_ray_tracing[]
+ifdef::VK_EXT_opacity_micromap[]
+flink:vkCmdWriteMicromapsPropertiesEXT,
+endif::VK_EXT_opacity_micromap[]
+ifdef::VK_BASE_VERSION_1_3,VK_KHR_synchronization2[]
+flink:vkCmdWriteTimestamp2,
+endif::VK_BASE_VERSION_1_3,VK_KHR_synchronization2[]
+and flink:vkCmdWriteTimestamp are excluded from this scope.
+
+The second <<synchronization-dependencies-scopes, synchronization scope>>
+includes all commands which reference the queries in pname:queryPool
+indicated by pname:query that occur later in
+<<synchronization-submission-order,submission order>>.
+
+The operation of this command happens after the first scope and happens
+before the second scope.
+
+fname:vkCmdCopyQueryPoolResults is considered to be a transfer operation,
+and its writes to buffer memory must: be synchronized using
+ename:VK_PIPELINE_STAGE_TRANSFER_BIT and ename:VK_ACCESS_TRANSFER_WRITE_BIT
+before using the results.
+
+.Valid Usage
+****
+:flags: flags
+include::{chapters}/commonvalidity/query_pool_count_common.adoc[]
+include::{chapters}/commonvalidity/query_results_common.adoc[]
+  * [[VUID-vkCmdCopyQueryPoolResults-None-09402]]
+    All queries used by the command must: not be uninitialized when the
+    command is executed
+  * [[VUID-vkCmdCopyQueryPoolResults-dstOffset-00819]]
+    pname:dstOffset must: be less than the size of pname:dstBuffer
+  * [[VUID-vkCmdCopyQueryPoolResults-flags-00822]]
+    If ename:VK_QUERY_RESULT_64_BIT is not set in pname:flags then
+    pname:dstOffset must: be a multiple of `4`
+  * [[VUID-vkCmdCopyQueryPoolResults-queryCount-12254]]
+    If pname:queryCount is greater than 1 and ename:VK_QUERY_RESULT_64_BIT
+    is not set in pname:flags then pname:stride must: be a multiple of `4`
+  * [[VUID-vkCmdCopyQueryPoolResults-flags-00823]]
+    If ename:VK_QUERY_RESULT_64_BIT is set in pname:flags then
+    pname:dstOffset must: be a multiple of `8`
+  * [[VUID-vkCmdCopyQueryPoolResults-queryCount-12255]]
+    If pname:queryCount is greater than 1 and ename:VK_QUERY_RESULT_64_BIT
+    is set in pname:flags then pname:stride must: be a multiple of `8`
+  * [[VUID-vkCmdCopyQueryPoolResults-dstBuffer-00824]]
+    pname:dstBuffer must: have enough storage, from pname:dstOffset, to
+    contain the result of each query, as described
+    <<queries-operation-memorylayout,here>>
+  * [[VUID-vkCmdCopyQueryPoolResults-dstBuffer-00825]]
+    pname:dstBuffer must: have been created with the
+    ename:VK_BUFFER_USAGE_TRANSFER_DST_BIT usage flag set
+  * [[VUID-vkCmdCopyQueryPoolResults-dstBuffer-00826]]
+    If pname:dstBuffer is non-sparse then it must: be bound completely and
+    contiguously to a single sname:VkDeviceMemory object
+ifdef::VK_KHR_performance_query[]
+  * [[VUID-vkCmdCopyQueryPoolResults-queryType-03232]]
+    If the pname:queryType used to create pname:queryPool was
+    ename:VK_QUERY_TYPE_PERFORMANCE_QUERY_KHR,
+    slink:VkPhysicalDevicePerformanceQueryPropertiesKHR::pname:allowCommandBufferQueryCopies
+    must: be ename:VK_TRUE
+endif::VK_KHR_performance_query[]
+ifdef::VK_INTEL_performance_query[]
+  * [[VUID-vkCmdCopyQueryPoolResults-queryType-02734]]
+    flink:vkCmdCopyQueryPoolResults must: not be called if the
+    pname:queryType used to create pname:queryPool was
+    ename:VK_QUERY_TYPE_PERFORMANCE_QUERY_INTEL
+endif::VK_INTEL_performance_query[]
+  * [[VUID-vkCmdCopyQueryPoolResults-None-07429]]
+    All queries used by the command must: not be active
+  * [[VUID-vkCmdCopyQueryPoolResults-None-08752]]
+    All queries used by the command must: have been made _available_ by
+    prior executed commands
+****
+
+include::{generated}/validity/protos/vkCmdCopyQueryPoolResults.adoc[]
+--
+
+ifdef::VK_GRAPHICS_VERSION_1_0[]
+[[queries-operation-undefined]]
+Rendering operations such as clears, MSAA resolves, attachment load/store
+operations, and blits may: count towards the results of queries.
+This behavior is implementation-dependent and may: vary depending on the
+path used within an implementation.
+For example, some implementations have several types of clears, some of
+which may: include vertices and some not.
+ifdef::VK_QCOM_elapsed_timer_query[]
+Elapsed timer queries must: count the device execution time for all
+operations performed between the start and end of the query.
+endif::VK_QCOM_elapsed_timer_query[]
+endif::VK_GRAPHICS_VERSION_1_0[]
+
+
+ifdef::VK_GRAPHICS_VERSION_1_0[]
+[[queries-occlusion]]
+== Occlusion Queries
+
+Occlusion queries track the number of samples that pass the per-fragment
+tests for a set of drawing commands.
+As such, occlusion queries are only available on queue families supporting
+graphics operations.
+The application can: then use these results to inform future rendering
+decisions.
+An occlusion query is begun and ended by calling fname:vkCmdBeginQuery and
+fname:vkCmdEndQuery, respectively.
+When an occlusion query begins, the count of passing samples always starts
+at zero.
+For each drawing command, the count is incremented as described in
+<<fragops-samplecount,Sample Counting>>.
+If pname:flags does not contain ename:VK_QUERY_CONTROL_PRECISE_BIT an
+implementation may: generate any non-zero result value for the query if the
+count of passing samples is non-zero.
+
+[NOTE]
+====
+Not setting ename:VK_QUERY_CONTROL_PRECISE_BIT mode may: be more efficient
+on some implementations, and should: be used where it is sufficient to know
+a boolean result on whether any samples passed the per-fragment tests.
+In this case, some implementations may: only return zero or one, regardless
+of the actual number of samples passing the per-fragment tests.
+
+Setting ename:VK_QUERY_CONTROL_PRECISE_BIT does not guarantee that different
+implementations return the same number of samples in an occlusion query.
+Some implementations may kill fragments in the
+<<pipelines-graphics-subsets-pre-rasterization, pre-rasterization shader
+stage>>, and these killed fragments do not contribute to the final result of
+the query.
+It is possible that some implementations generate a zero result value for
+the query, while others generate a non-zero value.
+====
+
+When an occlusion query finishes, the result for that query is marked as
+available.
+The application can: then either copy the result to a buffer (via
+fname:vkCmdCopyQueryPoolResults) or request it be put into host memory (via
+fname:vkGetQueryPoolResults).
+
+[NOTE]
+====
+If occluding geometry is not drawn first, samples can: pass the depth test,
+but still not be visible in a final image.
+====
+endif::VK_GRAPHICS_VERSION_1_0[]
+
+
+ifdef::VK_COMPUTE_VERSION_1_0[]
+[[queries-pipestats]]
+== Pipeline Statistics Queries
+
+Pipeline statistics queries allow the application to sample a specified set
+of sname:VkPipeline counters.
+These counters are accumulated by Vulkan for a set of
+ifdef::VK_GRAPHICS_VERSION_1_0[either drawing or]
+dispatching commands while a pipeline statistics query is active.
+As such, pipeline statistics queries are available on queue families
+supporting
+ifdef::VK_GRAPHICS_VERSION_1_0[either graphics or]
+compute operations.
+The availability of pipeline statistics queries is indicated by the
+pname:pipelineStatisticsQuery member of the sname:VkPhysicalDeviceFeatures
+object (see fname:vkGetPhysicalDeviceFeatures and fname:vkCreateDevice for
+detecting and requesting this query type on a sname:VkDevice).
+
+A pipeline statistics query is begun and ended by calling
+fname:vkCmdBeginQuery and fname:vkCmdEndQuery, respectively.
+When a pipeline statistics query begins, all statistics counters are set to
+zero.
+While the query is active, the pipeline type determines which set of
+statistics are available, but these must: be configured on the query pool
+when it is created.
+If a statistic counter is issued on a command buffer that does not support
+the corresponding operation, or the counter corresponds to a shading stage
+which is missing from any of the pipelines used while the query is active,
+the value of that counter is undefined: after the query has been made
+available.
+At least one statistic counter relevant to the operations supported on the
+recording command buffer must: be enabled.
+
+[open,refpage='VkQueryPipelineStatisticFlagBits',desc='Bitmask specifying queried pipeline statistics',type='enums']
+--
+Bits which can: be set in
+slink:VkQueryPoolCreateInfo::pname:pipelineStatistics for query pools and in
+slink:VkCommandBufferInheritanceInfo::pname:pipelineStatistics for secondary
+command buffers, individually enabling pipeline statistics counters, are:
+
+include::{generated}/api/enums/VkQueryPipelineStatisticFlagBits.adoc[]
+
+  * ename:VK_QUERY_PIPELINE_STATISTIC_INPUT_ASSEMBLY_VERTICES_BIT specifies
+    that queries managed by the pool will count the number of vertices
+    processed by the <<drawing,input assembly>> stage.
+    Vertices corresponding to incomplete primitives may: contribute to the
+    count.
+  * ename:VK_QUERY_PIPELINE_STATISTIC_INPUT_ASSEMBLY_PRIMITIVES_BIT
+    specifies that queries managed by the pool will count the number of
+    primitives processed by the <<drawing,input assembly>> stage.
+    If primitive restart is enabled, restarting the primitive topology has
+    no effect on the count.
+    Incomplete primitives may: be counted.
+  * ename:VK_QUERY_PIPELINE_STATISTIC_VERTEX_SHADER_INVOCATIONS_BIT
+    specifies that queries managed by the pool will count the number of
+    vertex shader invocations.
+    This counter's value is incremented each time a vertex shader is
+    <<shaders-vertex-execution,invoked>>.
+  * ename:VK_QUERY_PIPELINE_STATISTIC_GEOMETRY_SHADER_INVOCATIONS_BIT
+    specifies that queries managed by the pool will count the number of
+    geometry shader invocations.
+    This counter's value is incremented each time a geometry shader is
+    <<shaders-geometry-execution,invoked>>.
+    In the case of <<geometry-invocations,instanced geometry shaders>>, the
+    geometry shader invocations count is incremented for each separate
+    instanced invocation.
+  * ename:VK_QUERY_PIPELINE_STATISTIC_GEOMETRY_SHADER_PRIMITIVES_BIT
+    specifies that queries managed by the pool will count the number of
+    primitives generated by geometry shader invocations.
+    The counter's value is incremented each time the geometry shader emits a
+    primitive.
+    Restarting primitive topology using the SPIR-V instructions
+    code:OpEndPrimitive or code:OpEndStreamPrimitive has no effect on the
+    geometry shader output primitives count.
+  * ename:VK_QUERY_PIPELINE_STATISTIC_CLIPPING_INVOCATIONS_BIT specifies
+    that queries managed by the pool will count the number of primitives
+    processed by the <<vertexpostproc-clipping,Primitive Clipping>> stage of
+    the pipeline.
+    The counter's value is incremented each time a primitive reaches the
+    primitive clipping stage.
+  * ename:VK_QUERY_PIPELINE_STATISTIC_CLIPPING_PRIMITIVES_BIT specifies that
+    queries managed by the pool will count the number of primitives output
+    by the <<vertexpostproc-clipping,Primitive Clipping>> stage of the
+    pipeline.
+    The counter's value is incremented each time a primitive passes the
+    primitive clipping stage.
+    The actual number of primitives output by the primitive clipping stage
+    for a particular input primitive is implementation-dependent but must:
+    satisfy the following conditions:
+  ** If at least one vertex of the input primitive lies inside the clipping
+     volume, the counter is incremented by one or more.
+  ** Otherwise, the counter is incremented by zero or more.
+  * ename:VK_QUERY_PIPELINE_STATISTIC_FRAGMENT_SHADER_INVOCATIONS_BIT
+    specifies that queries managed by the pool will count the number of
+    fragment shader invocations.
+    The counter's value is incremented each time the fragment shader is
+    <<fragops-shader,invoked>>.
+  * ename:VK_QUERY_PIPELINE_STATISTIC_TESSELLATION_CONTROL_SHADER_PATCHES_BIT
+    specifies that queries managed by the pool will count the number of
+    patches processed by the tessellation control shader.
+    The counter's value is incremented once for each patch for which a
+    tessellation control shader is
+    <<shaders-tessellation-control-execution,invoked>>.
+  * ename:VK_QUERY_PIPELINE_STATISTIC_TESSELLATION_EVALUATION_SHADER_INVOCATIONS_BIT
+    specifies that queries managed by the pool will count the number of
+    invocations of the tessellation evaluation shader.
+    The counter's value is incremented each time the tessellation evaluation
+    shader is <<shaders-tessellation-evaluation-execution,invoked>>.
+  * ename:VK_QUERY_PIPELINE_STATISTIC_COMPUTE_SHADER_INVOCATIONS_BIT
+    specifies that queries managed by the pool will count the number of
+    compute shader invocations.
+    The counter's value is incremented every time the compute shader is
+    invoked.
+    Implementations may: skip the execution of certain compute shader
+    invocations or execute additional compute shader invocations for
+    implementation-dependent reasons as long as the results of rendering
+    otherwise remain unchanged.
+ifdef::VK_EXT_mesh_shader[]
+  * ename:VK_QUERY_PIPELINE_STATISTIC_TASK_SHADER_INVOCATIONS_BIT_EXT
+    specifies that queries managed by the pool will count the number of task
+    shader invocations.
+    The counter's value is incremented every time the task shader is
+    invoked.
+  * ename:VK_QUERY_PIPELINE_STATISTIC_MESH_SHADER_INVOCATIONS_BIT_EXT
+    specifies that queries managed by the pool will count the number of mesh
+    shader invocations.
+    The counter's value is incremented every time the mesh shader is
+    invoked.
+endif::VK_EXT_mesh_shader[]
+
+These values are intended to measure relative statistics on one
+implementation.
+Various device architectures will count these values differently.
+Any or all counters may: be affected by the issues described in
+<<queries-operation-undefined,Query Operation>>.
+
+ifdef::VK_EXT_mesh_shader,VK_NV_mesh_shader[]
+This counting difference is especially true if the pipeline contains mesh or
+task shaders, which may affect several of the counters in unexpected ways.
+endif::VK_EXT_mesh_shader,VK_NV_mesh_shader[]
+
+[NOTE]
+====
+For example, tile-based rendering devices may: need to replay the scene
+multiple times, affecting some of the counts.
+====
+
+ifdef::VK_GRAPHICS_VERSION_1_0[]
+If a pipeline has pname:rasterizerDiscardEnable enabled, implementations
+may: discard primitives after the final
+<<pipelines-graphics-subsets-pre-rasterization,pre-rasterization shader
+stage>>.
+As a result, if pname:rasterizerDiscardEnable is enabled, the clipping input
+and output primitives counters may: not be incremented.
+endif::VK_GRAPHICS_VERSION_1_0[]
+
+When a pipeline statistics query finishes, the result for that query is
+marked as available.
+The application can: copy the result to a buffer (via
+fname:vkCmdCopyQueryPoolResults), or request it be put into host memory (via
+fname:vkGetQueryPoolResults).
+--
+
+[open,refpage='VkQueryPipelineStatisticFlags',desc='Bitmask of VkQueryPipelineStatisticFlagBits',type='flags']
+--
+include::{generated}/api/flags/VkQueryPipelineStatisticFlags.adoc[]
+
+tname:VkQueryPipelineStatisticFlags is a bitmask type for setting a mask of
+zero or more elink:VkQueryPipelineStatisticFlagBits.
+--
+endif::VK_COMPUTE_VERSION_1_0[]
+
+
+[[queries-timestamps]]
+== Timestamp Queries
+
+_Timestamps_ provide applications with a mechanism for monotonically
+tracking the execution of commands.
+A timestamp is an integer value generated by the sname:VkPhysicalDevice.
+Unlike other queries, timestamps do not operate over a range, and so do not
+use flink:vkCmdBeginQuery or flink:vkCmdEndQuery.
+The mechanism is built around a set of commands that allow the application
+to tell the sname:VkPhysicalDevice to write timestamp values to a
+<<queries-pools,query pool>> and then either read timestamp values on the
+host (using flink:vkGetQueryPoolResults) or copy timestamp values to a
+sname:VkBuffer (using flink:vkCmdCopyQueryPoolResults).
+
+The number of valid bits in a timestamp value is determined by the
+sname:VkQueueFamilyProperties::pname:timestampValidBits property of the
+queue on which the timestamp is written.
+Timestamps are supported on any queue which reports a non-zero value for
+pname:timestampValidBits via flink:vkGetPhysicalDeviceQueueFamilyProperties.
+If the <<limits-timestampComputeAndGraphics,
+pname:timestampComputeAndGraphics>> limit is ename:VK_TRUE, timestamps are
+supported by every queue family that supports either graphics or compute
+operations (see slink:VkQueueFamilyProperties).
+
+The number of nanoseconds it takes for a timestamp value to be incremented
+by 1 can: be obtained from
+sname:VkPhysicalDeviceLimits::pname:timestampPeriod after a call to
+fname:vkGetPhysicalDeviceProperties.
+
+ifdef::VK_BASE_VERSION_1_3,VK_KHR_synchronization2[]
+[open,refpage='vkCmdWriteTimestamp2',desc='Write a device timestamp into a query object',type='protos']
+--
+:refpage: vkCmdWriteTimestamp2
+
+To request a timestamp and write the value to memory, call:
+
+ifdef::VK_BASE_VERSION_1_3[]
+include::{generated}/api/protos/vkCmdWriteTimestamp2.adoc[]
+endif::VK_BASE_VERSION_1_3[]
+
+ifdef::VK_KHR_synchronization2[]
+include::{generated}/api/protos/vkCmdWriteTimestamp2KHR.adoc[]
+endif::VK_KHR_synchronization2[]
+
+  * pname:commandBuffer is the command buffer into which the command will be
+    recorded.
+  * pname:stage specifies a stage of the pipeline.
+  * pname:queryPool is the query pool that will manage the timestamp.
+  * pname:query is the query within the query pool that will contain the
+    timestamp.
+
+When fname:vkCmdWriteTimestamp2 is submitted to a queue, it defines an
+execution dependency on commands that were submitted before it, and writes a
+timestamp to a query pool.
+
+The first <<synchronization-dependencies-scopes, synchronization scope>>
+includes all commands that occur earlier in
+<<synchronization-submission-order,submission order>>.
+The synchronization scope is limited to operations on the pipeline stage
+specified by pname:stage.
+
+The second <<synchronization-dependencies-scopes, synchronization scope>>
+includes only the timestamp write operation.
+
+[NOTE]
+====
+Implementations may write the timestamp at any stage that is
+<<synchronization-pipeline-stages-order, logically later>> than pname:stage.
+====
+
+Any timestamp write that <<synchronization-dependencies-execution,
+happens-after>> another timestamp write in the same submission must: not
+have a lower value unless its value overflows the maximum supported integer
+bit width of the query.
+ifdef::VK_KHR_calibrated_timestamps,VK_EXT_calibrated_timestamps[]
+If
+ifdef::VK_KHR_calibrated_timestamps[`apiext:VK_KHR_calibrated_timestamps`]
+ifdef::VK_KHR_calibrated_timestamps+VK_EXT_calibrated_timestamps[or]
+ifdef::VK_EXT_calibrated_timestamps[`apiext:VK_EXT_calibrated_timestamps`]
+is enabled, this extends to timestamp writes across all submissions on the
+same logical device: any timestamp write that
+<<synchronization-dependencies-execution, happens-after>> another must: not
+have a lower value unless its value overflows the maximum supported integer
+bit width of the query.
+Timestamps written by this command must: be in the
+ifdef::VK_KHR_calibrated_timestamps[ename:VK_TIME_DOMAIN_DEVICE_KHR]
+ifndef::VK_KHR_calibrated_timestamps[ename:VK_TIME_DOMAIN_DEVICE_EXT]
+<<VkTimeDomainKHR, time domain>>.
+endif::VK_KHR_calibrated_timestamps,VK_EXT_calibrated_timestamps[]
+If an overflow occurs, the timestamp value must: wrap back to zero.
+
+ifdef::VK_GRAPHICS_VERSION_1_1,VK_KHR_multiview[]
+
+If fname:vkCmdWriteTimestamp2 is called while executing a render pass
+instance that has multiview enabled, the timestamp uses [eq]#N# consecutive
+query indices in the query pool (starting at pname:query) where [eq]#N# is
+the number of bits set in the view mask of the subpass
+ifdef::VK_GRAPHICS_VERSION_1_3,VK_KHR_dynamic_rendering[or dynamic render pass]
+the command is executed in.
+The resulting query values are determined by an implementation-dependent
+choice of one of the following behaviors:
+
+  * The first query is a timestamp value and (if more than one bit is set in
+    the view mask) zero is written to the remaining queries.
+  * All [eq]#N# queries are timestamp values.
+
+Either way, if two timestamps are written in the same subpass
+ifdef::VK_GRAPHICS_VERSION_1_3,VK_KHR_dynamic_rendering[or dynamic render pass]
+with multiview enabled, each of the [eq]#N# consecutive queries written for
+a timestamp must: not have a lower value than the queries with corresponding
+indices written by the timestamp that happens-before unless the value
+overflows the maximum supported integer bit width of the query.
+
+endif::VK_GRAPHICS_VERSION_1_1,VK_KHR_multiview[]
+
+.Valid Usage
+****
+:stageMaskName: stage
+include::{chapters}/commonvalidity/stage_mask_2_common.adoc[]
+  * [[VUID-vkCmdWriteTimestamp2-synchronization2-03858]]
+    The <<features-synchronization2, pname:synchronization2>> feature must:
+    be enabled
+  * [[VUID-vkCmdWriteTimestamp2-stage-03859]]
+    pname:stage must: only include a single pipeline stage
+  * [[VUID-vkCmdWriteTimestamp2-stage-03860]]
+    pname:stage must: only include stages valid for the queue family that
+    was used to create the command pool that pname:commandBuffer was
+    allocated from
+  * [[VUID-vkCmdWriteTimestamp2-queryPool-03861]]
+    pname:queryPool must: have been created with a pname:queryType of
+    ename:VK_QUERY_TYPE_TIMESTAMP
+  * [[VUID-vkCmdWriteTimestamp2-timestampValidBits-03863]]
+    The command pool's queue family must: support a non-zero
+    pname:timestampValidBits
+  * [[VUID-vkCmdWriteTimestamp2-query-04903]]
+    pname:query must: be less than the number of queries in pname:queryPool
+  * [[VUID-vkCmdWriteTimestamp2-None-03864]]
+    All queries used by the command must: be _unavailable_
+ifdef::VK_GRAPHICS_VERSION_1_1,VK_KHR_multiview[]
+  * [[VUID-vkCmdWriteTimestamp2-query-03865]]
+    If fname:vkCmdWriteTimestamp2 is called within a render pass instance,
+    the sum of pname:query and the number of bits set in the current
+    subpass's view mask must: be less than or equal to the number of queries
+    in pname:queryPool
+endif::VK_GRAPHICS_VERSION_1_1,VK_KHR_multiview[]
+ifdef::VK_QCOM_tile_shading[]
+  * [[VUID-vkCmdWriteTimestamp2-None-10639]]
+    This command must: not be recorded when
+    <<renderpass-per-tile-execution-model,per-tile execution model>> is
+    enabled
+endif::VK_QCOM_tile_shading[]
+****
+
+include::{generated}/validity/protos/vkCmdWriteTimestamp2.adoc[]
+--
+endif::VK_BASE_VERSION_1_3,VK_KHR_synchronization2[]
+
+[open,refpage='vkCmdWriteTimestamp',desc='Write a device timestamp into a query object',type='protos']
+--
+:refpage: vkCmdWriteTimestamp
+
+To request a timestamp and write the value to memory, call:
+
+include::{generated}/api/protos/vkCmdWriteTimestamp.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command will be
+    recorded.
+  * pname:pipelineStage is a elink:VkPipelineStageFlagBits value, specifying
+    a stage of the pipeline.
+  * pname:queryPool is the query pool that will manage the timestamp.
+  * pname:query is the query within the query pool that will contain the
+    timestamp.
+
+When fname:vkCmdWriteTimestamp is submitted to a queue, it defines an
+execution dependency on commands that were submitted before it, and writes a
+timestamp to a query pool.
+
+The first <<synchronization-dependencies-scopes, synchronization scope>>
+includes all commands that occur earlier in
+<<synchronization-submission-order,submission order>>.
+The synchronization scope is limited to operations on the pipeline stage
+specified by pname:pipelineStage.
+
+The second <<synchronization-dependencies-scopes, synchronization scope>>
+includes only the timestamp write operation.
+
+[NOTE]
+====
+Implementations may write the timestamp at any stage that is
+<<synchronization-pipeline-stages-order, logically later>> than pname:stage.
+====
+
+Any timestamp write that <<synchronization-dependencies-execution,
+happens-after>> another timestamp write in the same submission must: not
+have a lower value unless its value overflows the maximum supported integer
+bit width of the query.
+ifdef::VK_KHR_calibrated_timestamps,VK_EXT_calibrated_timestamps[]
+If
+ifdef::VK_KHR_calibrated_timestamps[`apiext:VK_KHR_calibrated_timestamps`]
+ifdef::VK_KHR_calibrated_timestamps+VK_EXT_calibrated_timestamps[or]
+ifdef::VK_EXT_calibrated_timestamps[`apiext:VK_EXT_calibrated_timestamps`]
+is enabled, this extends to timestamp writes across all submissions on the
+same logical device: any timestamp write that
+<<synchronization-dependencies-execution, happens-after>> another must: not
+have a lower value unless its value overflows the maximum supported integer
+bit width of the query.
+Timestamps written by this command must: be in the
+ifdef::VK_KHR_calibrated_timestamps[ename:VK_TIME_DOMAIN_DEVICE_KHR]
+ifndef::VK_KHR_calibrated_timestamps[ename:VK_TIME_DOMAIN_DEVICE_EXT]
+<<VkTimeDomainKHR, time domain>>.
+endif::VK_KHR_calibrated_timestamps,VK_EXT_calibrated_timestamps[]
+If an overflow occurs, the timestamp value must: wrap back to zero.
+
+ifdef::VK_GRAPHICS_VERSION_1_1,VK_KHR_multiview[]
+
+If fname:vkCmdWriteTimestamp is called while executing a render pass
+instance that has multiview enabled, the timestamp uses [eq]#N# consecutive
+query indices in the query pool (starting at pname:query) where [eq]#N# is
+the number of bits set in the view mask of the subpass
+ifdef::VK_GRAPHICS_VERSION_1_3,VK_KHR_dynamic_rendering[or dynamic render pass]
+the command is executed in.
+The resulting query values are determined by an implementation-dependent
+choice of one of the following behaviors:
+
+  * The first query is a timestamp value and (if more than one bit is set in
+    the view mask) zero is written to the remaining queries.
+  * All [eq]#N# queries are timestamp values.
+
+Either way, if two timestamps are written in the same subpass
+ifdef::VK_GRAPHICS_VERSION_1_3,VK_KHR_dynamic_rendering[or dynamic render pass]
+with multiview enabled, each of the [eq]#N# consecutive queries written for
+a timestamp must: not have a lower value than the queries with corresponding
+indices written by the timestamp that happens-before unless the value
+overflows the maximum supported integer bit width of the query.
+
+endif::VK_GRAPHICS_VERSION_1_1,VK_KHR_multiview[]
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/pipeline_stage_common.adoc[]
+  * [[VUID-vkCmdWriteTimestamp-queryPool-01416]]
+    pname:queryPool must: have been created with a pname:queryType of
+    ename:VK_QUERY_TYPE_TIMESTAMP
+  * [[VUID-vkCmdWriteTimestamp-timestampValidBits-00829]]
+    The command pool's queue family must: support a non-zero
+    pname:timestampValidBits
+  * [[VUID-vkCmdWriteTimestamp-query-04904]]
+    pname:query must: be less than the number of queries in pname:queryPool
+  * [[VUID-vkCmdWriteTimestamp-None-00830]]
+    All queries used by the command must: be _unavailable_
+ifdef::VK_GRAPHICS_VERSION_1_1,VK_KHR_multiview[]
+  * [[VUID-vkCmdWriteTimestamp-query-00831]]
+    If fname:vkCmdWriteTimestamp is called within a render pass instance,
+    the sum of pname:query and the number of bits set in the current
+    subpass's view mask must: be less than or equal to the number of queries
+    in pname:queryPool
+endif::VK_GRAPHICS_VERSION_1_1,VK_KHR_multiview[]
+ifdef::VK_QCOM_tile_shading[]
+  * [[VUID-vkCmdWriteTimestamp-None-10640]]
+    This command must: not be recorded when
+    <<renderpass-per-tile-execution-model,per-tile execution model>> is
+    enabled
+endif::VK_QCOM_tile_shading[]
+****
+
+include::{generated}/validity/protos/vkCmdWriteTimestamp.adoc[]
+--
+
+ifdef::VK_QCOM_elapsed_timer_query[]
+[[queries-elapsed-timer]]
+== Elapsed Timer Queries
+
+Elapsed timer queries provide a mechanism to query the elapsed time between
+a flink:vkCmdBeginQuery and a flink:vkCmdEndQuery command.
+The time calculated is generated by the sname:VkPhysicalDevice, and can: be
+read from the host (using flink:vkGetQueryPoolResults) or copied to a
+sname:VkBuffer (using flink:vkCmdCopyQueryPoolResults).
+
+The implementation uses timestamps to calculate the elapsed time, therefore
+these queries are supported on any queue which reports a non-zero value for
+pname:timestampValidBits via flink:vkGetPhysicalDeviceQueueFamilyProperties.
+If the <<limits-timestampComputeAndGraphics,
+pname:timestampComputeAndGraphics>> limit is ename:VK_TRUE, elapsed timer
+queries are supported by every queue family that supports either graphics or
+compute operations (see slink:VkQueueFamilyProperties).
+
+ifdef::VK_KHR_calibrated_timestamps,VK_EXT_calibrated_timestamps[]
+If
+ifdef::VK_KHR_calibrated_timestamps[`apiext:VK_KHR_calibrated_timestamps`]
+ifdef::VK_KHR_calibrated_timestamps+VK_EXT_calibrated_timestamps[or]
+ifdef::VK_EXT_calibrated_timestamps[`apiext:VK_EXT_calibrated_timestamps`]
+is enabled, the timestamps used by the start and end commands must: be in
+the
+ifdef::VK_KHR_calibrated_timestamps[ename:VK_TIME_DOMAIN_DEVICE_KHR]
+ifndef::VK_KHR_calibrated_timestamps[ename:VK_TIME_DOMAIN_DEVICE_EXT]
+<<VkTimeDomainKHR, time domain>>.
+endif::VK_KHR_calibrated_timestamps,VK_EXT_calibrated_timestamps[]
+
+The number of valid bits when measuring the start and stop times is
+determined by the sname:VkQueueFamilyProperties::pname:timestampValidBits
+property of the queue on which the query is recorded.
+
+However, the implementation may: internally use scratch memory of a size
+other than pname:timestampValidBits to perform the elapsed time calculation.
+The scratch memory should: use enough bits to make overflows unlikely to
+happen.
+If an overflow occurs while measuring the elapsed time, the resulting value
+is undefined:.
+
+If an overflow does not occur, the implementation must: not produce a result
+from a calculation using timestamps where the start time is greater than the
+stop time.
+The start time must: be recorded by the device with a time that is less than
+or equal to the stop time.
+
+The result is given in timestamp units which the application can: convert to
+nanoseconds by multiplying it with the
+sname:VkPhysicalDeviceLimits::pname:timestampPeriod.
+endif::VK_QCOM_elapsed_timer_query[]
+
+ifdef::VK_KHR_performance_query[]
+[[queries-performance]]
+== Performance Queries
+
+_Performance queries_ provide applications with a mechanism for getting
+performance counter information about the execution of command buffers,
+render passes, and commands.
+
+Each queue family advertises the performance counters that can: be queried
+on a queue of that family via a call to
+flink:vkEnumeratePhysicalDeviceQueueFamilyPerformanceQueryCountersKHR.
+Implementations may: limit access to performance counters based on platform
+requirements or only to specialized drivers for development purposes.
+
+[NOTE]
+====
+This may include no performance counters being enumerated, or a reduced set.
+Please refer to platform-specific documentation for guidance on any such
+restrictions.
+====
+
+Performance queries use the existing flink:vkCmdBeginQuery and
+flink:vkCmdEndQuery to control what command buffers, render passes, or
+commands to get performance information for.
+
+Implementations may: require multiple passes where the command buffer,
+render passes, or commands being recorded are the same and are executed on
+the same queue to record performance counter data.
+This is achieved by submitting the same batch and providing a
+slink:VkPerformanceQuerySubmitInfoKHR structure containing a counter pass
+index.
+The number of passes required for a given performance query pool can: be
+queried via a call to
+flink:vkGetPhysicalDeviceQueueFamilyPerformanceQueryPassesKHR.
+
+[NOTE]
+====
+Command buffers recorded with
+ename:VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT must: not be re-submitted.
+Changing command buffer usage bits may: affect performance.
+To avoid this, the application should: re-record any command buffers with
+the ename:VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT when multiple counter
+passes are required.
+====
+
+Performance counter results from a performance query pool can: be obtained
+with the command flink:vkGetQueryPoolResults.
+
+[open,refpage='VkPerformanceCounterResultKHR',desc='Union containing a performance counter result',type='structs']
+--
+The sname:VkPerformanceCounterResultKHR union is defined as:
+
+include::{generated}/api/structs/VkPerformanceCounterResultKHR.adoc[]
+
+  * pname:int32 is a 32-bit signed integer value.
+  * pname:int64 is a 64-bit signed integer value.
+  * pname:uint32 is a 32-bit unsigned integer value.
+  * pname:uint64 is a 64-bit unsigned integer value.
+  * pname:float32 is a 32-bit floating-point value.
+  * pname:float64 is a 64-bit floating-point value.
+
+Performance query results are returned in an array of
+sname:VkPerformanceCounterResultKHR unions containing the data associated
+with each counter in the query, stored in the same order as the counters
+supplied in pname:pCounterIndices when creating the performance query.
+slink:VkPerformanceCounterKHR::pname:storage specifies how to parse the
+counter data.
+
+include::{generated}/validity/structs/VkPerformanceCounterResultKHR.adoc[]
+--
+
+
+[[profiling-lock]]
+=== Profiling Lock
+
+[open,refpage='vkAcquireProfilingLockKHR',desc='Acquires the profiling lock',type='protos']
+--
+:refpage: vkAcquireProfilingLockKHR
+
+To record and submit a command buffer containing a performance query pool
+the profiling lock must: be held.
+The profiling lock must: be acquired prior to any call to
+flink:vkBeginCommandBuffer that will be using a performance query pool.
+The profiling lock must: be held while any command buffer containing a
+performance query pool is in the _recording_, _executable_, or _pending
+state_.
+To acquire the profiling lock, call:
+
+include::{generated}/api/protos/vkAcquireProfilingLockKHR.adoc[]
+
+  * pname:device is the logical device to profile.
+  * pname:pInfo is a pointer to a slink:VkAcquireProfilingLockInfoKHR
+    structure containing information about how the profiling is to be
+    acquired.
+
+Implementations may: allow multiple actors to hold the profiling lock
+concurrently.
+
+include::{chapters}/commonvalidity/no_dynamic_allocations_common.adoc[]
+
+include::{generated}/validity/protos/vkAcquireProfilingLockKHR.adoc[]
+--
+
+[open,refpage='VkAcquireProfilingLockInfoKHR',desc='Structure specifying parameters to acquire the profiling lock',type='structs']
+--
+The sname:VkAcquireProfilingLockInfoKHR structure is defined as:
+
+include::{generated}/api/structs/VkAcquireProfilingLockInfoKHR.adoc[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:flags is reserved for future use.
+  * pname:timeout indicates how long the function waits, in nanoseconds, if
+    the profiling lock is not available.
+
+include::{generated}/validity/structs/VkAcquireProfilingLockInfoKHR.adoc[]
+
+If pname:timeout is 0, fname:vkAcquireProfilingLockKHR will not block while
+attempting to acquire the profiling lock.
+If pname:timeout is code:UINT64_MAX, the function will not return until the
+profiling lock was acquired.
+--
+
+[open,refpage='VkAcquireProfilingLockFlagBitsKHR',desc='Reserved for future use',type='enums']
+--
+include::{generated}/api/enums/VkAcquireProfilingLockFlagBitsKHR.adoc[]
+--
+
+[open,refpage='VkAcquireProfilingLockFlagsKHR',desc='Reserved for future use',type='flags']
+--
+include::{generated}/api/flags/VkAcquireProfilingLockFlagsKHR.adoc[]
+
+tlink:VkAcquireProfilingLockFlagsKHR is a bitmask type for setting a mask,
+but is currently reserved for future use.
+--
+
+[open,refpage='vkReleaseProfilingLockKHR',desc='Releases the profiling lock',type='protos']
+--
+To release the profiling lock, call:
+
+include::{generated}/api/protos/vkReleaseProfilingLockKHR.adoc[]
+
+  * pname:device is the logical device to cease profiling on.
+
+.Valid Usage
+****
+  * [[VUID-vkReleaseProfilingLockKHR-device-03235]]
+    The profiling lock of pname:device must: have been held via a previous
+    successful call to flink:vkAcquireProfilingLockKHR
+****
+
+include::{generated}/validity/protos/vkReleaseProfilingLockKHR.adoc[]
+--
+endif::VK_KHR_performance_query[]
+
+
+ifdef::VK_EXT_transform_feedback[]
+[[queries-transform-feedback]]
+== Transform Feedback Queries
+
+Transform feedback queries track the number of primitives attempted to be
+written and actually written, by the vertex stream being captured, to a
+transform feedback buffer.
+This query is updated during drawing commands while transform feedback is
+active.
+The number of primitives actually written will be less than the number
+attempted to be written if the bound transform feedback buffer size was too
+small for the number of primitives actually drawn.
+Primitives are not written beyond the bound range of the transform feedback
+buffer.
+A transform feedback query is begun and ended by calling
+fname:vkCmdBeginQuery and fname:vkCmdEndQuery, respectively to query for
+vertex stream zero.
+fname:vkCmdBeginQueryIndexedEXT and fname:vkCmdEndQueryIndexedEXT can: be
+used to begin and end transform feedback queries for any supported vertex
+stream.
+When a transform feedback query begins, the count of primitives written and
+primitives needed starts from zero.
+For each drawing command, the count is incremented as vertex attribute
+outputs are captured to the transform feedback buffers while transform
+feedback is active.
+
+When a transform feedback query finishes, the result for that query is
+marked as available.
+The application can: then either copy the result to a buffer (via
+fname:vkCmdCopyQueryPoolResults) or request it be put into host memory (via
+fname:vkGetQueryPoolResults).
+endif::VK_EXT_transform_feedback[]
+
+
+ifdef::VK_EXT_primitives_generated_query[]
+[[queries-primitives-generated]]
+== Primitives Generated Queries
+
+When a generated primitive query for a vertex stream is active, the
+primitives-generated count is incremented every time a primitive emitted to
+that stream reaches the transform feedback stage, whether or not transform
+feedback is active.
+A primitives generated query is begun and ended by calling
+fname:vkCmdBeginQuery and fname:vkCmdEndQuery, respectively to query for
+vertex stream zero.
+fname:vkCmdBeginQueryIndexedEXT and fname:vkCmdEndQueryIndexedEXT can: be
+used to begin and end primitives generated queries for any supported vertex
+stream.
+When a primitives generated query begins, the count of primitives generated
+starts from zero.
+
+When a primitives generated query finishes, the result for that query is
+marked as available.
+The application can: then either copy the result to a buffer (via
+fname:vkCmdCopyQueryPoolResults) or request it be put into host memory (via
+fname:vkGetQueryPoolResults).
+
+[NOTE]
+====
+The result of this query is typically identical to
+ename:VK_QUERY_PIPELINE_STATISTIC_CLIPPING_INVOCATIONS_BIT, but the
+primitives generated query is deterministic, i.e. it must be identical to
+the number of primitives processed.
+ename:VK_QUERY_PIPELINE_STATISTIC_CLIPPING_INVOCATIONS_BIT may vary for
+implementation-dependent reasons, e.g. the same primitive may be processed
+multiple times for purposes of clipping.
+====
+endif::VK_EXT_primitives_generated_query[]
+
+
+ifdef::VK_EXT_mesh_shader[]
+[[queries-mesh-shader]]
+== Mesh Shader Queries
+
+When a generated mesh primitives query is active, the
+mesh-primitives-generated count is incremented every time a primitive
+emitted from the mesh shader stage reaches the fragment shader stage.
+When a generated mesh primitives query begins, the mesh-primitives-generated
+count starts from zero.
+
+Mesh and task shader pipeline statistics queries function the same way that
+invocation queries work for other shader stages, counting the number of
+times the respective shader stage has been run.
+When the statistics query begins, the invocation counters start from zero.
+endif::VK_EXT_mesh_shader[]
+
+
+ifdef::VK_INTEL_performance_query[]
+[[queries-performance-intel]]
+== Intel Performance Queries
+
+Intel performance queries allow an application to capture performance data
+for a set of commands.
+Performance queries are used in a similar way than other types of queries.
+A main difference with existing queries is that the resulting data should be
+handed over to a library capable to produce human readable results rather
+than being read directly by an application.
+
+[open,refpage='vkInitializePerformanceApiINTEL',desc='Initialize a device for performance queries',type='protos']
+--
+Prior to creating a performance query pool, initialize the device for
+performance queries with the call:
+
+include::{generated}/api/protos/vkInitializePerformanceApiINTEL.adoc[]
+
+  * pname:device is the logical device used for the queries.
+  * pname:pInitializeInfo is a pointer to a
+    slink:VkInitializePerformanceApiInfoINTEL structure specifying
+    initialization parameters.
+
+include::{generated}/validity/protos/vkInitializePerformanceApiINTEL.adoc[]
+--
+
+[open,refpage='VkInitializePerformanceApiInfoINTEL',desc='Structure specifying parameters of initialize of the device',type='structs']
+--
+The sname:VkInitializePerformanceApiInfoINTEL structure is defined as :
+
+include::{generated}/api/structs/VkInitializePerformanceApiInfoINTEL.adoc[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:pUserData is NULL or a pointer for application data.
+
+include::{generated}/validity/structs/VkInitializePerformanceApiInfoINTEL.adoc[]
+--
+
+[open,refpage='vkUninitializePerformanceApiINTEL',desc='Uninitialize a device for performance queries',type='protos']
+--
+Once performance query operations have completed, uninitialize the device
+for performance queries with the call:
+
+include::{generated}/api/protos/vkUninitializePerformanceApiINTEL.adoc[]
+
+  * pname:device is the logical device used for the queries.
+
+include::{generated}/validity/protos/vkUninitializePerformanceApiINTEL.adoc[]
+--
+
+[open,refpage='vkGetPerformanceParameterINTEL',desc='Query performance capabilities of the device',type='protos']
+--
+Some performance query features of a device can be discovered with the call:
+
+include::{generated}/api/protos/vkGetPerformanceParameterINTEL.adoc[]
+
+  * pname:device is the logical device to query.
+  * pname:parameter is the parameter to query.
+  * pname:pValue is a pointer to a slink:VkPerformanceValueINTEL structure
+    in which the type and value of the parameter are returned.
+
+include::{generated}/validity/protos/vkGetPerformanceParameterINTEL.adoc[]
+--
+
+[open,refpage='VkPerformanceParameterTypeINTEL',desc='Parameters that can be queried',type='enums']
+--
+Possible values of flink:vkGetPerformanceParameterINTEL::pname:parameter,
+specifying a performance query feature, are:
+
+include::{generated}/api/enums/VkPerformanceParameterTypeINTEL.adoc[]
+
+  * ename:VK_PERFORMANCE_PARAMETER_TYPE_HW_COUNTERS_SUPPORTED_INTEL has a
+    boolean result which tells whether hardware counters can be captured.
+  * ename:VK_PERFORMANCE_PARAMETER_TYPE_STREAM_MARKER_VALID_BITS_INTEL has a
+    32 bits integer result which tells how many bits can be written into the
+    sname:VkPerformanceValueINTEL value.
+--
+
+[open,refpage='VkPerformanceValueINTEL',desc='Container for value and types of parameters that can be queried',type='structs']
+--
+The sname:VkPerformanceValueINTEL structure is defined as:
+
+include::{generated}/api/structs/VkPerformanceValueINTEL.adoc[]
+
+  * pname:type is a elink:VkPerformanceValueTypeINTEL value specifying the
+    type of the returned data.
+  * pname:data is a slink:VkPerformanceValueDataINTEL union specifying the
+    value of the returned data.
+
+include::{generated}/validity/structs/VkPerformanceValueINTEL.adoc[]
+--
+
+[open,refpage='VkPerformanceValueTypeINTEL',desc='Type of the parameters that can be queried',type='enums']
+--
+Possible values of slink:VkPerformanceValueINTEL::pname:type, specifying the
+type of the data returned in slink:VkPerformanceValueINTEL::pname:data, are:
+
+  * ename:VK_PERFORMANCE_VALUE_TYPE_UINT32_INTEL specifies that unsigned
+    32-bit integer data is returned in pname:data.value32.
+  * ename:VK_PERFORMANCE_VALUE_TYPE_UINT64_INTEL specifies that unsigned
+    64-bit integer data is returned in pname:data.value64.
+  * ename:VK_PERFORMANCE_VALUE_TYPE_FLOAT_INTEL specifies that
+    floating-point data is returned in pname:data.valueFloat.
+  * ename:VK_PERFORMANCE_VALUE_TYPE_BOOL_INTEL specifies that
+    basetype:VkBool32 data is returned in pname:data.valueBool.
+  * ename:VK_PERFORMANCE_VALUE_TYPE_STRING_INTEL specifies that a pointer to
+    a null-terminated UTF-8 string is returned in pname:data.valueString.
+    The pointer is valid for the lifetime of the pname:device parameter
+    passed to flink:vkGetPerformanceParameterINTEL.
+
+include::{generated}/api/enums/VkPerformanceValueTypeINTEL.adoc[]
+--
+
+[open,refpage='VkPerformanceValueDataINTEL',desc='Values returned for the parameters',type='structs']
+--
+The sname:VkPerformanceValueDataINTEL union is defined as:
+
+include::{generated}/api/structs/VkPerformanceValueDataINTEL.adoc[]
+
+  * pname:value32 represents 32-bit integer data.
+  * pname:value64 represents 64-bit integer data.
+  * pname:valueFloat represents floating-point data.
+  * pname:valueBool represents basetype:VkBool32 data.
+  * pname:valueString represents a pointer to a null-terminated UTF-8
+    string.
+
+The correct member of the union is determined by the associated
+elink:VkPerformanceValueTypeINTEL value.
+
+include::{generated}/validity/structs/VkPerformanceValueDataINTEL.adoc[]
+--
+
+[open,refpage='VkQueryPoolPerformanceQueryCreateInfoINTEL',desc='Structure specifying parameters to create a pool of performance queries',type='structs']
+--
+The sname:VkQueryPoolPerformanceQueryCreateInfoINTEL structure is defined
+as:
+
+include::{generated}/api/structs/VkQueryPoolPerformanceQueryCreateInfoINTEL.adoc[]
+
+include::{generated}/api/structs/VkQueryPoolCreateInfoINTEL.adoc[]
+
+To create a pool for Intel performance queries, set
+slink:VkQueryPoolCreateInfo::pname:queryType to
+ename:VK_QUERY_TYPE_PERFORMANCE_QUERY_INTEL and add a
+sname:VkQueryPoolPerformanceQueryCreateInfoINTEL structure to the
+pname:pNext chain of the slink:VkQueryPoolCreateInfo structure.
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:performanceCountersSampling describe how performance queries
+    should be captured.
+
+include::{generated}/validity/structs/VkQueryPoolPerformanceQueryCreateInfoINTEL.adoc[]
+--
+
+[open,refpage='VkQueryPoolSamplingModeINTEL',desc='Enum specifying how performance queries should be captured',type='enums']
+--
+Possible values of
+slink:VkQueryPoolPerformanceQueryCreateInfoINTEL::pname:performanceCountersSampling
+are:
+
+include::{generated}/api/enums/VkQueryPoolSamplingModeINTEL.adoc[]
+
+  * ename:VK_QUERY_POOL_SAMPLING_MODE_MANUAL_INTEL is the default mode in
+    which the application calls flink:vkCmdBeginQuery and
+    flink:vkCmdEndQuery to record performance data.
+--
+
+[open,refpage='vkCmdSetPerformanceMarkerINTEL',desc='Markers',type='protos']
+--
+To help associate query results with a particular point at which an
+application emitted commands, markers can be set into the command buffers
+with the call:
+
+include::{generated}/api/protos/vkCmdSetPerformanceMarkerINTEL.adoc[]
+
+The last marker set onto a command buffer before the end of a query will be
+part of the query result.
+
+include::{generated}/validity/protos/vkCmdSetPerformanceMarkerINTEL.adoc[]
+--
+
+[open,refpage='VkPerformanceMarkerInfoINTEL',desc='Structure specifying performance markers',type='structs']
+--
+The sname:VkPerformanceMarkerInfoINTEL structure is defined as:
+
+include::{generated}/api/structs/VkPerformanceMarkerInfoINTEL.adoc[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:marker is the marker value that will be recorded into the opaque
+    query results.
+
+include::{generated}/validity/structs/VkPerformanceMarkerInfoINTEL.adoc[]
+--
+
+[open,refpage='vkCmdSetPerformanceStreamMarkerINTEL',desc='Markers',type='protos']
+--
+When monitoring the behavior of an application within the dataset generated
+by the entire set of applications running on the system, it is useful to
+identify draw calls within a potentially huge amount of performance data.
+To do so, application can generate stream markers that will be used to trace
+back a particular draw call with a particular performance data item.
+
+include::{generated}/api/protos/vkCmdSetPerformanceStreamMarkerINTEL.adoc[]
+
+  * pname:commandBuffer is a slink:VkCommandBuffer into which a stream
+    marker is added.
+  * pname:pMarkerInfo is a pointer to a
+    slink:VkPerformanceStreamMarkerInfoINTEL structure describing the marker
+    to insert.
+
+include::{generated}/validity/protos/vkCmdSetPerformanceStreamMarkerINTEL.adoc[]
+--
+
+[open,refpage='VkPerformanceStreamMarkerInfoINTEL',desc='Structure specifying stream performance markers',type='structs']
+--
+The sname:VkPerformanceStreamMarkerInfoINTEL structure is defined as:
+
+include::{generated}/api/structs/VkPerformanceStreamMarkerInfoINTEL.adoc[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:marker is the marker value that will be recorded into the reports
+    consumed by an external application.
+
+.Valid Usage
+****
+  * [[VUID-VkPerformanceStreamMarkerInfoINTEL-marker-02735]]
+    The value written by the application into pname:marker must: only used
+    the valid bits as reported by flink:vkGetPerformanceParameterINTEL with
+    the ename:VK_PERFORMANCE_PARAMETER_TYPE_STREAM_MARKER_VALID_BITS_INTEL
+****
+
+include::{generated}/validity/structs/VkPerformanceStreamMarkerInfoINTEL.adoc[]
+--
+
+[open,refpage='vkCmdSetPerformanceOverrideINTEL',desc='Performance override settings',type='protos']
+--
+Some applications might want measure the effect of a set of commands with a
+different settings.
+It is possible to override a particular settings using :
+
+include::{generated}/api/protos/vkCmdSetPerformanceOverrideINTEL.adoc[]
+
+  * pname:commandBuffer is the command buffer where the override takes
+    place.
+  * pname:pOverrideInfo is a pointer to a
+    slink:VkPerformanceOverrideInfoINTEL structure selecting the parameter
+    to override.
+
+.Valid Usage
+****
+  * [[VUID-vkCmdSetPerformanceOverrideINTEL-pOverrideInfo-02736]]
+    pname:pOverrideInfo must: not be used with a
+    elink:VkPerformanceOverrideTypeINTEL that is not reported available by
+    fname:vkGetPerformanceParameterINTEL
+****
+
+include::{generated}/validity/protos/vkCmdSetPerformanceOverrideINTEL.adoc[]
+--
+
+[open,refpage='VkPerformanceOverrideInfoINTEL',desc='Performance override information',type='structs']
+--
+The sname:VkPerformanceOverrideInfoINTEL structure is defined as:
+
+include::{generated}/api/structs/VkPerformanceOverrideInfoINTEL.adoc[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:type is the particular elink:VkPerformanceOverrideTypeINTEL to
+    set.
+  * pname:enable defines whether the override is enabled.
+  * pname:parameter is a potential required parameter for the override.
+
+include::{generated}/validity/structs/VkPerformanceOverrideInfoINTEL.adoc[]
+--
+
+[open,refpage='VkPerformanceOverrideTypeINTEL',desc='Performance override type',type='enums']
+--
+Possible values of slink:VkPerformanceOverrideInfoINTEL::pname:type,
+specifying performance override types, are:
+
+include::{generated}/api/enums/VkPerformanceOverrideTypeINTEL.adoc[]
+
+  * ename:VK_PERFORMANCE_OVERRIDE_TYPE_NULL_HARDWARE_INTEL turns all
+    rendering operations into noop.
+  * ename:VK_PERFORMANCE_OVERRIDE_TYPE_FLUSH_GPU_CACHES_INTEL stalls the
+    stream of commands until all previously emitted commands have completed
+    and all caches been flushed and invalidated.
+--
+
+[open,refpage='VkPerformanceConfigurationINTEL',desc='Device configuration for performance queries',type='handles']
+--
+Before submitting command buffers containing performance queries commands to
+a device queue, the application must: acquire and set a performance query
+configuration.
+The configuration can be released once all command buffers containing
+performance query commands are not in a pending state.
+
+include::{generated}/api/handles/VkPerformanceConfigurationINTEL.adoc[]
+--
+
+[open,refpage='vkAcquirePerformanceConfigurationINTEL',desc='Acquire the performance query capability',type='protos']
+--
+To acquire a device performance configuration, call:
+
+include::{generated}/api/protos/vkAcquirePerformanceConfigurationINTEL.adoc[]
+
+  * pname:device is the logical device that the performance query commands
+    will be submitted to.
+  * pname:pAcquireInfo is a pointer to a
+    slink:VkPerformanceConfigurationAcquireInfoINTEL structure, specifying
+    the performance configuration to acquire.
+  * pname:pConfiguration is a pointer to a
+    sname:VkPerformanceConfigurationINTEL handle in which the resulting
+    configuration object is returned.
+
+include::{generated}/validity/protos/vkAcquirePerformanceConfigurationINTEL.adoc[]
+--
+
+[open,refpage='VkPerformanceConfigurationAcquireInfoINTEL',desc='Acquire a configuration to capture performance data',type='structs']
+--
+The sname:VkPerformanceConfigurationAcquireInfoINTEL structure is defined
+as:
+
+include::{generated}/api/structs/VkPerformanceConfigurationAcquireInfoINTEL.adoc[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:type is one of the elink:VkPerformanceConfigurationTypeINTEL type
+    of performance configuration that will be acquired.
+
+include::{generated}/validity/structs/VkPerformanceConfigurationAcquireInfoINTEL.adoc[]
+--
+
+[open,refpage='VkPerformanceConfigurationTypeINTEL',desc='Type of performance configuration',type='enums']
+--
+Possible values of
+slink:VkPerformanceConfigurationAcquireInfoINTEL::pname:type, specifying
+performance configuration types, are:
+
+include::{generated}/api/enums/VkPerformanceConfigurationTypeINTEL.adoc[]
+--
+
+[open,refpage='vkQueueSetPerformanceConfigurationINTEL',desc='Set a performance query',type='protos']
+--
+To set a performance configuration, call:
+
+include::{generated}/api/protos/vkQueueSetPerformanceConfigurationINTEL.adoc[]
+
+  * pname:queue is the queue on which the configuration will be used.
+  * pname:configuration is the configuration to use.
+
+include::{generated}/validity/protos/vkQueueSetPerformanceConfigurationINTEL.adoc[]
+--
+
+[open,refpage='vkReleasePerformanceConfigurationINTEL',desc='Release a configuration to capture performance data',type='protos']
+--
+To release a device performance configuration, call:
+
+include::{generated}/api/protos/vkReleasePerformanceConfigurationINTEL.adoc[]
+
+  * pname:device is the device associated to the configuration object to
+    release.
+  * pname:configuration is the configuration object to release.
+
+.Valid Usage
+****
+  * [[VUID-vkReleasePerformanceConfigurationINTEL-configuration-02737]]
+    pname:configuration must: not be released before all command buffers
+    submitted while the configuration was set are in
+    <<commandbuffers-lifecycle, pending state>>
+****
+
+include::{generated}/validity/protos/vkReleasePerformanceConfigurationINTEL.adoc[]
+--
+endif::VK_INTEL_performance_query[]
+
+
+ifdef::VK_KHR_video_queue[]
+[[queries-result-status-only]]
+== Result Status Queries
+
+Result status queries serve a single purpose: allowing the application to
+determine whether a set of operations have completed successfully or not, as
+indicated by the elink:VkQueryResultStatusKHR value written when retrieving
+the result of a query using the ename:VK_QUERY_RESULT_WITH_STATUS_BIT_KHR
+flag.
+
+Unlike other query types, result status queries do not track or maintain any
+other data beyond the completion status, thus no other data is written when
+retrieving their results.
+
+Support for result status queries is indicated by
+slink:VkQueueFamilyQueryResultStatusPropertiesKHR::pname:queryResultStatusSupport
+, as returned by flink:vkGetPhysicalDeviceQueueFamilyProperties2 for the
+queue family in question.
+endif::VK_KHR_video_queue[]
+
+
+ifdef::VK_KHR_video_encode_queue[]
+[[queries-video-encode-feedback]]
+== Video Encode Feedback Queries
+
+Video encode feedback queries allow the application to capture feedback
+values generated by video encode operations.
+As such, video encode feedback queries are available on queue families
+supporting video encode operations.
+The availability of individual video encode feedback values is indicated by
+the bits of
+slink:VkVideoEncodeCapabilitiesKHR::pname:supportedEncodeFeedbackFlags, as
+returned by flink:vkGetPhysicalDeviceVideoCapabilitiesKHR for the
+<<video-profiles,video profile>> the queries are intended to be used with.
+
+The set of enabled video encode feedback values must: be configured on the
+query pool when it is created using the pname:encodeFeedbackFlags member of
+the slink:VkQueryPoolVideoEncodeFeedbackCreateInfoKHR structure included in
+the pname:pNext chain of slink:VkQueryPoolCreateInfo.
+
+[open,refpage='VkQueryPoolVideoEncodeFeedbackCreateInfoKHR',desc='Structure specifying enabled video encode feedback values',type='structs']
+--
+The sname:VkQueryPoolVideoEncodeFeedbackCreateInfoKHR structure is defined
+as:
+
+include::{generated}/api/structs/VkQueryPoolVideoEncodeFeedbackCreateInfoKHR.adoc[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:encodeFeedbackFlags is a bitmask of
+    elink:VkVideoEncodeFeedbackFlagBitsKHR values specifying the set of
+    enabled video encode feedback values captured by queries of the new
+    pool.
+
+include::{generated}/validity/structs/VkQueryPoolVideoEncodeFeedbackCreateInfoKHR.adoc[]
+--
+
+[open,refpage='VkVideoEncodeFeedbackFlagBitsKHR',desc='Bits specifying queried video encode feedback values',type='enums']
+--
+Bits which can: be set in
+slink:VkQueryPoolVideoEncodeFeedbackCreateInfoKHR::pname:encodeFeedbackFlags
+for video encode feedback query pools are:
+
+include::{generated}/api/enums/VkVideoEncodeFeedbackFlagBitsKHR.adoc[]
+
+  * ename:VK_VIDEO_ENCODE_FEEDBACK_BITSTREAM_BUFFER_OFFSET_BIT_KHR specifies
+    that queries managed by the pool will capture the byte offset of the
+    bitstream data written by the video encode operation to the bitstream
+    buffer specified in slink:VkVideoEncodeInfoKHR::pname:dstBuffer relative
+    to the offset specified in
+    slink:VkVideoEncodeInfoKHR::pname:dstBufferOffset.
+    For the first video encode operation issued by any
+    <<video-encode-commands,video encode command>>, this value will always
+    be zero, meaning that bitstream data is always written to the buffer
+    specified in slink:VkVideoEncodeInfoKHR::pname:dstBuffer starting from
+    the offset specified in
+    slink:VkVideoEncodeInfoKHR::pname:dstBufferOffset.
+  * ename:VK_VIDEO_ENCODE_FEEDBACK_BITSTREAM_BYTES_WRITTEN_BIT_KHR specifies
+    that queries managed by the pool will capture the number of bytes
+    written by the video encode operation to the bitstream buffer specified
+    in slink:VkVideoEncodeInfoKHR::pname:dstBuffer.
+  * ename:VK_VIDEO_ENCODE_FEEDBACK_BITSTREAM_HAS_OVERRIDES_BIT_KHR specifies
+    that queries managed by the pool will capture a boolean value indicating
+    that the data written to the bitstream buffer specified in
+    slink:VkVideoEncodeInfoKHR::pname:dstBuffer contains
+    <<encode-overrides,overridden parameters>>.
+ifdef::VK_KHR_video_encode_feedback2[]
+  * ename:VK_VIDEO_ENCODE_FEEDBACK_AVERAGE_QUANTIZATION_BIT_KHR specifies
+    that queries managed by the pool will capture the average quantization
+    used across the encoded coding blocks.
+  * ename:VK_VIDEO_ENCODE_FEEDBACK_MIN_QUANTIZATION_BIT_KHR specifies that
+    queries managed by the pool will capture the minimum quantization used
+    across the encoded coding blocks.
+  * ename:VK_VIDEO_ENCODE_FEEDBACK_MAX_QUANTIZATION_BIT_KHR specifies that
+    queries managed by the pool will capture the maximum quantization used
+    across the encoded coding blocks.
+  * ename:VK_VIDEO_ENCODE_FEEDBACK_INTRA_PIXELS_BIT_KHR specifies that
+    queries managed by the pool will capture the number of pixels encoded as
+    intra blocks, including or excluding any skipped blocks, as described
+    below.
+  * ename:VK_VIDEO_ENCODE_FEEDBACK_INTER_PIXELS_BIT_KHR specifies that
+    queries managed by the pool will capture the number of pixels encoded as
+    inter blocks, including or excluding any skipped blocks, as described
+    below.
+  * ename:VK_VIDEO_ENCODE_FEEDBACK_SKIPPED_PIXELS_BIT_KHR specifies that
+    queries managed by the pool will capture the number of pixels encoded as
+    skipped blocks.
+  * ename:VK_VIDEO_ENCODE_FEEDBACK_PICTURE_PARTITION_COUNT_BIT_KHR specifies
+    that queries managed by the pool will capture the number of encoded
+    picture partitions.
+endif::VK_KHR_video_encode_feedback2[]
+
+ifdef::VK_KHR_video_encode_feedback2[]
+The average, minimum, and maximum quantization values captured when
+ename:VK_VIDEO_ENCODE_FEEDBACK_AVERAGE_QUANTIZATION_BIT_KHR,
+ename:VK_VIDEO_ENCODE_FEEDBACK_MIN_QUANTIZATION_BIT_KHR, and/or
+ename:VK_VIDEO_ENCODE_FEEDBACK_MAX_QUANTIZATION_BIT_KHR are specified,
+respectively, depend on the used video profile:
+
+ifdef::VK_KHR_video_encode_h264[]
+  * In case of <<encode-h264-profile,H.264 encode profiles>>, this value is
+    a signed integer indicating the average, minimum, or maximum QP used
+    across the encoded coding blocks, respectively.
+endif::VK_KHR_video_encode_h264[]
+ifdef::VK_KHR_video_encode_h265[]
+  * In case of <<encode-h265-profile,H.265 encode profiles>> this value is a
+    signed integer indicating the average, minimum, or maximum QP used
+    across the encoded coding blocks, respectively.
+endif::VK_KHR_video_encode_h265[]
+ifdef::VK_KHR_video_encode_av1[]
+  * In case of <<encode-av1-profile,AV1 encode profiles>> this value is an
+    unsigned integer indicating the average, minimum, or maximum quantizer
+    index used across the encoded coding blocks, respectively.
+endif::VK_KHR_video_encode_av1[]
+
+The rounding mode used to calculate the average value captured when
+ename:VK_VIDEO_ENCODE_FEEDBACK_AVERAGE_QUANTIZATION_BIT_KHR is specified is
+undefined:.
+
+The number of pixels captured when
+ename:VK_VIDEO_ENCODE_FEEDBACK_INTRA_PIXELS_BIT_KHR,
+ename:VK_VIDEO_ENCODE_FEEDBACK_INTER_PIXELS_BIT_KHR, and/or
+ename:VK_VIDEO_ENCODE_FEEDBACK_SKIPPED_PIXELS_BIT_KHR are specified include
+padding pixels beyond the requested coded extent that are part of the
+complete coding blocks encoded for the picture.
+
+If ename:VK_VIDEO_ENCODE_FEEDBACK_SKIPPED_PIXELS_BIT_KHR is not supported
+for a video encode profile, then the results captured for
+ename:VK_VIDEO_ENCODE_FEEDBACK_INTRA_PIXELS_BIT_KHR and
+ename:VK_VIDEO_ENCODE_FEEDBACK_INTER_PIXELS_BIT_KHR will always include
+pixels in any intra or inter blocks, respectively, that are encoded as
+skipped blocks.
+Otherwise, the behavior depends on the used video profile:
+
+ifdef::VK_KHR_video_encode_h264[]
+  * In case of <<encode-h264-profile,H.264 encode profiles>>, skipped blocks
+    are always inter blocks and the results captured for
+    ename:VK_VIDEO_ENCODE_FEEDBACK_INTER_PIXELS_BIT_KHR will always include
+    pixels encoded as skipped blocks.
++
+[NOTE]
+====
+Implementations that would otherwise not count skipped pixels as inter
+pixels can simply sum the captured non-skipped inter pixel count and skipped
+pixel counts in the reported value for
+ename:VK_VIDEO_ENCODE_FEEDBACK_INTER_PIXELS_BIT_KHR.
+====
+endif::VK_KHR_video_encode_h264[]
+ifdef::VK_KHR_video_encode_h265[]
+  * In case of <<encode-h265-profile,H.265 encode profiles>>, skipped blocks
+    are always inter blocks and the results captured for
+    ename:VK_VIDEO_ENCODE_FEEDBACK_INTER_PIXELS_BIT_KHR will always include
+    pixels encoded as skipped blocks.
++
+[NOTE]
+====
+Implementations that would otherwise not count skipped pixels as inter
+pixels can simply sum the captured non-skipped inter pixel count and skipped
+pixel counts in the reported value for
+ename:VK_VIDEO_ENCODE_FEEDBACK_INTER_PIXELS_BIT_KHR.
+====
+endif::VK_KHR_video_encode_h265[]
+ifdef::VK_KHR_video_encode_av1[]
+  * In case of <<encode-av1-profile,AV1 encode profiles>>, both inter and
+    intra blocks can: be skipped blocks.
+    Implementations should: include any pixels encoded as skipped intra or
+    inter blocks in the results captured for
+    ename:VK_VIDEO_ENCODE_FEEDBACK_INTRA_PIXELS_BIT_KHR and
+    ename:VK_VIDEO_ENCODE_FEEDBACK_INTER_PIXELS_BIT_KHR, respectively, if
+    possible.
+    However, some implementations may: not be able to do so if they do not
+    differentiate between skipped intra and inter blocks.
+    Therefore, in case of <<encode-av1-profile,AV1 encode profiles>> that do
+    support ename:VK_VIDEO_ENCODE_FEEDBACK_SKIPPED_PIXELS_BIT_KHR
+    implementations must: either include skipped pixels part of intra and
+    inter blocks in both or neither of the results captured by
+    ename:VK_VIDEO_ENCODE_FEEDBACK_INTRA_PIXELS_BIT_KHR and
+    ename:VK_VIDEO_ENCODE_FEEDBACK_INTER_PIXELS_BIT_KHR, respectively.
++
+[NOTE]
+====
+Applications can detect whether the reported intra and inter pixel counts
+include the skipped pixels or not, by checking whether the sum of the intra
+and pixel pixels adds up to the coded extent padded to entire coding blocks.
+====
+endif::VK_KHR_video_encode_av1[]
+endif::VK_KHR_video_encode_feedback2[]
+
+When retrieving the results of video encode feedback queries, the values
+corresponding to each enabled video encode feedback are written in the order
+of the bits defined above, followed by an optional value indicating
+availability or result status if ename:VK_QUERY_RESULT_WITH_AVAILABILITY_BIT
+or ename:VK_QUERY_RESULT_WITH_STATUS_BIT_KHR is specified, respectively.
+ifdef::VK_KHR_video_encode_feedback2[]
+If <<queries-video-encode-per-partition-feedback,per picture partition
+feedback>> is enabled, this is followed by the values corresponding to each
+enabled per picture partition video encode feedback for each encoded picture
+partition but at most for
+slink:VkQueryPoolVideoEncodePerPartitionFeedbackCreateInfoKHR::pname:maxPerPartitionFeedbackEntries
+number of picture partitions, in picture-partition-major order.
+endif::VK_KHR_video_encode_feedback2[]
+
+If the result status of a video encode feedback query is negative, then the
+results of all enabled video encode feedback values will be undefined:.
+
+[NOTE]
+====
+Applications should always specify ename:VK_QUERY_RESULT_WITH_STATUS_BIT_KHR
+when retrieving the results of video encode feedback queries and ignore such
+undefined: video encode feedback values for any
+<<encode-unsuccessful,unsuccessfully>> completed video encode operations.
+====
+--
+
+[open,refpage='VkVideoEncodeFeedbackFlagsKHR',desc='Bitmask of VkVideoEncodeFeedbackFlagBitsKHR',type='flags']
+--
+include::{generated}/api/flags/VkVideoEncodeFeedbackFlagsKHR.adoc[]
+
+tname:VkVideoEncodeFeedbackFlagsKHR is a bitmask type for setting a mask of
+zero or more elink:VkVideoEncodeFeedbackFlagBitsKHR.
+--
+endif::VK_KHR_video_encode_queue[]
+
+ifdef::VK_KHR_video_encode_feedback2[]
+[[queries-video-encode-per-partition-feedback]]
+=== Per Picture Partition Feedback
+
+If the <<features-videoEncodeFeedback2,pname:videoEncodeFeedback2>> feature
+is enabled, video encode feedback queries also allow the application to
+capture additional feedback values for each picture partition generated by
+video encode operations.
+The availability of individual per picture partition video encode feedback
+values is indicated by the bits of
+slink:VkVideoEncodeFeedback2CapabilitiesKHR::pname:supportedPerPartitionEncodeFeedbackFlags,
+as returned by flink:vkGetPhysicalDeviceVideoCapabilitiesKHR for the
+<<video-profiles,video profile>> the queries are intended to be used with.
+
+The set of enabled per picture partition video encode feedback values must:
+be configured on the query pool at the time of its creation by using the
+pname:perPartitionEncodeFeedbackFlags member of the
+slink:VkQueryPoolVideoEncodePerPartitionFeedbackCreateInfoKHR structure
+included in the pname:pNext chain of slink:VkQueryPoolCreateInfo.
+
+[open,refpage='VkQueryPoolVideoEncodePerPartitionFeedbackCreateInfoKHR',desc='Structure specifying enabled per picture partition video encode feedback values',type='structs']
+--
+The sname:VkQueryPoolVideoEncodePerPartitionFeedbackCreateInfoKHR structure
+is defined as:
+
+include::{generated}/api/structs/VkQueryPoolVideoEncodePerPartitionFeedbackCreateInfoKHR.adoc[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:maxPerPartitionFeedbackEntries specifies the maximum number of
+    picture partitions for which per picture partition video encode feedback
+    values can: be captured by queries of the new pool.
+  * pname:perPartitionEncodeFeedbackFlags is a bitmask of
+    elink:VkVideoEncodePerPartitionFeedbackFlagBitsKHR values specifying the
+    set of enabled per picture partition video encode feedback values
+    captured by queries of the new pool.
+
+include::{generated}/validity/structs/VkQueryPoolVideoEncodePerPartitionFeedbackCreateInfoKHR.adoc[]
+--
+
+[open,refpage='VkVideoEncodePerPartitionFeedbackFlagBitsKHR',desc='Bits specifying queried per picture partition video encode feedback values',type='enums']
+--
+Bits which can: be set in
+slink:VkQueryPoolVideoEncodePerPartitionFeedbackCreateInfoKHR::pname:perPartitionEncodeFeedbackFlags
+for video encode feedback query pools are:
+
+include::{generated}/api/enums/VkVideoEncodePerPartitionFeedbackFlagBitsKHR.adoc[]
+
+  * ename:VK_VIDEO_ENCODE_PER_PARTITION_FEEDBACK_STATUS_BIT_KHR specifies
+    that queries managed by the pool will capture the result status of each
+    encoded picture partition.
+    These result status values are reported as elink:VkQueryResultStatusKHR
+    values, similar to <<queries-result-status-only,result status queries>>
+    but indicate the result status of the encoding of individual picture
+    partitions instead of that of the whole video encode operation.
+  * ename:VK_VIDEO_ENCODE_PER_PARTITION_FEEDBACK_BITSTREAM_BUFFER_OFFSET_BIT_KHR
+    specifies that queries managed by the pool will capture the byte offset
+    of the bitstream data of the corresponding picture partition written to
+    the bitstream buffer specified in
+    slink:VkVideoEncodeInfoKHR::pname:dstBuffer relative to the offset
+    specified in slink:VkVideoEncodeInfoKHR::pname:dstBufferOffset.
+  * ename:VK_VIDEO_ENCODE_PER_PARTITION_FEEDBACK_BITSTREAM_BYTES_WRITTEN_BIT_KHR
+    specifies that queries managed by the pool will capture the number of
+    bytes written by the video encode operation for the corresponding
+    picture partition to the bitstream buffer specified in
+    slink:VkVideoEncodeInfoKHR::pname:dstBuffer.
+
+The bitstream offsets reported for subsequent picture partitions are always
+monotonically increasing and the bitstream buffer ranges corresponding to
+individual picture partitions do not overlap.
+
+[NOTE]
+====
+The bitstream range corresponding to the entire frame, as reported through
+the ename:VK_VIDEO_ENCODE_FEEDBACK_BITSTREAM_BUFFER_OFFSET_BIT_KHR and
+ename:VK_VIDEO_ENCODE_FEEDBACK_BITSTREAM_BYTES_WRITTEN_BIT_KHR feedback
+values may contain additional data such as frame headers.
+In addition, certain implementations or video compression standards may have
+additional payloads in between subsequent picture partitions.
+ifdef::VK_KHR_video_encode_av1[]
+For example, AV1 bitstreams contain the code:tile_size_minus_1 syntax
+element in between subsequent tiles that are not part of the actual tile
+data.
+endif::VK_KHR_video_encode_av1[]
+Therefore the specification only guarantees monotonically increasing offsets
+and non-overlapping ranges for picture partitions but does not guarantee
+that the picture partition ranges are tightly packed or that the union of
+the picture partition ranges covers the entire range of the bitstream
+output.
+====
+
+When retrieving the results of video encode feedback queries with per
+picture partition video encode feedback values, the values corresponding to
+each enabled per picture partition video encode feedback are written for
+each encoded picture partition in the order of the bits defined above, in
+picture-partition-major order.
+
+If the video encode operation results in more encoded picture partitions
+than the pname:maxPerPartitionFeedbackEntries specified in the
+slink:VkQueryPoolVideoEncodePerPartitionFeedbackCreateInfoKHR structure the
+query pool was created with, then the per picture partition feedback values
+corresponding to additional picture partitions are not available for
+retrieval.
+
+If the per picture partition feedback status is negative, then all other per
+partition feedback values corresponding to that picture partition will be
+undefined:.
+Specifically, implementations may: report a per picture partition feedback
+status of
+ename:VK_QUERY_RESULT_STATUS_INSUFFICIENT_BITSTREAM_BUFFER_RANGE_KHR for the
+picture partition(s) whose encoded bitstream data no longer fit into the
+destination video bitstream buffer range.
+--
+
+[open,refpage='VkVideoEncodePerPartitionFeedbackFlagsKHR',desc='Bitmask of VkVideoEncodePerPartitionFeedbackFlagBitsKHR',type='flags']
+--
+include::{generated}/api/flags/VkVideoEncodePerPartitionFeedbackFlagsKHR.adoc[]
+
+tname:VkVideoEncodePerPartitionFeedbackFlagsKHR is a bitmask type for
+setting a mask of zero or more
+elink:VkVideoEncodePerPartitionFeedbackFlagBitsKHR.
+--
+endif::VK_KHR_video_encode_feedback2[]

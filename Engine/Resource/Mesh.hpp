@@ -29,6 +29,13 @@ struct Vertex_UV
 	Vector2 texture_coord;
 };
 
+/// A vertex with a spatial component.
+struct Vertex_Spatial
+{
+	/// Vertex's position.
+	Vector3 position;
+};
+
 /// A vertex index.
 using Index = uint32_t;
 
@@ -52,14 +59,20 @@ constexpr uint8_t MESH_VERSION = 1;
 Result create_mesh_storage(Allocator* allocator);
 /// Destroys the storage for meshes.
 void destroy_mesh_storage();
+
 /// Loads a `.bmesh` file into memory.
 Pool_Handle<Mesh> load_mesh(const char* stem);
 /// Unloads a mesh from memory.
 void unload_mesh(Pool_Handle<Mesh> handle);
 /// Gets a pointer to a mesh's data.
 Mesh* get_mesh(Pool_Handle<Mesh> handle);
+
 /// Computes a procedural UV sphere and loads it into memory.
 /// @param segment_count Number of vertical slices.
 /// @param ring_count Number of horizontal slices.
 Pool_Handle<Mesh> compute_uv_sphere(float radius, uint32_t segment_count, uint32_t ring_count);
+/// Computes a procedural flat grid on the XZ plane, from (0, 0, 0) to (1, 0, 1), facing +Y, and loads it into memory.
+/// Its texture coordinates match its XZ position.
+/// @param quad_count Number of quads per side.
+Pool_Handle<Mesh> compute_grid(uint32_t quad_count);
 }  // namespace blk

@@ -23,11 +23,26 @@ typedef struct
 	uint8 a;
 } Color_RGBA;
 
+typedef enum <uint8>
+{
+	RGBA8 = 0,
+	R16 = 1
+} Texture_Format;
+
 typedef struct
 {
+	Texture_Format format;
 	uint32 width;
 	uint32 height;
-	Color_RGBA pixels[width * height];
+
+	if (format == RGBA8)
+	{
+		Color_RGBA pixels[width * height];
+	}
+	else if (format == R16)
+	{
+		uint16 pixels[width * height];
+	}
 } Texture;
 
 Header header;

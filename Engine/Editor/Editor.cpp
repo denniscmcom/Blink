@@ -5,11 +5,12 @@
 
 #include "Engine/Editor/Editor.hpp"
 
+#include "Engine/Core/Pool.hpp"
+#include "Engine/Core/String.hpp"
 #include "Engine/Editor/Camera.hpp"
 #include "Engine/Editor/Context.hpp"
 #include "Engine/Editor/Menu.hpp"
 #include "Engine/Editor/Status_Bar.hpp"
-#include "Engine/Editor/World/Stats.hpp"
 #include "Engine/Input/Input.hpp"
 #include "Engine/Platform/Application.hpp"
 #include "Engine/Platform/Assert.hpp"
@@ -20,6 +21,9 @@
 #include "Engine/Platform/Window_Internal.hpp"
 #include "Engine/Renderer/Renderer.hpp"
 #include "Engine/Renderer/Renderer_Internal.hpp"
+#include "Engine/Resource/Mesh.hpp"
+#include "Engine/Scene/Node.hpp"
+#include "Stats.hpp"
 
 #include <Windows.h>
 #include <imgui.h>
@@ -28,9 +32,88 @@
 
 #include <stdio.h>
 
-blk::Result
-blk::create_editor(Editor_Context& context)
+namespace
 {
+blk::Editor_Context context = {};
+}  // namespace
+
+blk::Result
+blk::create_editor(World* game_world, Allocator* allocator)
+{
+	if (!BLK_VERIFY(game_world) || !BLK_VERIFY(allocator))
+	{
+		return Result::INVALID_ARGUMENTS;
+	}
+
+	// Assign game world.
+	context.world_context.world = game_world;
+
+	// Create the editor camera for `Editor_Mode::WORLD` and activate it by default.
+
+	context.world_context.editor_camera_handle = spawn_camera(*game_world, game_world->scene_graph.root);
+
+	if (!BLK_VERIFY(context.world_context.editor_camera_handle != POOL_HANDLE_NONE<Camera>))
+	{
+		return Result::INVALID_ARGUMENTS;
+	}
+
+	context.world_context.world->active_camera_handle = context.world_context.editor_camera_handle;
+	Camera* editor_camera = get_camera(*game_world, context.world_context.editor_camera_handle);
+	BLK_CHECK(editor_camera);
+
+	editor_camera->near_plane = 0.5f;
+	editor_camera->far_plane = 5'000.0f;
+
+	BLK_IF_NOT_SUCCESS(rename_node(game_world->scene_graph, editor_camera->node_handle, "Editor_Camera"))
+	{
+		BLK_ERROR("Failed to rename editor camera\n");
+	}
+
+	// Create the world for `Editor_Mode::MATERIAL`.
+	BLK_CHECK(create_world(allocator, {}, context.material_context.world) == Result::SUCCESS);
+
+	// Spawn camera.
+
+	const Pool_Handle<Camera> material_mode_camera_handle = spawn_camera(context.material_context.world, {});
+	context.material_context.world.active_camera_handle = material_mode_camera_handle;
+	Camera* material_mode_camera = get_camera(context.material_context.world, material_mode_camera_handle);
+	BLK_CHECK(material_mode_camera);
+
+	BLK_CHECK(
+		rename_node(context.material_context.world.scene_graph, material_mode_camera->node_handle, "Editor_Camera") ==
+		Result::SUCCESS
+	);
+
+	// Spawn UV sphere.
+
+	const Pool_Handle<Mesh> sphere_mesh_handle = compute_uv_sphere(1.0f, 64, 32);
+	const Pool_Handle<Node> sphere_node_handle =
+		spawn_node(context.material_context.world.scene_graph, Node_Type::MESH_REF, {});
+
+	BLK_CHECK(rename_node(context.material_context.world.scene_graph, sphere_node_handle, "Sphere") == Result::SUCCESS);
+
+	Node* sphere_node = get_node(context.material_context.world.scene_graph, sphere_node_handle);
+	BLK_CHECK(sphere_node);
+
+	sphere_node->transform.position.z = 5.0f;
+	sphere_node->mesh_ref.mesh_handle = sphere_mesh_handle;
+
+	// Create the world for `Editor_Mode::PREFAB`.
+
+	BLK_CHECK(create_world(allocator, {}, context.prefab_context.world) == Result::SUCCESS);
+
+	// Spawn camera.
+	const Pool_Handle<Camera> prefab_mode_camera_handle = spawn_camera(context.prefab_context.world, {});
+	context.prefab_context.world.active_camera_handle = prefab_mode_camera_handle;
+
+	Camera* prefab_mode_camera = get_camera(context.material_context.world, material_mode_camera_handle);
+	BLK_CHECK(prefab_mode_camera);
+
+	BLK_CHECK(
+		rename_node(context.prefab_context.world.scene_graph, prefab_mode_camera->node_handle, "Editor_Camera") ==
+		Result::SUCCESS
+	);
+
 	// Create ImGui context.
 
 	IMGUI_CHECKVERSION();
@@ -48,13 +131,12 @@ blk::create_editor(Editor_Context& context)
 	// Format the absolute path to the JetBrains Mono fonts.
 	char mono_font_path[MAX_PATH_SIZE];
 
-	if (const int written = snprintf(
-			mono_font_path,
-			MAX_PATH_SIZE,
-			"%s/Fonts/JetBrainsMono-2.304/fonts/ttf",
-			BLK_EDITOR_RESOURCES_DIRECTORY
-		);
-		written < 0 || static_cast<size_t>(written) >= MAX_PATH_SIZE)
+	BLK_IF_NOT_SNPRINTF(
+		mono_font_path,
+		MAX_PATH_SIZE,
+		"%s/Fonts/JetBrainsMono-2.304/fonts/ttf",
+		BLK_EDITOR_RESOURCES_DIRECTORY
+	)
 	{
 		BLK_ERROR("Failed to format the absolute path to JetBrains Mono fonts\n");
 
@@ -64,9 +146,7 @@ blk::create_editor(Editor_Context& context)
 	// Format the absolute path for the JetBrains Mono Medium font.
 	char mono_font_medium_path[MAX_PATH_SIZE];
 
-	if (const int written =
-			snprintf(mono_font_medium_path, MAX_PATH_SIZE, "%s/JetBrainsMono-Medium.ttf", mono_font_path);
-		written < 0 || static_cast<size_t>(written) >= MAX_PATH_SIZE)
+	BLK_IF_NOT_SNPRINTF(mono_font_medium_path, MAX_PATH_SIZE, "%s/JetBrainsMono-Medium.ttf", mono_font_path)
 	{
 		BLK_ERROR("Failed to format the absolute path to JetBrains Mono Medium font\n");
 
@@ -76,13 +156,12 @@ blk::create_editor(Editor_Context& context)
 	// Format the absolute path to the material design icons fonts.
 	char icon_font_path[MAX_PATH_SIZE];
 
-	if (const int written = snprintf(
-			icon_font_path,
-			MAX_PATH_SIZE,
-			"%s/Fonts/material-design-icons/font",
-			BLK_EDITOR_RESOURCES_DIRECTORY
-		);
-		written < 0 || static_cast<size_t>(written) >= MAX_PATH_SIZE)
+	BLK_IF_NOT_SNPRINTF(
+		icon_font_path,
+		MAX_PATH_SIZE,
+		"%s/Fonts/material-design-icons/font",
+		BLK_EDITOR_RESOURCES_DIRECTORY
+	)
 	{
 		BLK_ERROR("Failed to format the absolute path to the material design icons fonts\n");
 
@@ -92,9 +171,7 @@ blk::create_editor(Editor_Context& context)
 	// Format the absolute path to the material design icons regular font.
 	char icon_font_regular_path[MAX_PATH_SIZE];
 
-	if (const int written =
-			snprintf(icon_font_regular_path, MAX_PATH_SIZE, "%s/MaterialIcons-Regular.ttf", icon_font_path);
-		written < 0 || static_cast<size_t>(written) >= MAX_PATH_SIZE)
+	BLK_IF_NOT_SNPRINTF(icon_font_regular_path, MAX_PATH_SIZE, "%s/MaterialIcons-Regular.ttf", icon_font_path)
 	{
 		BLK_ERROR("Failed to format the absolute path to the material design icons regular font\n");
 
@@ -165,102 +242,72 @@ blk::create_editor(Editor_Context& context)
 	return Result::SUCCESS;
 }
 
-void
-blk::update_editor(Editor_Context& context, const double delta_time)
+blk::Editor_Context
+blk::update_editor(const Input_State& input_state, const double delta_time)
 {
-	if (!context.input_state)
-	{
-		BLK_ERROR("Failed to update editor; input state is missing\n");
+	// We only handle global input here and delegates the rest to its own widgets.
 
-		return;
+	// Set active world based on mode.
+
+	switch (context.mode)
+	{
+	case Editor_Mode::WORLD: {
+		context.active_world = context.world_context.world;
+	}
+	break;
+	case Editor_Mode::MATERIAL: {
+		context.active_world = &context.material_context.world;
+	}
+	break;
+	case Editor_Mode::PREFAB: {
+		context.active_world = &context.prefab_context.world;
+	}
+	break;
 	}
 
 	// Holding mouse right button activates free fly mode.
-	bool should_enter_free_fly_mode = is_key_held(*context.input_state, Key::MOUSE_RIGHT);
-	bool should_exit_free_fly_mode = is_key_release(*context.input_state, Key::MOUSE_RIGHT);
-
-	// We assign these variables later depending on the `Editor_Mode`.
-	// We use them to update the editor camera.
-	World* world_mode = nullptr;
-	Pool_Handle<Camera> editor_camera_handle = {};
-
-	if (context.mode == Editor_Mode::WORLD)
-	{
-		// We only enter or exit fly mode is the editor camera is active; not gameplay camera.
-		should_enter_free_fly_mode = should_enter_free_fly_mode && context.world_context.is_editor_camera_active;
-		should_exit_free_fly_mode = should_exit_free_fly_mode && context.world_context.is_editor_camera_active;
-
-		world_mode = context.world_context.game_world;
-		editor_camera_handle = context.world_context.editor_camera_handle;
-
-		// Pause or resume the game simulation.
-		if (is_key_press(*context.input_state, Key::KEYBOARD_F1))
-		{
-			context.world_context.is_game_simulation_paused = !context.world_context.is_game_simulation_paused;
-		}
-
-		// Switch between the editor and the in-game camera.
-		if (is_key_press(*context.input_state, Key::KEYBOARD_F2) && BLK_VERIFY(context.world_context.game_world))
-		{
-			if (context.world_context.is_editor_camera_active)
-			{
-				context.world_context.game_world->active_camera_handle = context.world_context.game_camera_handle;
-				context.world_context.is_editor_camera_active = false;
-			}
-			else
-			{
-				activate_world_mode_editor_camera(context.world_context);
-			}
-		}
-	}
-
-	if (context.mode == Editor_Mode::MATERIAL)
-	{
-		world_mode = &context.material_context.world;
-		editor_camera_handle = context.material_context.camera_handle;
-	}
-
-	BLK_CHECK(world_mode);
+	const bool should_enter_free_fly_mode = is_key_held(input_state, Key::MOUSE_RIGHT);
+	const bool should_exit_free_fly_mode = is_key_release(input_state, Key::MOUSE_RIGHT);
 
 	// Enter free-fly mode.
 	if (should_enter_free_fly_mode)
 	{
 		// If we are not in free fly mode already.
-		if (!context.viewport_context.is_in_free_fly_mode)
+		if (!context.is_in_free_fly_mode)
 		{
 			// We save the cursor position before hide it to restore it when we exit fly mode.
-			BLK_IF_NOT_SUCCESS(get_cursor_position(context.viewport_context.cursor_position_before_hidden))
+			BLK_IF_NOT_SUCCESS(get_cursor_position(context.cursor_position_x, context.cursor_position_y))
 			{
 				BLK_ERROR("Failed to get cursor position\n");
 
-				return;
+				return context;
 			}
 
 			hide_cursor();
 		}
 
-		context.viewport_context.is_in_free_fly_mode = true;
-		update_editor_camera(*world_mode, editor_camera_handle, *context.input_state, delta_time);
+		context.is_in_free_fly_mode = true;
+		update_editor_camera(context, input_state, delta_time);
 	}
 
 	// Exit free-fly mode.
 	if (should_exit_free_fly_mode)
 	{
 		// If we are in fly mode.
-		if (context.viewport_context.is_in_free_fly_mode)
+		if (context.is_in_free_fly_mode)
 		{
 			// Set the cursor position to where it was before entering fly mode and show the cursor.
-			BLK_IF_NOT_SUCCESS(set_cursor_position(context.viewport_context.cursor_position_before_hidden))
+			BLK_IF_NOT_SUCCESS(set_cursor_position(context.cursor_position_x, context.cursor_position_y))
 			{
 				BLK_ERROR("Failed to set cursor position\n");
 
-				return;
+				return context;
 			}
 
 			show_cursor();
 		}
 
-		context.viewport_context.is_in_free_fly_mode = false;
+		context.is_in_free_fly_mode = false;
 	}
 
 	// Stuff needed by ImGui using a Vulkan backend.
@@ -272,27 +319,37 @@ blk::update_editor(Editor_Context& context, const double delta_time)
 	// We first compute data that the editor needs.
 	compute_stats(context, delta_time);
 
-	// Draw the status bar now because it needs data compute previously.
-	draw_status_bar(context);
-
 	// The menu is the source of truth of the editor; it is from where all widgets are drawn, shown, or hidden.
 	draw_menu(context);
 
+	// Draw the status bar now because it needs data compute previously.
+	draw_status_bar(context);
+
 	// We finally tell ImGui to render everything.
 	ImGui::Render();
+
+	return context;
+}
+
+bool
+blk::is_game_simulation_paused()
+{
+	return context.world_context.is_game_simulation_paused;
+}
+
+blk::World*
+blk::get_active_world()
+{
+	return context.active_world;
 }
 
 void
 blk::destroy_editor()
 {
-	// `ImGui_ImplVulkan_Shutdown` destroys the backend's own buffers, and the GPU is still executing the frames
-	// `render_frame` submitted, which read them.
+	// `ImGui_ImplVulkan_Shutdown` destroys GPU resources, so we wait for the GPU to finish.
 	wait_renderer_idle();
 
 	ImGui_ImplVulkan_Shutdown();
 	ImGui_ImplWin32_Shutdown();
 	ImGui::DestroyContext();
-
-	// We do not destroy `Editor_Context` here because it is not created by `create_editor`. Instead, it is created by
-	// the caller.
 }

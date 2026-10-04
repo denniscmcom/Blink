@@ -1,0 +1,994 @@
+// Copyright 2019-2026 The Khronos Group Inc.
+//
+// SPDX-License-Identifier: CC-BY-4.0
+
+// Common Valid Usage
+// Common to all dispatch and drawing commands
+  * [[VUID-{refpage}-magFilter-04553]]
+    If a slink:VkSampler created with pname:magFilter or pname:minFilter
+    equal to ename:VK_FILTER_LINEAR,
+ifdef::VK_COMPUTE_VERSION_1_2,VK_EXT_sampler_filter_minmax[]
+    pname:reductionMode equal to
+    ename:VK_SAMPLER_REDUCTION_MODE_WEIGHTED_AVERAGE,
+endif::VK_COMPUTE_VERSION_1_2,VK_EXT_sampler_filter_minmax[]
+    and pname:compareEnable equal to ename:VK_FALSE is used to sample a
+    slink:VkImageView as a result of this command, then the image view's
+    <<resources-image-view-format-features,format features>> must: contain
+    ename:VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT
+ifdef::VK_COMPUTE_VERSION_1_2,VK_EXT_sampler_filter_minmax[]
+  * [[VUID-{refpage}-magFilter-09598]]
+    If a slink:VkSampler created with pname:magFilter or pname:minFilter
+    equal to ename:VK_FILTER_LINEAR and pname:reductionMode equal to either
+    ename:VK_SAMPLER_REDUCTION_MODE_MIN or
+    ename:VK_SAMPLER_REDUCTION_MODE_MAX is used to sample a
+    slink:VkImageView as a result of this command, then the image view's
+    <<resources-image-view-format-features,format features>> must: contain
+    ename:VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_MINMAX_BIT
+endif::VK_COMPUTE_VERSION_1_2,VK_EXT_sampler_filter_minmax[]
+  * [[VUID-{refpage}-mipmapMode-04770]]
+    If a slink:VkSampler created with pname:mipmapMode equal to
+    ename:VK_SAMPLER_MIPMAP_MODE_LINEAR,
+ifdef::VK_COMPUTE_VERSION_1_2,VK_EXT_sampler_filter_minmax[]
+    pname:reductionMode equal to
+    ename:VK_SAMPLER_REDUCTION_MODE_WEIGHTED_AVERAGE,
+endif::VK_COMPUTE_VERSION_1_2,VK_EXT_sampler_filter_minmax[]
+    and pname:compareEnable equal to ename:VK_FALSE is used to sample a
+    slink:VkImageView as a result of this command, then the image view's
+    <<resources-image-view-format-features,format features>> must: contain
+    ename:VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT
+ifdef::VK_COMPUTE_VERSION_1_2,VK_EXT_sampler_filter_minmax[]
+  * [[VUID-{refpage}-mipmapMode-09599]]
+    If a slink:VkSampler created with pname:mipmapMode equal to
+    ename:VK_SAMPLER_MIPMAP_MODE_LINEAR and pname:reductionMode equal to
+    either ename:VK_SAMPLER_REDUCTION_MODE_MIN or
+    ename:VK_SAMPLER_REDUCTION_MODE_MAX is used to sample a
+    slink:VkImageView as a result of this command, then the image view's
+    <<resources-image-view-format-features,format features>> must: contain
+    ename:VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_MINMAX_BIT
+endif::VK_COMPUTE_VERSION_1_2,VK_EXT_sampler_filter_minmax[]
+  * [[VUID-{refpage}-unnormalizedCoordinates-09635]]
+    If a slink:VkSampler created with pname:unnormalizedCoordinates equal to
+    ename:VK_TRUE is used to sample a slink:VkImageView as a result of this
+    command, then the image view's pname:levelCount and pname:layerCount
+    must: be 1
+  * [[VUID-{refpage}-None-08609]]
+    If a slink:VkSampler created with pname:unnormalizedCoordinates equal to
+    ename:VK_TRUE is used to sample a slink:VkImageView as a result of this
+    command, then the image view's pname:viewType must: be
+    ename:VK_IMAGE_VIEW_TYPE_1D or ename:VK_IMAGE_VIEW_TYPE_2D
+  * [[VUID-{refpage}-None-08610]]
+    If a slink:VkSampler created with pname:unnormalizedCoordinates equal to
+    ename:VK_TRUE is used to sample a slink:VkImageView as a result of this
+    command, then the sampler must: not be used with any of the SPIR-V
+    `OpImageSample*` or `OpImageSparseSample*` instructions with
+    code:ImplicitLod, code:Dref or code:Proj in their name
+  * [[VUID-{refpage}-None-08611]]
+    If a slink:VkSampler created with pname:unnormalizedCoordinates equal to
+    ename:VK_TRUE is used to sample a slink:VkImageView as a result of this
+    command, then the sampler must: not be used with any of the SPIR-V
+    `OpImageSample*` or `OpImageSparseSample*` instructions that includes a
+    LOD bias or any offset values
+ifndef::VK_COMPUTE_VERSION_1_3,VK_KHR_format_feature_flags2[]
+  * [[VUID-{refpage}-aspectMask-06478]]
+    If a slink:VkImageView is sampled with
+    <<textures-depth-compare-operation,depth comparison>>, the image view
+    must: have been created with an pname:aspectMask that contains
+    ename:VK_IMAGE_ASPECT_DEPTH_BIT
+endif::VK_COMPUTE_VERSION_1_3,VK_KHR_format_feature_flags2[]
+ifdef::VK_COMPUTE_VERSION_1_3,VK_KHR_format_feature_flags2[]
+  * [[VUID-{refpage}-None-06479]]
+    If a slink:VkImageView is sampled with
+    <<textures-depth-compare-operation,depth comparison>>, the image view's
+    <<resources-image-view-format-features,format features>> must: contain
+    ename:VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT
+endif::VK_COMPUTE_VERSION_1_3,VK_KHR_format_feature_flags2[]
+  * [[VUID-{refpage}-None-02691]]
+    If a slink:VkImageView is accessed using atomic operations as a result
+    of this command, then the image view's
+    <<resources-image-view-format-features,format features>> must: contain
+    ename:VK_FORMAT_FEATURE_STORAGE_IMAGE_ATOMIC_BIT
+  * [[VUID-{refpage}-None-07888]]
+    If a ename:VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER descriptor is
+    accessed using atomic operations as a result of this command, then the
+    storage texel buffer's <<resources-buffer-view-format-features,format
+    features>> must: contain
+    ename:VK_FORMAT_FEATURE_STORAGE_TEXEL_BUFFER_ATOMIC_BIT
+ifdef::VK_IMG_filter_cubic,VK_EXT_filter_cubic[]
+  * [[VUID-{refpage}-None-02692]]
+    If a slink:VkImageView is sampled with ename:VK_FILTER_CUBIC_EXT as a
+    result of this command, then the image view's
+    <<resources-image-view-format-features,format features>> must: contain
+    ename:VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_CUBIC_BIT_EXT
+  * [[VUID-{refpage}-None-02693]]
+    If
+ifdef::VK_EXT_filter_cubic[]
+    the apiext:VK_EXT_filter_cubic extension is not enabled and
+endif::VK_EXT_filter_cubic[]
+    any slink:VkImageView is sampled with ename:VK_FILTER_CUBIC_EXT as a
+    result of this command, it must: not have a elink:VkImageViewType of
+    ename:VK_IMAGE_VIEW_TYPE_3D, ename:VK_IMAGE_VIEW_TYPE_CUBE, or
+    ename:VK_IMAGE_VIEW_TYPE_CUBE_ARRAY
+ifdef::VK_EXT_filter_cubic[]
+  * [[VUID-{refpage}-filterCubic-02694]]
+    Any slink:VkImageView being sampled with ename:VK_FILTER_CUBIC_EXT as a
+    result of this command must: have a elink:VkImageViewType and format
+    that supports cubic filtering, as specified by
+    slink:VkFilterCubicImageViewImageFormatPropertiesEXT::pname:filterCubic
+    returned by flink:vkGetPhysicalDeviceImageFormatProperties2
+  * [[VUID-{refpage}-filterCubicMinmax-02695]]
+    Any slink:VkImageView being sampled with ename:VK_FILTER_CUBIC_EXT with
+    a reduction mode of either ename:VK_SAMPLER_REDUCTION_MODE_MIN or
+    ename:VK_SAMPLER_REDUCTION_MODE_MAX as a result of this command must:
+    have a elink:VkImageViewType and format that supports cubic filtering
+    together with minmax filtering, as specified by
+    slink:VkFilterCubicImageViewImageFormatPropertiesEXT::pname:filterCubicMinmax
+    returned by flink:vkGetPhysicalDeviceImageFormatProperties2
+endif::VK_EXT_filter_cubic[]
+endif::VK_IMG_filter_cubic,VK_EXT_filter_cubic[]
+ifdef::VK_QCOM_filter_cubic_clamp[]
+  * [[VUID-{refpage}-cubicRangeClamp-09212]]
+    If the <<features-cubicRangeClamp, pname:cubicRangeClamp>> feature is
+    not enabled, then any slink:VkImageView being sampled with
+    ename:VK_FILTER_CUBIC_EXT as a result of this command must: not have a
+    slink:VkSamplerReductionModeCreateInfo::pname:reductionMode equal to
+    ename:VK_SAMPLER_REDUCTION_MODE_WEIGHTED_AVERAGE_RANGECLAMP_QCOM
+  * [[VUID-{refpage}-reductionMode-09213]]
+    Any slink:VkImageView being sampled with a
+    slink:VkSamplerReductionModeCreateInfo::pname:reductionMode equal to
+    ename:VK_SAMPLER_REDUCTION_MODE_WEIGHTED_AVERAGE_RANGECLAMP_QCOM as a
+    result of this command must: sample with ename:VK_FILTER_CUBIC_EXT
+endif::VK_QCOM_filter_cubic_clamp[]
+ifdef::VK_QCOM_filter_cubic_weights[]
+  * [[VUID-{refpage}-selectableCubicWeights-09214]]
+    If the <<features-selectableCubicWeights, pname:selectableCubicWeights>>
+    feature is not enabled, then any slink:VkImageView being sampled with
+    ename:VK_FILTER_CUBIC_EXT as a result of this command must: have
+    slink:VkSamplerCubicWeightsCreateInfoQCOM::pname:cubicWeights equal to
+    ename:VK_CUBIC_FILTER_WEIGHTS_CATMULL_ROM_QCOM
+endif::VK_QCOM_filter_cubic_weights[]
+ifdef::VK_NV_corner_sampled_image[]
+  * [[VUID-{refpage}-flags-02696]]
+    Any slink:VkImage created with a slink:VkImageCreateInfo::pname:flags
+    containing ename:VK_IMAGE_CREATE_CORNER_SAMPLED_BIT_NV sampled as a
+    result of this command must: only be sampled using a
+    elink:VkSamplerAddressMode of
+    ename:VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE
+endif::VK_NV_corner_sampled_image[]
+ifdef::VK_COMPUTE_VERSION_1_3,VK_KHR_format_feature_flags2[]
+  * [[VUID-{refpage}-OpTypeImage-07027]]
+    For any slink:VkImageView being written as a storage image where the
+    image format field of the code:OpTypeImage is code:Unknown, the view's
+    <<resources-image-view-format-features,format features>> must: contain
+    ename:VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT
+  * [[VUID-{refpage}-OpTypeImage-07028]]
+    For any slink:VkImageView being read as a storage image where the image
+    format field of the code:OpTypeImage is code:Unknown, the view's
+    <<resources-image-view-format-features,format features>> must: contain
+    ename:VK_FORMAT_FEATURE_2_STORAGE_READ_WITHOUT_FORMAT_BIT
+  * [[VUID-{refpage}-OpTypeImage-07029]]
+    For any slink:VkBufferView being written as a storage texel buffer where
+    the image format field of the code:OpTypeImage is code:Unknown, the
+    view's <<VkFormatProperties3,buffer features>> must: contain
+    ename:VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT
+  * [[VUID-{refpage}-OpTypeImage-07030]]
+    Any slink:VkBufferView being read as a storage texel buffer where the
+    image format field of the code:OpTypeImage is code:Unknown then the
+    view's <<VkFormatProperties3,buffer features>> must: contain
+    ename:VK_FORMAT_FEATURE_2_STORAGE_READ_WITHOUT_FORMAT_BIT
+endif::VK_COMPUTE_VERSION_1_3,VK_KHR_format_feature_flags2[]
+  * [[VUID-{refpage}-None-08600]]
+    If a <<shaders-binding,a bound shader>>
+ifdef::VK_EXT_descriptor_heap[]
+    was created with a pipeline layout and
+endif::VK_EXT_descriptor_heap[]
+    statically uses a set _n_, a descriptor set must: have been bound to _n_
+    at the same pipeline bind point, with layouts compatible for set _n_
+    with
+ the layout(s) used to create the shader, as described in
+ <<descriptors-compatibility>>
+  * [[VUID-{refpage}-None-08601]]
+    If a <<shaders-binding,a bound shader>>
+ifdef::VK_EXT_descriptor_heap[]
+    was created with a pipeline layout
+ifdef::VK_EXT_shader_object[]
+ or specified push constant ranges
+endif::VK_EXT_shader_object[]
+ and
+endif::VK_EXT_descriptor_heap[]
+    statically uses a push constant value, that value must: have been set
+    for the same pipeline bind point, with push constant ranges that are
+    <<descriptors-compatibility,compatible>> with the push constant range
+ used to create the shader
+  * [[VUID-{refpage}-None-10068]]
+    For each array of resources that is used by <<shaders-binding,a bound
+    shader>>, the indices used to access members of the array must: be less
+    than the descriptor count for the identified binding in the descriptor
+    sets used by this command
+  * [[VUID-{refpage}-None-08114]]
+    Descriptors in each bound descriptor set, specified via
+    flink:vkCmdBindDescriptorSets, must: be valid if they are accessed as
+    described by <<descriptor-validity,descriptor validity>> by
+ifndef::VK_EXT_descriptor_buffer[<<shaders-binding,a bound shader>>]
+ifdef::VK_EXT_descriptor_buffer[]
+    the slink:VkPipeline bound to the pipeline bind point used by this
+    command and the bound slink:VkPipeline was not created with
+    ename:VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT
+endif::VK_EXT_descriptor_buffer[]
+  * [[VUID-{refpage}-imageLayout-00344]]
+    If an image descriptor is accessed by a shader, the elink:VkImageLayout
+    must: match the subresource accessible from the slink:VkImageView as
+    defined by the <<resources-image-layouts-matching-rule, image layout
+    matching rules>>
+ifdef::VK_EXT_descriptor_buffer[]
+  * [[VUID-{refpage}-None-08115]]
+    If the descriptors used by the slink:VkPipeline bound to the pipeline
+    bind point were specified via flink:vkCmdBindDescriptorSets, the bound
+    slink:VkPipeline must: have been created without
+    ename:VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT
+  * [[VUID-{refpage}-None-08116]]
+    Descriptors in bound descriptor buffers, specified via
+    flink:vkCmdSetDescriptorBufferOffsetsEXT, must: be valid if they are
+    dynamically accessed
+  * [[VUID-{refpage}-None-08117]]
+    If the descriptors used by the slink:VkPipeline bound to the pipeline
+    bind point were specified via flink:vkCmdSetDescriptorBufferOffsetsEXT,
+    the bound slink:VkPipeline must: have been created with
+    ename:VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT
+  * [[VUID-{refpage}-None-08119]]
+    If a descriptor is dynamically used with a slink:VkPipeline created with
+    ename:VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT, the descriptor
+    memory must: be resident
+ifdef::VK_EXT_shader_object[]
+  * [[VUID-{refpage}-None-08605]]
+    If a descriptor is dynamically used with a slink:VkShaderEXT created
+    with a sname:VkDescriptorSetLayout that was created with
+    ename:VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT, the
+    descriptor memory must: be resident
+endif::VK_EXT_shader_object[]
+endif::VK_EXT_descriptor_buffer[]
+  * [[VUID-{refpage}-None-08606]]
+ifdef::VK_EXT_shader_object[]
+    If the <<features-shaderObject, pname:shaderObject>> feature is not
+    enabled, a
+endif::VK_EXT_shader_object[]
+ifndef::VK_EXT_shader_object[A]
+    valid pipeline must: be bound to the pipeline bind point used by this
+    command
+  * [[VUID-{refpage}-None-08608]]
+ifdef::VK_EXT_shader_object[]
+    If a pipeline is bound to the pipeline bind point used by this command,
+    there
+endif::VK_EXT_shader_object[]
+ifndef::VK_EXT_shader_object[There]
+    must: not have been any calls to dynamic state setting commands for any
+    state specified statically in the slink:VkPipeline object bound to the
+    pipeline bind point used by this command, since that pipeline was bound
+  * [[VUID-{refpage}-uniformBuffers-06935]]
+    If any stage of the slink:VkPipeline object bound to the pipeline bind
+    point used by this command accesses a uniform buffer,
+ifdef::VK_COMPUTE_VERSION_1_4,VK_EXT_pipeline_robustness[]
+    and that stage was created without enabling either
+    ename:VK_PIPELINE_ROBUSTNESS_BUFFER_BEHAVIOR_ROBUST_BUFFER_ACCESS or
+    ename:VK_PIPELINE_ROBUSTNESS_BUFFER_BEHAVIOR_ROBUST_BUFFER_ACCESS_2 for
+    pname:uniformBuffers,
+endif::VK_COMPUTE_VERSION_1_4,VK_EXT_pipeline_robustness[]
+    and the <<features-robustBufferAccess, pname:robustBufferAccess>>
+    feature is not enabled, that stage must: not access values outside of
+    the range of the buffer as specified in the descriptor set bound to the
+    same pipeline bind point
+ifdef::VK_EXT_shader_object[]
+  * [[VUID-{refpage}-None-08612]]
+    If the <<features-robustBufferAccess, pname:robustBufferAccess>> feature
+    is not enabled, and any slink:VkShaderEXT bound to a stage corresponding
+    to the pipeline bind point used by this command accesses a uniform
+    buffer, it must: not access values outside of the range of the buffer as
+    specified in the descriptor set bound to the same pipeline bind point
+endif::VK_EXT_shader_object[]
+  * [[VUID-{refpage}-storageBuffers-06936]]
+    If any stage of the slink:VkPipeline object bound to the pipeline bind
+    point used by this command accesses a storage buffer,
+ifdef::VK_COMPUTE_VERSION_1_4,VK_EXT_pipeline_robustness[]
+    and that stage was created without enabling either
+    ename:VK_PIPELINE_ROBUSTNESS_BUFFER_BEHAVIOR_ROBUST_BUFFER_ACCESS or
+    ename:VK_PIPELINE_ROBUSTNESS_BUFFER_BEHAVIOR_ROBUST_BUFFER_ACCESS_2 for
+    pname:storageBuffers,
+endif::VK_COMPUTE_VERSION_1_4,VK_EXT_pipeline_robustness[]
+    and the <<features-robustBufferAccess, pname:robustBufferAccess>>
+    feature is not enabled, that stage must: not access values outside of
+    the range of the buffer as specified in the descriptor set bound to the
+    same pipeline bind point
+ifdef::VK_EXT_shader_object[]
+  * [[VUID-{refpage}-None-08613]]
+    If the <<features-robustBufferAccess, pname:robustBufferAccess>> feature
+    is not enabled, and any slink:VkShaderEXT bound to a stage corresponding
+    to the pipeline bind point used by this command accesses a storage
+    buffer, it must: not access values outside of the range of the buffer as
+    specified in the descriptor set bound to the same pipeline bind point
+endif::VK_EXT_shader_object[]
+ifdef::VK_BASE_VERSION_1_1[]
+  * [[VUID-{refpage}-commandBuffer-02707]]
+    If pname:commandBuffer is an unprotected command buffer and
+    <<limits-protectedNoFault, pname:protectedNoFault>> is not supported,
+    any resource accessed by <<shaders-binding,bound shaders>> must: not be
+    a protected resource
+endif::VK_BASE_VERSION_1_1[]
+  * [[VUID-{refpage}-viewType-07752]]
+    If a slink:VkImageView is accessed as a result of this command, then the
+    image view's pname:viewType must: match the code:Dim operand of the
+    code:OpTypeImage as described in <<spirvenv-image-dimensions>>
+  * [[VUID-{refpage}-format-07753]]
+    If a slink:VkImageView or slink:VkBufferView is accessed as a result of
+    this command, then the <<formats-numericformat, numeric type>> of the
+    view's pname:format and the code:Sampled code:Type operand of the
+    code:OpTypeImage must: match
+  * [[VUID-{refpage}-OpImageWrite-08795]]
+    If a slink:VkImageView
+ifdef::VK_BASE_VERSION_1_4,VK_KHR_maintenance5[]
+    created with a format other than ename:VK_FORMAT_A8_UNORM
+endif::VK_BASE_VERSION_1_4,VK_KHR_maintenance5[]
+    is accessed using code:OpImageWrite as a result of this command, then
+    the code:Type of the code:Texel operand of that instruction must: have
+    at least as many components as the image view's format
+ifdef::VK_COMPUTE_VERSION_1_4,VK_KHR_maintenance5[]
+  * [[VUID-{refpage}-OpImageWrite-08796]]
+    If a slink:VkImageView created with the format ename:VK_FORMAT_A8_UNORM
+    is accessed using code:OpImageWrite as a result of this command, then
+    the code:Type of the code:Texel operand of that instruction must: have
+    four components
+endif::VK_COMPUTE_VERSION_1_4,VK_KHR_maintenance5[]
+  * [[VUID-{refpage}-OpImageWrite-04469]]
+    If a slink:VkBufferView is accessed using code:OpImageWrite as a result
+    of this command, then the code:Type of the code:Texel operand of that
+    instruction must: have at least as many components as the buffer view's
+    format
+  * [[VUID-{refpage}-SampledType-04470]]
+    If a slink:VkImageView with a elink:VkFormat that has a 64-bit component
+    width is accessed as a result of this command, the code:SampledType of
+    the code:OpTypeImage operand of that instruction must: have a code:Width
+    of 64
+  * [[VUID-{refpage}-SampledType-04471]]
+    If a slink:VkImageView with a elink:VkFormat that has a component width
+    less than 64-bit is accessed as a result of this command, the
+    code:SampledType of the code:OpTypeImage operand of that instruction
+    must: have a code:Width of 32
+  * [[VUID-{refpage}-SampledType-04472]]
+    If a slink:VkBufferView with a elink:VkFormat that has a 64-bit
+    component width is accessed as a result of this command, the
+    code:SampledType of the code:OpTypeImage operand of that instruction
+    must: have a code:Width of 64
+  * [[VUID-{refpage}-SampledType-04473]]
+    If a slink:VkBufferView with a elink:VkFormat that has a component width
+    less than 64-bit is accessed as a result of this command, the
+    code:SampledType of the code:OpTypeImage operand of that instruction
+    must: have a code:Width of 32
+ifdef::VK_EXT_shader_image_atomic_int64[]
+  * [[VUID-{refpage}-sparseImageInt64Atomics-04474]]
+    If the <<features-sparseImageInt64Atomics,
+    pname:sparseImageInt64Atomics>> feature is not enabled, slink:VkImage
+    objects created with the ename:VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT flag
+    must: not be accessed by atomic instructions through an code:OpTypeImage
+    with a code:SampledType with a code:Width of 64 by this command
+  * [[VUID-{refpage}-sparseImageInt64Atomics-04475]]
+    If the <<features-sparseImageInt64Atomics,
+    pname:sparseImageInt64Atomics>> feature is not enabled, slink:VkBuffer
+    objects created with the ename:VK_BUFFER_CREATE_SPARSE_RESIDENCY_BIT
+    flag must: not be accessed by atomic instructions through an
+    code:OpTypeImage with a code:SampledType with a code:Width of 64 by this
+    command
+endif::VK_EXT_shader_image_atomic_int64[]
+ifdef::VK_QCOM_image_processing[]
+  * [[VUID-{refpage}-OpImageSampleWeightedQCOM-06971]]
+    If code:OpImageSampleWeightedQCOM is used to sample a slink:VkImageView
+    as a result of this command, then the image view's
+    <<resources-image-view-format-features,format features>> must: contain
+    ename:VK_FORMAT_FEATURE_2_WEIGHT_SAMPLED_IMAGE_BIT_QCOM
+  * [[VUID-{refpage}-OpImageSampleWeightedQCOM-06972]]
+    If code:OpImageSampleWeightedQCOM uses a slink:VkImageView as a sample
+    weight image as a result of this command, then the image view's
+    <<resources-image-view-format-features,format features>> must: contain
+    ename:VK_FORMAT_FEATURE_2_WEIGHT_IMAGE_BIT_QCOM
+  * [[VUID-{refpage}-OpImageBoxFilterQCOM-06973]]
+    If code:OpImageBoxFilterQCOM is used to sample a slink:VkImageView as a
+    result of this command, then the image view's
+    <<resources-image-view-format-features,format features>> must: contain
+    ename:VK_FORMAT_FEATURE_2_BOX_FILTER_SAMPLED_BIT_QCOM
+  * [[VUID-{refpage}-OpImageBlockMatchSSDQCOM-06974]]
+    If code:OpImageBlockMatchSSDQCOM is used to read from an
+    slink:VkImageView as a result of this command, then the image view's
+    <<resources-image-view-format-features,format features>> must: contain
+    ename:VK_FORMAT_FEATURE_2_BLOCK_MATCHING_BIT_QCOM
+ifdef::VK_QCOM_image_processing3[]
+    or ename:VK_FORMAT_FEATURE_2_BLOCK_MATCHING_SXD_BIT_QCOM
+endif::VK_QCOM_image_processing3[]
+  * [[VUID-{refpage}-OpImageBlockMatchSADQCOM-12420]]
+    If code:OpImageBlockMatchSADQCOM is used to read from an
+    slink:VkImageView as a result of this command, then the image view's
+    <<resources-image-view-format-features,format features>> must: contain
+    ename:VK_FORMAT_FEATURE_2_BLOCK_MATCHING_BIT_QCOM
+ifdef::VK_QCOM_image_processing3[]
+    or ename:VK_FORMAT_FEATURE_2_BLOCK_MATCHING_SXD_BIT_QCOM
+endif::VK_QCOM_image_processing3[]
+  * [[VUID-{refpage}-OpImageBlockMatchSADQCOM-06976]]
+    If code:OpImageBlockMatchSADQCOM or OpImageBlockMatchSSDQCOM is used to
+    read from a reference image as result of this command,
+ifdef::VK_QCOM_image_processing3[]
+    and the
+    <<features-blockMatchExtendedClampToEdge,blockMatchExtendedClampToEdge>>
+    feature is not enabled or the _input_ sampler was not created with both
+    pname:addressModeU and pname:addressModeV equal to
+    ename:VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE
+endif::VK_QCOM_image_processing3[]
+    then the specified reference coordinates must: not fail
+    <<textures-integer-coordinate-validation,integer texel coordinate
+    validation>>
+  * [[VUID-{refpage}-OpImageSampleWeightedQCOM-06977]]
+    If code:OpImageSampleWeightedQCOM, code:OpImageBoxFilterQCOM,
+ifdef::VK_QCOM_image_processing2[]
+    code:OpImageBlockMatchWindowSSDQCOM,
+    code:OpImageBlockMatchWindowSADQCOM,
+    code:OpImageBlockMatchGatherSSDQCOM,
+    code:OpImageBlockMatchGatherSADQCOM,
+endif::VK_QCOM_image_processing2[]
+    code:OpImageBlockMatchSSDQCOM, or code:OpImageBlockMatchSADQCOM uses a
+    slink:VkSampler as a result of this command, then the sampler must: have
+    been created with ename:VK_SAMPLER_CREATE_IMAGE_PROCESSING_BIT_QCOM
+  * [[VUID-{refpage}-OpImageSampleWeightedQCOM-06978]]
+    If any command other than code:OpImageSampleWeightedQCOM,
+    code:OpImageBoxFilterQCOM,
+ifdef::VK_QCOM_image_processing2[]
+    code:OpImageBlockMatchWindowSSDQCOM,
+    code:OpImageBlockMatchWindowSADQCOM,
+    code:OpImageBlockMatchGatherSSDQCOM,
+    code:OpImageBlockMatchGatherSADQCOM,
+endif::VK_QCOM_image_processing2[]
+    code:OpImageBlockMatchSSDQCOM, or code:OpImageBlockMatchSADQCOM uses a
+    slink:VkSampler as a result of this command, then the sampler must: not
+    have been created with ename:VK_SAMPLER_CREATE_IMAGE_PROCESSING_BIT_QCOM
+endif::VK_QCOM_image_processing[]
+ifdef::VK_QCOM_image_processing2[]
+  * [[VUID-{refpage}-OpImageBlockMatchWindow-09215]]
+    If a code:OpImageBlockMatchWindow*QCOM or
+    code:OpImageBlockMatchGather*QCOM instruction is used to read from an
+    slink:VkImageView as a result of this command, then the image view's
+    <<resources-image-view-format-features,format features>> must: contain
+    ename:VK_FORMAT_FEATURE_2_BLOCK_MATCHING_BIT_QCOM
+  * [[VUID-{refpage}-OpImageBlockMatchWindow-09216]]
+    If a code:OpImageBlockMatchWindow*QCOM or
+    code:OpImageBlockMatchGather*QCOM instruction is used to read from an
+    slink:VkImageView as a result of this command, then the image view's
+    format must: be a single-component format
+  * [[VUID-{refpage}-OpImageBlockMatchWindow-09217]]
+    If a code:OpImageBlockMatchWindow*QCOM or
+    code:OpImageBlockMatchGather*QCOM read from a reference image as result
+    of this command,
+ifdef::VK_QCOM_image_processing3[]
+    and the
+    <<features-blockMatchExtendedClampToEdge,blockMatchExtendedClampToEdge>>
+    feature is not enabled or the _input_ sampler was not created with both
+    pname:addressModeU and pname:addressModeV equal to
+    ename:VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE
+endif::VK_QCOM_image_processing3[]
+    then the specified reference coordinates must: not fail
+    <<textures-integer-coordinate-validation,integer texel coordinate
+    validation>>
+  * [[VUID-{refpage}-OpImageBlockMatchWindow-12421]]
+    If a code:OpImageBlockMatchWindow*QCOM or
+    code:OpImageBlockMatchGather*QCOM instruction uses a slink:VkSampler as
+    a result of this command,
+ifdef::VK_QCOM_image_processing3[]
+    and the
+    <<features-blockMatchExtendedClampToEdge,pname:blockMatchExtendedClampToEdge>>
+    feature is not enabled,
+endif::VK_QCOM_image_processing3[]
+    the _input_ sampler must: not have been created with either
+    pname:addressModeU or pname:addressModeV equal to
+    ename:VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE
+ifdef::VK_QCOM_image_processing3[]
+  * [[VUID-{refpage}-addressModeU-12422]]
+    If a code:OpImageBlockMatchWindow*QCOM or
+    code:OpImageBlockMatchGather*QCOM instruction uses a slink:VkSampler as
+    a result of this command, and the _input_ sampler was created with
+    either pname:addressModeU or pname:addressModeV equal to
+    ename:VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, then the sampler must: have
+    been created with both pname:addressModeU and pname:addressModeV equal
+    to ename:VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE
+endif::VK_QCOM_image_processing3[]
+endif::VK_QCOM_image_processing2[]
+  * [[VUID-{refpage}-None-07288]]
+    Any shader invocation executed by this command must:
+    <<shaders-termination,terminate>>
+  * [[VUID-{refpage}-None-09600]]
+    If a descriptor with type equal to any of
+ifdef::VK_QCOM_image_processing[]
+    ename:VK_DESCRIPTOR_TYPE_SAMPLE_WEIGHT_IMAGE_QCOM,
+    ename:VK_DESCRIPTOR_TYPE_BLOCK_MATCH_IMAGE_QCOM,
+endif::VK_QCOM_image_processing[]
+    ename:VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+    ename:VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, or
+    ename:VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT is accessed as a result of
+    this command, all image subresources identified by that descriptor must:
+    be in the image layout identified when the descriptor was written
+ifdef::VK_KHR_opacity_micromap[]
+ifdef::VK_KHR_ray_query[]
+  * [[VUID-{refpage}-micromap-11636]]
+    If an acceleration structure is accessed as a result of this command
+    through an code:OpRayQueryProceedKHR operation
+ifdef::VK_EXT_opacity_micromap[]
+    , the `apiext:VK_EXT_opacity_micromap` extension is not enabled,
+endif::VK_EXT_opacity_micromap[]
+    and the acceleration structure is built using geometry with a
+    slink:VkAccelerationStructureTrianglesOpacityMicromapKHR structure
+    included in its pname:pNext chain, the shader must: have specified a
+    code:OpacityMicromapIdKHR execution mode with its specialization
+    constant operand equal to ename:VK_TRUE
+endif::VK_KHR_ray_query[]
+  * [[VUID-{refpage}-micromap-11637]]
+    If an acceleration structure is accessed as a result of this command and
+    the acceleration structure was constructed through deserialization, all
+    micromap arrays referenced by the acceleration structure that were not
+    replaced by an acceleration structure update command must: have been
+    deserialized using the serialized data of the corresponding micromaps
+    used to originally build the acceleration structure prior to the
+    execution of this command on the device
+ifdef::VK_KHR_maintenance5,VK_BASE_VERSION_1_4[]
+  * [[VUID-{refpage}-micromap-11638]]
+    If an acceleration structure is accessed as a result of this command and
+    the acceleration structure is built using geometry with an
+    pname:indexBuffer containing both elink:VkOpacityMicromapSpecialIndexKHR
+    values and indices into an associated micromap array, any
+    slink:VkPipeline bound to the pipeline bind point used by this command
+    must: not have been created with pname:flags that includes
+    ename:VK_PIPELINE_CREATE_2_OPACITY_MICROMAP_DISALLOW_MIXED_SPECIAL_INDEX_BIT_KHR
+endif::VK_KHR_maintenance5,VK_BASE_VERSION_1_4[]
+ifdef::VK_EXT_shader_object[]
+  * [[VUID-{refpage}-micromap-11639]]
+    If an acceleration structure is accessed as a result of this command and
+    the acceleration structure is built using geometry with an
+    pname:indexBuffer containing both elink:VkOpacityMicromapSpecialIndexKHR
+    values and indices into an associated micromap array, any
+    slink:VkShaderEXT that accessed the descriptor must: not have been
+    created with pname:flags that includes
+    ename:VK_SHADER_CREATE_OPACITY_MICROMAP_DISALLOW_MIXED_SPECIAL_INDEX_BIT_EXT
+endif::VK_EXT_shader_object[]
+endif::VK_KHR_opacity_micromap[]
+ifdef::VK_QCOM_tile_memory_heap[]
+  * [[VUID-{refpage}-commandBuffer-10746]]
+    The sname:VkDeviceMemory object allocated from a sname:VkMemoryHeap with
+    the ename:VK_MEMORY_HEAP_TILE_MEMORY_BIT_QCOM property that is bound to
+    a resource accessed as a result of this command must: be the active
+    <<memory-bind-tile-memory, bound tile memory object>> in
+    pname:commandBuffer
+endif::VK_QCOM_tile_memory_heap[]
+ifdef::VK_QCOM_tile_shading[]
+  * [[VUID-{refpage}-None-10678]]
+    If this command is recorded inside a <<renderpass-tile-shading,tile
+    shading render pass>> instance, the stages corresponding to the pipeline
+    bind point used by this command must: only include
+    ename:VK_SHADER_STAGE_VERTEX_BIT, ename:VK_SHADER_STAGE_FRAGMENT_BIT,
+    and/or ename:VK_SHADER_STAGE_COMPUTE_BIT
+ifdef::VK_EXT_attachment_feedback_loop_layout[]
+  * [[VUID-{refpage}-None-10679]]
+    If this command is recorded where
+    <<renderpass-per-tile-execution-model,per-tile execution model>> is
+    enabled, there must: be no access to any image while the image was be
+    transitioned to the
+    ename:VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT layout
+endif::VK_EXT_attachment_feedback_loop_layout[]
+endif::VK_QCOM_tile_shading[]
+ifdef::VK_ARM_tensors[]
+  * [[VUID-{refpage}-pDescription-09900]]
+    If a ename:VK_DESCRIPTOR_TYPE_TENSOR_ARM descriptor is accessed as a
+    result of this command, then the underlying slink:VkTensorARM object
+    must: have been created with the ename:VK_TENSOR_USAGE_SHADER_BIT_ARM
+    usage flag set
+  * [[VUID-{refpage}-dimensionCount-09905]]
+    If a ename:VK_DESCRIPTOR_TYPE_TENSOR_ARM descriptor is accessed as a
+    result of this command, then the code:Rank of the code:OpTypeTensorARM
+    of the tensor resource variable must: be equal to the
+    pname:dimensionCount provided via
+    slink:VkTensorCreateInfoARM::pname:pDescription when creating the
+    underlying slink:VkTensorARM object
+  * [[VUID-{refpage}-OpTypeTensorARM-09906]]
+    If a ename:VK_DESCRIPTOR_TYPE_TENSOR_ARM descriptor is accessed as a
+    result of this command, then the element type of the
+    code:OpTypeTensorARM of the tensor resource variable must: be
+    <<spirvenv-tensor-formats,compatible>> with the elink:VkFormat of the
+    slink:VkTensorViewARM used for the access
+endif::VK_ARM_tensors[]
+ifdef::VK_ARM_tensor_controls[]
+  * [[VUID-{refpage}-OpTensorReadARM-12462]]
+    If a ename:VK_DESCRIPTOR_TYPE_TENSOR_ARM descriptor is accessed as a
+    result of this command, using code:OpTensorReadARM or
+    code:OpTensorWriteARM, and the underlying slink:VkTensorARM object was
+    created with a ename:VK_TENSOR_TILING_BRICK_16_WIDE_ARM,
+    ename:VK_TENSOR_TILING_BRICK_8_WIDE_ARM,
+    ename:VK_TENSOR_TILING_BRICK_4_WIDE_ARM,
+    ename:VK_TENSOR_TILING_BLOCK_U_INTERLEAVED_ARM, or
+    ename:VK_TENSOR_TILING_BLOCK_U_INTERLEAVED_64K_ARM
+    elink:VkTensorTilingARM, and the object read or written is an array,
+    then the innermost coordinate provided to code:OpTensorReadARM or
+    code:OpTensorWriteARM via the code:Coordinates operand must: be a
+    multiple of the largest power of 2 that is less than or equal to the
+    number of components of the array
+  * [[VUID-{refpage}-pNext-12463]]
+    If a ename:VK_DESCRIPTOR_TYPE_TENSOR_ARM descriptor is accessed as a
+    result of this command and the corresponding slink:VkTensorARM object
+    was created with a slink:VkTensorRollingBackingCreateInfoARM structure
+    in the pname:pNext chain of slink:VkTensorCreateInfoARM, then the number
+    of elements accessed with one code:OpTensorReadARM or
+    code:OpTensorWriteARM, must: be less than or equal to the number of
+    elements available from the starting coordinate in the rolling backing
+    along the innermost dimension, defined as
+    [eq]#pname:wraps[pname:dimensionCount - 1] - InnermostCoordinate %
+    pname:wraps[pname:dimensionCount - 1]# where InnermostCoordinate is the
+    last component of the coordinates array provided via the
+    code:Coordinates operand
+endif::VK_ARM_tensor_controls[]
+ifdef::VK_EXT_descriptor_heap[]
+  * [[VUID-{refpage}-None-12472]]
+    Descriptors dynamically accessed in bound descriptor heaps must: be
+    valid
+  * [[VUID-{refpage}-None-11297]]
+    If a pipeline is bound to the pipeline bind point used by this command,
+ifdef::VK_EXT_shader_object[]
+    or shader is bound to a shader stage used by this command,
+endif::VK_EXT_shader_object[]
+    and it was created with a <<descriptorheaps-bindings,descriptor
+    mapping>> using
+    ename:VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_PUSH_INDEX_EXT,
+ifdef::VK_KHR_ray_tracing_pipeline,VK_NV_ray_tracing[]
+    ename:VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_SHADER_RECORD_INDEX_EXT,
+endif::VK_KHR_ray_tracing_pipeline,VK_NV_ray_tracing[]
+    ename:VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_INDIRECT_INDEX_ARRAY_EXT,
+    or ename:VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_INDIRECT_INDEX_EXT, and
+    a shader accesses a code:OpTypeStruct decorated with code:Block or
+    code:BufferBlock using that mapping, the calculated [eq]#offset# for the
+    resource heap must: be a multiple of <<limits-bufferDescriptorAlignment,
+    pname:bufferDescriptorAlignment>>
+  * [[VUID-{refpage}-None-11298]]
+    If a pipeline is bound to the pipeline bind point used by this command,
+ifdef::VK_EXT_shader_object[]
+    or shader is bound to a shader stage used by this command,
+endif::VK_EXT_shader_object[]
+    and it was created with a <<descriptorheaps-bindings,descriptor
+    mapping>> using
+    ename:VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_PUSH_INDEX_EXT,
+ifdef::VK_KHR_ray_tracing_pipeline,VK_NV_ray_tracing[]
+    ename:VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_SHADER_RECORD_INDEX_EXT,
+endif::VK_KHR_ray_tracing_pipeline,VK_NV_ray_tracing[]
+    ename:VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_INDIRECT_INDEX_ARRAY_EXT,
+    or ename:VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_INDIRECT_INDEX_EXT, and
+    a shader accesses an code:OpTypeImage or code:OpTypeSampledImage using
+    that mapping, the calculated [eq]#offset# for the resource heap must: be
+    a multiple of <<limits-imageDescriptorAlignment,
+    pname:imageDescriptorAlignment>>
+  * [[VUID-{refpage}-None-11299]]
+    If a pipeline is bound to the pipeline bind point used by this command,
+ifdef::VK_EXT_shader_object[]
+    or shader is bound to a shader stage used by this command,
+endif::VK_EXT_shader_object[]
+    and it was created with a <<descriptorheaps-bindings,descriptor
+    mapping>> using
+    ename:VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_PUSH_INDEX_EXT,
+ifdef::VK_KHR_ray_tracing_pipeline,VK_NV_ray_tracing[]
+    ename:VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_SHADER_RECORD_INDEX_EXT,
+endif::VK_KHR_ray_tracing_pipeline,VK_NV_ray_tracing[]
+    ename:VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_INDIRECT_INDEX_ARRAY_EXT,
+    or ename:VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_INDIRECT_INDEX_EXT, and
+    a shader accesses an code:OpTypeSampler or code:OpTypeSampledImage using
+    that mapping, the calculated [eq]#offset# for the sampler heap must: be
+    a multiple of <<limits-samplerDescriptorAlignment,
+    pname:samplerDescriptorAlignment>>
+ifdef::VK_ARM_tensors[]
+  * [[VUID-{refpage}-None-11397]]
+    If a pipeline is bound to the pipeline bind point used by this command,
+ifdef::VK_EXT_shader_object[]
+    or shader is bound to a shader stage used by this command,
+endif::VK_EXT_shader_object[]
+    and it was created with a <<descriptorheaps-bindings,descriptor
+    mapping>> using
+    ename:VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_PUSH_INDEX_EXT,
+ifdef::VK_KHR_ray_tracing_pipeline,VK_NV_ray_tracing[]
+    ename:VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_SHADER_RECORD_INDEX_EXT,
+endif::VK_KHR_ray_tracing_pipeline,VK_NV_ray_tracing[]
+    ename:VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_INDIRECT_INDEX_ARRAY_EXT,
+    or ename:VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_INDIRECT_INDEX_EXT, and
+    a shader accesses an code:OpTypeTensorARM using that mapping, the
+    calculated [eq]#offset# for the resource heap must: be a multiple of
+    <<limits-tensorDescriptorAlignment, pname:tensorDescriptorAlignment>>
+endif::VK_ARM_tensors[]
+  * [[VUID-{refpage}-None-11300]]
+    If a pipeline is bound to the pipeline bind point used by this command,
+ifdef::VK_EXT_shader_object[]
+    or shader is bound to a shader stage used by this command,
+endif::VK_EXT_shader_object[]
+    and it was created with a <<descriptorheaps-bindings,descriptor
+    mapping>> using
+    ename:VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_INDIRECT_INDEX_ARRAY_EXT or
+    ename:VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_INDIRECT_INDEX_EXT, and a
+    shader accesses a resource using that mapping, the value of the address
+    at the expected location in push data must: be a multiple of 4
+  * [[VUID-{refpage}-None-11301]]
+    If a pipeline is bound to the pipeline bind point used by this command,
+ifdef::VK_EXT_shader_object[]
+    or shader is bound to a shader stage used by this command,
+endif::VK_EXT_shader_object[]
+    and it was created with a <<descriptorheaps-bindings,descriptor
+    mapping>> using
+    ename:VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_INDIRECT_INDEX_ARRAY_EXT or
+    ename:VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_INDIRECT_INDEX_EXT, and a
+    shader accesses a resource using that mapping, the value of the address
+    at the expected location in push data must: be a valid
+    basetype:VkDeviceAddress backed by physical memory at every offset
+    specified by each mapping
+  * [[VUID-{refpage}-None-11302]]
+    If a pipeline is bound to the pipeline bind point used by this command,
+ifdef::VK_EXT_shader_object[]
+    or shader is bound to a shader stage used by this command,
+endif::VK_EXT_shader_object[]
+    and it was created with a <<descriptorheaps-bindings,descriptor
+    mapping>> using ename:VK_DESCRIPTOR_MAPPING_SOURCE_PUSH_ADDRESS_EXT, and
+    a shader accesses a resource using that mapping, the value of the
+    address at the expected location in push data must: be a valid
+    basetype:VkDeviceAddress
+  * [[VUID-{refpage}-None-11304]]
+    If a pipeline is bound to the pipeline bind point used by this command,
+ifdef::VK_EXT_shader_object[]
+    or shader is bound to a shader stage used by this command,
+endif::VK_EXT_shader_object[]
+    and it was created with a <<descriptorheaps-bindings,descriptor
+    mapping>> using ename:VK_DESCRIPTOR_MAPPING_SOURCE_INDIRECT_ADDRESS_EXT,
+    and a shader accesses a resource using that mapping, the value of the
+    address at the expected location in push data must: be a multiple of 8
+  * [[VUID-{refpage}-None-11305]]
+    If a pipeline is bound to the pipeline bind point used by this command,
+ifdef::VK_EXT_shader_object[]
+    or shader is bound to a shader stage used by this command,
+endif::VK_EXT_shader_object[]
+    and it was created with a <<descriptorheaps-bindings,descriptor
+    mapping>> using ename:VK_DESCRIPTOR_MAPPING_SOURCE_INDIRECT_ADDRESS_EXT,
+    and a shader accesses a resource using that mapping, the value of the
+    address at the expected location in push data must: be a valid
+    basetype:VkDeviceAddress backed by physical memory at every offset
+    specified by each mapping
+  * [[VUID-{refpage}-None-11306]]
+    If a pipeline is bound to the pipeline bind point used by this command,
+ifdef::VK_EXT_shader_object[]
+    or shader is bound to a shader stage used by this command,
+endif::VK_EXT_shader_object[]
+    and it was created with a <<descriptorheaps-bindings,descriptor
+    mapping>> using ename:VK_DESCRIPTOR_MAPPING_SOURCE_INDIRECT_ADDRESS_EXT,
+    and a shader accesses a resource using that mapping, the value of the
+    address pointed to by the address in push data must: be a valid
+    basetype:VkDeviceAddress
+  * [[VUID-{refpage}-None-11308]]
+    For each <<descriptorheaps, descriptor heap>> that is statically used by
+    <<shaders-binding,a bound shader>>, either directly or via a
+    <<descriptorheaps-bindings,descriptor mapping>>, a valid descriptor heap
+    must: be bound
+  * [[VUID-{refpage}-None-11309]]
+    If a <<shaders-binding,bound shader>> was created
+ifdef::VK_EXT_shader_object[]
+    as a slink:VkShaderEXT with the
+    ename:VK_SHADER_CREATE_DESCRIPTOR_HEAP_BIT_EXT flag or
+endif::VK_EXT_shader_object[]
+    as part of a pipeline with the
+    ename:VK_PIPELINE_CREATE_2_DESCRIPTOR_HEAP_BIT_EXT flag, execution of
+    this command must: not result in any descriptor read accessing data
+    outside of the user range of the respective heap bound by
+    ftext:vkCmdBind*HeapEXT commands
+  * [[VUID-{refpage}-None-11372]]
+    If any stage of the slink:VkPipeline object bound to the pipeline bind
+    point used by this command accesses a uniform buffer or uniform texel
+    buffer through a descriptor in the bound resource heap,
+ifdef::VK_VERSION_1_4,VK_EXT_pipeline_robustness[]
+    that stage was created without enabling either
+    ename:VK_PIPELINE_ROBUSTNESS_BUFFER_BEHAVIOR_ROBUST_BUFFER_ACCESS or
+    ename:VK_PIPELINE_ROBUSTNESS_BUFFER_BEHAVIOR_ROBUST_BUFFER_ACCESS_2 for
+    pname:uniformBuffers,
+endif::VK_VERSION_1_4,VK_EXT_pipeline_robustness[]
+ifdef::VK_EXT_robustness2[]
+    the <<features-robustBufferAccess2,pname:robustBufferAccess2>> feature
+    is not enabled,
+endif::VK_EXT_robustness2[]
+    and the <<features-robustBufferAccess, pname:robustBufferAccess>>
+    feature is not enabled, that stage must: not access values outside of
+    the range of the descriptor specified via slink:VkDeviceAddressRangeKHR
+    when the descriptor was written
+  * [[VUID-{refpage}-None-11373]]
+    If any stage of the slink:VkPipeline object bound to the pipeline bind
+    point used by this command accesses a storage buffer or storage texel
+    buffer through a descriptor in the bound resource heap,
+ifdef::VK_VERSION_1_4,VK_EXT_pipeline_robustness[]
+    that stage was created without enabling either
+    ename:VK_PIPELINE_ROBUSTNESS_BUFFER_BEHAVIOR_ROBUST_BUFFER_ACCESS or
+    ename:VK_PIPELINE_ROBUSTNESS_BUFFER_BEHAVIOR_ROBUST_BUFFER_ACCESS_2 for
+    pname:storageBuffers,
+endif::VK_VERSION_1_4,VK_EXT_pipeline_robustness[]
+ifdef::VK_EXT_robustness2[]
+    the <<features-robustBufferAccess2,pname:robustBufferAccess2>> feature
+    is not enabled,
+endif::VK_EXT_robustness2[]
+    and the <<features-robustBufferAccess, pname:robustBufferAccess>>
+    feature is not enabled, that stage must: not access values outside of
+    the range of the descriptor specified by slink:VkDeviceAddressRangeKHR
+    when the descriptor was written
+ifdef::VK_EXT_shader_object[]
+  * [[VUID-{refpage}-None-11374]]
+    If
+ifdef::VK_EXT_robustness2[]
+    the <<features-robustBufferAccess2,pname:robustBufferAccess2>> feature
+    is not enabled,
+endif::VK_EXT_robustness2[]
+    the <<features-robustBufferAccess, pname:robustBufferAccess>> feature is
+    not enabled, and any slink:VkShaderEXT bound to a stage corresponding to
+    the pipeline bind point used by this command accesses a uniform buffer,
+    uniform texel buffer, storage buffer, or storage texel buffer, that
+    shader must: not access values outside of the range of the buffer as
+    specified by slink:VkDeviceAddressRangeKHR when the descriptor was
+    written
+endif::VK_EXT_shader_object[]
+  * [[VUID-{refpage}-pBindInfo-11375]]
+    If any <<shaders-binding,bound shader>> uses an embedded sampler via a
+    <<descriptorheaps-bindings,descriptor mapping>>, the value of
+    pname:pBindInfo->reservedRangeSize set for flink:vkCmdBindSamplerHeapEXT
+    must: be greater than or equal to
+    <<limits-minSamplerHeapReservedRangeWithEmbedded,
+    pname:minSamplerHeapReservedRangeWithEmbedded>>
+  * [[VUID-{refpage}-None-11376]]
+    If a <<shaders-binding,bound shader>> was created
+ifdef::VK_EXT_shader_object[]
+    as a slink:VkShaderEXT with the
+    ename:VK_SHADER_CREATE_DESCRIPTOR_HEAP_BIT_EXT flag or
+endif::VK_EXT_shader_object[]
+    as part of a pipeline with the
+    ename:VK_PIPELINE_CREATE_2_DESCRIPTOR_HEAP_BIT_EXT flag, and that shader
+    statically uses a push constant value, that value must: have been set by
+    flink:vkCmdPushDataEXT
+  * [[VUID-{refpage}-None-11398]]
+    If a <<shaders-binding,bound shader>> was created with a
+    <<descriptorheaps-bindings,descriptor mapping>> using
+    ename:VK_DESCRIPTOR_MAPPING_SOURCE_PUSH_DATA_EXT,
+    ename:VK_DESCRIPTOR_MAPPING_SOURCE_PUSH_ADDRESS_EXT,
+ifdef::VK_KHR_ray_tracing_pipeline,VK_NV_ray_tracing[]
+    ename:VK_DESCRIPTOR_MAPPING_SOURCE_SHADER_RECORD_DATA_EXT,
+    ename:VK_DESCRIPTOR_MAPPING_SOURCE_SHADER_RECORD_ADDRESS_EXT,
+endif::VK_KHR_ray_tracing_pipeline,VK_NV_ray_tracing[]
+    ename:VK_DESCRIPTOR_MAPPING_SOURCE_RESOURCE_HEAP_DATA_EXT, or
+    ename:VK_DESCRIPTOR_MAPPING_SOURCE_INDIRECT_ADDRESS_EXT, and a shader
+    accesses a resource using that mapping, the access must: not be
+    <<shaders-execution-memory-access-bounds,out of bounds>>
+  * [[VUID-{refpage}-None-11437]]
+    If a pipeline is bound to the pipeline bind point used by this command,
+ifdef::VK_EXT_shader_object[]
+    or shader is bound to a shader stage used by this command,
+endif::VK_EXT_shader_object[]
+    and it was created with a <<descriptorheaps-bindings,descriptor
+    mapping>> using
+    ename:VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_INDIRECT_INDEX_ARRAY_EXT,
+    ename:VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_INDIRECT_INDEX_EXT, or
+    ename:VK_DESCRIPTOR_MAPPING_SOURCE_INDIRECT_ADDRESS_EXT, and a shader
+    accesses a resource using that mapping, the buffer from which the
+    address in push data was queried must: have been created with the
+    ename:VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT usage flag set
+  * [[VUID-{refpage}-None-11438]]
+    If a pipeline is bound to the pipeline bind point used by this command,
+ifdef::VK_EXT_shader_object[]
+    or shader is bound to a shader stage used by this command,
+endif::VK_EXT_shader_object[]
+    and it was created with a <<descriptorheaps-bindings,descriptor
+    mapping>> using ename:VK_DESCRIPTOR_MAPPING_SOURCE_PUSH_ADDRESS_EXT,
+ifdef::VK_KHR_ray_tracing_pipeline,VK_NV_ray_tracing[]
+    ename:VK_DESCRIPTOR_MAPPING_SOURCE_SHADER_RECORD_ADDRESS_EXT,
+endif::VK_KHR_ray_tracing_pipeline,VK_NV_ray_tracing[]
+    or ename:VK_DESCRIPTOR_MAPPING_SOURCE_INDIRECT_ADDRESS_EXT, and a shader
+    accesses a uniform buffer using that mapping, the address that the
+    uniform buffer is mapped to must: have been queried from a buffer
+    created with the ename:VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT usage flag set
+  * [[VUID-{refpage}-None-11441]]
+    If a pipeline is bound to the pipeline bind point used by this command,
+ifdef::VK_EXT_shader_object[]
+    or shader is bound to a shader stage used by this command,
+endif::VK_EXT_shader_object[]
+    and it was created with a <<descriptorheaps-bindings,descriptor
+    mapping>> using ename:VK_DESCRIPTOR_MAPPING_SOURCE_PUSH_ADDRESS_EXT,
+ifdef::VK_KHR_ray_tracing_pipeline,VK_NV_ray_tracing[]
+    ename:VK_DESCRIPTOR_MAPPING_SOURCE_SHADER_RECORD_ADDRESS_EXT,
+endif::VK_KHR_ray_tracing_pipeline,VK_NV_ray_tracing[]
+    ename:VK_DESCRIPTOR_MAPPING_SOURCE_INDIRECT_ADDRESS_EXT, or
+    ename:VK_DESCRIPTOR_MAPPING_SOURCE_RESOURCE_HEAP_DATA_EXT and a shader
+    accesses a uniform buffer using that mapping, the address that the
+    uniform buffer is mapped to must: be aligned to
+    <<limits-minUniformBufferOffsetAlignment,
+    pname:minUniformBufferOffsetAlignment>>
+  * [[VUID-{refpage}-None-11439]]
+    If a pipeline is bound to the pipeline bind point used by this command,
+ifdef::VK_EXT_shader_object[]
+    or shader is bound to a shader stage used by this command,
+endif::VK_EXT_shader_object[]
+    and it was created with a <<descriptorheaps-bindings,descriptor
+    mapping>> using ename:VK_DESCRIPTOR_MAPPING_SOURCE_PUSH_ADDRESS_EXT,
+ifdef::VK_KHR_ray_tracing_pipeline,VK_NV_ray_tracing[]
+    ename:VK_DESCRIPTOR_MAPPING_SOURCE_SHADER_RECORD_ADDRESS_EXT,
+endif::VK_KHR_ray_tracing_pipeline,VK_NV_ray_tracing[]
+    or ename:VK_DESCRIPTOR_MAPPING_SOURCE_INDIRECT_ADDRESS_EXT, and a shader
+    accesses a storage buffer using that mapping, the address that the
+    storage buffer is mapped to must: have been queried from a buffer
+    created with the ename:VK_BUFFER_USAGE_STORAGE_BUFFER_BIT usage flag set
+  * [[VUID-{refpage}-None-11442]]
+    If a pipeline is bound to the pipeline bind point used by this command,
+ifdef::VK_EXT_shader_object[]
+    or shader is bound to a shader stage used by this command,
+endif::VK_EXT_shader_object[]
+    and it was created with a <<descriptorheaps-bindings,descriptor
+    mapping>> using ename:VK_DESCRIPTOR_MAPPING_SOURCE_PUSH_ADDRESS_EXT,
+ifdef::VK_KHR_ray_tracing_pipeline,VK_NV_ray_tracing[]
+    ename:VK_DESCRIPTOR_MAPPING_SOURCE_SHADER_RECORD_ADDRESS_EXT,
+endif::VK_KHR_ray_tracing_pipeline,VK_NV_ray_tracing[]
+    or ename:VK_DESCRIPTOR_MAPPING_SOURCE_INDIRECT_ADDRESS_EXT, and a shader
+    accesses a storage buffer using that mapping, the address that the
+    storage buffer is mapped to must: be aligned to
+    <<limits-minStorageBufferOffsetAlignment,
+    pname:minStorageBufferOffsetAlignment>>
+ifdef::VK_KHR_ray_tracing_pipeline,VK_KHR_ray_query,VK_NV_ray_tracing[]
+  * [[VUID-{refpage}-None-11485]]
+    If a pipeline is bound to the pipeline bind point used by this command,
+ifdef::VK_EXT_shader_object[]
+    or shader is bound to a shader stage used by this command,
+endif::VK_EXT_shader_object[]
+    and it was created with a <<descriptorheaps-bindings,descriptor
+    mapping>> using ename:VK_DESCRIPTOR_MAPPING_SOURCE_PUSH_ADDRESS_EXT,
+ifdef::VK_KHR_ray_tracing_pipeline,VK_NV_ray_tracing[]
+    ename:VK_DESCRIPTOR_MAPPING_SOURCE_SHADER_RECORD_ADDRESS_EXT,
+endif::VK_KHR_ray_tracing_pipeline,VK_NV_ray_tracing[]
+    or ename:VK_DESCRIPTOR_MAPPING_SOURCE_INDIRECT_ADDRESS_EXT, and a shader
+    accesses an acceleration structure using that mapping, the address that
+    the acceleration structure is mapped to must: be an acceleration
+    structure
+ifdef::VK_KHR_acceleration_structure[]
+    address retrieved from a slink:VkAccelerationStructureKHR object via
+    flink:vkGetAccelerationStructureDeviceAddressKHR
+endif::VK_KHR_acceleration_structure[]
+ifdef::VK_KHR_acceleration_structure+VK_NV_ray_tracing[or]
+ifdef::VK_NV_ray_tracing[]
+    handle retrieved from a slink:VkAccelerationStructureNV object via
+    flink:vkGetAccelerationStructureHandleNV
+endif::VK_NV_ray_tracing[]
+endif::VK_KHR_ray_tracing_pipeline,VK_KHR_ray_query,VK_NV_ray_tracing[]
+  * [[VUID-{refpage}-index-11450]]
+    If a shader uses a sampler descriptor to sample an image as a result of
+    this command, and that sampler descriptor uses a custom border color
+    with an index defined by
+    slink:VkSamplerCustomBorderColorIndexCreateInfoEXT, the value of
+    slink:VkSamplerCustomBorderColorIndexCreateInfoEXT::pname:index must:
+    have been registered before this command was recorded, and still be
+    registered during the sampling operation, with an identically defined
+    color
+  * [[VUID-{refpage}-protectedNoFault-11455]]
+    If <<limits-protectedNoFault, pname:protectedNoFault>> is not supported,
+    a pipeline is bound to the pipeline bind point used by this command,
+ifdef::VK_EXT_shader_object[]
+    or a shader is bound to a shader stage used by this command,
+endif::VK_EXT_shader_object[]
+    and it was created with a <<descriptorheaps-bindings,descriptor
+    mapping>> using ename:VK_DESCRIPTOR_MAPPING_SOURCE_PUSH_ADDRESS_EXT,
+ifdef::VK_KHR_ray_tracing_pipeline,VK_NV_ray_tracing[]
+    ename:VK_DESCRIPTOR_MAPPING_SOURCE_SHADER_RECORD_ADDRESS_EXT,
+endif::VK_KHR_ray_tracing_pipeline,VK_NV_ray_tracing[]
+    or ename:VK_DESCRIPTOR_MAPPING_SOURCE_INDIRECT_ADDRESS_EXT, the address
+    that the resource is mapped to must: have been queried from a buffer
+    created without the ename:VK_BUFFER_CREATE_PROTECTED_BIT create flag set
+  * [[VUID-{refpage}-protectedNoFault-11456]]
+    If <<limits-protectedNoFault, pname:protectedNoFault>> is not supported,
+    a pipeline is bound to the pipeline bind point used by this command,
+ifdef::VK_EXT_shader_object[]
+    or a shader is bound to a shader stage used by this command,
+endif::VK_EXT_shader_object[]
+    and it was created with a <<descriptorheaps-bindings,descriptor
+    mapping>> using
+    ename:VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_INDIRECT_INDEX_EXT or
+    ename:VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_INDIRECT_INDEX_ARRAY_EXT,
+    the address of the indirect memory must: have been queried from a buffer
+    created without the ename:VK_BUFFER_CREATE_PROTECTED_BIT create flag set
+endif::VK_EXT_descriptor_heap[]
+// Common Valid Usage

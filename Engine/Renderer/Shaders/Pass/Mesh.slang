@@ -5,7 +5,7 @@
 
 #pragma once
 
-/// Data `VS_Mesh.slang` passes to `FS_Mesh.slang`.
+// Data passed from a mesh vertex shader to the fragment shader.
 struct VS_Mesh_Output
 {
 	float4 position : SV_Position;

@@ -41,7 +41,7 @@ void show_cursor();
 /// Hides the OS cursor.
 void hide_cursor();
 /// Moves the OS cursor to `position`.
-Result set_cursor_position(const Rect<int>& position);
+Result set_cursor_position(int x, int y);
 /// Writes the OS cursor position to `position`.
-Result get_cursor_position(Rect<int>& position);
+Result get_cursor_position(int& x, int& y);
 }  // namespace blk

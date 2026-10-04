@@ -48,7 +48,7 @@ blk::create_arena(const Context& context, Arena& arena)
 
 	if (const Result result = create_buffer(
 			context,
-			sizeof(Color_RGBA<uint8_t>) * TEXTURE_WIDTH * TEXTURE_HEIGHT,
+			MAX_TEXTURE_SIZE,
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			arena.texture_buffer

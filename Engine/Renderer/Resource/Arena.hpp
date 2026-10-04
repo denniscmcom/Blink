@@ -21,15 +21,15 @@ struct Mesh;
 /// Maximum vertices supported in scene.
 ///
 /// We use this value to preallocate a big enough vertex buffer.
-constexpr size_t MAX_VERTEX_COUNT = 10'000;
+constexpr size_t MAX_VERTEX_COUNT = 100'000;
 /// Maximum indices supported in scene.
 ///
 /// We use this value to preallocate a big enough index buffer.
-constexpr size_t MAX_INDEX_COUNT = 10'000;
-/// Width of a supported texture.
-constexpr size_t TEXTURE_WIDTH = 1'024;
-/// Height of a supported texture.
-constexpr size_t TEXTURE_HEIGHT = 1'024;
+constexpr size_t MAX_INDEX_COUNT = 100'000;
+/// Size in bytes of the largest supported texture, a 4096x4096 `Texture_Format::RGBA8`.
+///
+/// We use this value to preallocate a big enough texture staging buffer.
+constexpr size_t MAX_TEXTURE_SIZE = 4'096 * 4'096 * 4;
 /// Maximum material supported in scene.
 ///
 /// We use this value to calculate descriptor counts.

@@ -8,6 +8,7 @@
 #include "Engine/Core/Math/Constants.hpp"
 #include "Engine/Core/Pool.hpp"
 #include "Engine/Core/Serial.hpp"
+#include "Engine/Core/String.hpp"
 #include "Engine/Platform/Log.hpp"
 #include "Engine/Resource/Storage.hpp"
 
@@ -218,7 +219,11 @@ blk::compute_uv_sphere(const float radius, const uint32_t segment_count, const u
 			vertex.texture_coord.x = static_cast<float>(j) / static_cast<float>(segment_count);
 			vertex.texture_coord.y = static_cast<float>(i) / static_cast<float>(ring_count);
 
-			// TODO (Bug): Tangent and bitangent are not being computed.
+			// The tangent follows `dP/dtheta`, the direction `texture_coord.x` grows. The bitangent follows `-dP/dphi`,
+			// against the direction `texture_coord.y` grows. Imported meshes store `1 - uv.y`, so their bitangent, the
+			// FBX `+UV.y` direction, points that way too.
+			vertex.tangent = Vector3{.x = -sinf(theta), .y = 0.0f, .z = cosf(theta)};
+			vertex.bitangent = Vector3{.x = -cosf(phi) * cosf(theta), .y = sinf(phi), .z = -cosf(phi) * sinf(theta)};
 
 			push(mesh.vertices, vertex);
 		}
@@ -245,6 +250,107 @@ blk::compute_uv_sphere(const float radius, const uint32_t segment_count, const u
 				push(mesh.indices, next_ring);
 				push(mesh.indices, next_ring + 1);
 			}
+		}
+	}
+
+	// Store mesh in `storage`.
+	return store_resource(storage, mesh, hash, stem);
+}
+
+blk::Pool_Handle<blk::Mesh>
+blk::compute_grid(const uint32_t quad_count)
+{
+	if (!BLK_VERIFY(quad_count > 0))
+	{
+		return {};
+	}
+
+	// Since this is a procedurally generated mesh, we need to compute a logical stem to use it to then compute its
+	// mesh hash.
+	char stem[MAX_RESOURCE_STEM_SIZE];
+
+	BLK_IF_NOT_SNPRINTF(stem, sizeof(stem), "Grid:%u", quad_count)
+	{
+		BLK_ERROR("Failed to format grid stem\n");
+
+		return {};
+	}
+
+	// Compute the mesh hash.
+	const uint64_t hash = get_resource_hash(stem, Resource_Type::MESH);
+
+	if (is_resource_loaded(storage, hash))
+	{
+		// If the mesh is already loaded, we return its handle.
+		return get_resource_handle(storage, hash);
+	}
+
+	// Initialize a `Mesh`.
+	Mesh mesh = {};
+
+	// Both counts are known up front, so we allocate them exactly. `quad_count` quads per side need `quad_count + 1`
+	// vertices per side, and every quad pushes two triangles.
+	const size_t vertex_count = (static_cast<size_t>(quad_count) + 1) * (static_cast<size_t>(quad_count) + 1);
+	const size_t index_count = static_cast<size_t>(quad_count) * quad_count * 6;
+
+	BLK_IF_NOT_SUCCESS(create_dyn_array(mesh.vertices, storage.pool.allocator, vertex_count))
+	{
+		BLK_ERROR("Failed to allocate vertices array\n");
+
+		return {};
+	}
+
+	BLK_IF_NOT_SUCCESS(create_dyn_array(mesh.indices, storage.pool.allocator, index_count))
+	{
+		BLK_ERROR("Failed to allocate indices array\n");
+		destroy_dyn_array(mesh.vertices);
+
+		return {};
+	}
+
+	// Compute vertices, row by row along Z.
+
+	for (uint32_t z = 0; z <= quad_count; z++)
+	{
+		for (uint32_t x = 0; x <= quad_count; x++)
+		{
+			Vertex_UV vertex = {};
+			vertex.position.x = static_cast<float>(x) / static_cast<float>(quad_count);
+			vertex.position.z = static_cast<float>(z) / static_cast<float>(quad_count);
+
+			vertex.normal = Vector3{.x = 0.0f, .y = 1.0f, .z = 0.0f};
+			vertex.tangent = Vector3{.x = 1.0f, .y = 0.0f, .z = 0.0f};
+			vertex.bitangent = Vector3{.x = 0.0f, .y = 0.0f, .z = 1.0f};
+
+			vertex.texture_coord.x = vertex.position.x;
+			vertex.texture_coord.y = vertex.position.z;
+
+			push(mesh.vertices, vertex);
+		}
+	}
+
+	// Compute indices.
+	// Each triangle goes from its corner to its +X neighbor and then its +Z neighbor, the same winding
+	// `compute_uv_sphere` uses for its outward faces.
+
+	const uint32_t row_size = quad_count + 1;
+
+	for (uint32_t z = 0; z < quad_count; z++)
+	{
+		for (uint32_t x = 0; x < quad_count; x++)
+		{
+			const uint32_t corner = z * row_size + x;
+			const uint32_t right = corner + 1;
+			const uint32_t forward = corner + row_size;
+			const uint32_t forward_right = forward + 1;
+
+			push(mesh.indices, corner);
+			push(mesh.indices, right);
+			push(mesh.indices, forward);
+
+			push(mesh.indices, right);
+			push(mesh.indices, forward_right);
+			push(mesh.indices, forward);
 		}
 	}
 

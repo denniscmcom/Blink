@@ -1,0 +1,67 @@
+// Copyright 2025-2026 The Khronos Group Inc.
+//
+// SPDX-License-Identifier: CC-BY-4.0
+
+// Common Valid Usage
+// Common to VkCopyMemoryToImageIndirectCommand* structures
+  * [[VUID-{refpage}-srcAddress-10963]]
+    The pname:srcAddress must: be 4 byte aligned
+  * [[VUID-{refpage}-dstImage-12282]]
+    If pname:dstImage does not have either a depth/stencil format
+ifdef::VK_BASE_VERSION_1_1,VK_KHR_sampler_ycbcr_conversion[]
+    or a <<formats-requiring-sampler-ycbcr-conversion,multi-planar format>>,
+endif::VK_BASE_VERSION_1_1,VK_KHR_sampler_ycbcr_conversion[]
+    pname:srcAddress must: be a multiple of the
+    <<formats-compatibility-classes,texel block size>>
+ifdef::VK_BASE_VERSION_1_1,VK_KHR_sampler_ycbcr_conversion[]
+  * [[VUID-{refpage}-dstImage-12283]]
+    If pname:dstImage has a
+    <<formats-requiring-sampler-ycbcr-conversion,multi-planar format>>,
+    pname:srcAddress must: be a multiple of the element size of the
+    compatible format for the format and the pname:aspectMask of the
+    pname:imageSubresource as defined in <<formats-compatible-planes>>
+endif::VK_BASE_VERSION_1_1,VK_KHR_sampler_ycbcr_conversion[]
+  * [[VUID-{refpage}-bufferRowLength-10964]]
+    pname:bufferRowLength must: be `0`, or greater than or equal to the
+    pname:width member of pname:imageExtent
+  * [[VUID-{refpage}-bufferImageHeight-10965]]
+    pname:bufferImageHeight must: be `0`, or greater than or equal to the
+    pname:height member of pname:imageExtent
+  * [[VUID-{refpage}-imageOffset-10966]]
+    pname:imageOffset must: specify a valid offset in the destination image
+  * [[VUID-{refpage}-imageExtent-10967]]
+    pname:imageExtent must: specify a valid region in the destination image
+    and can: be `0`
+  * [[VUID-{refpage}-srcAddress-10968]]
+    The memory region starting at pname:srcAddress and described by
+    pname:bufferRowLength and pname:bufferImageHeight must: not exceed the
+    bounds of the memory allocation backing memory at pname:srcAddress
+  * [[VUID-{refpage}-imageOffset-10969]]
+    The pname:imageOffset and pname:imageExtent members of each region must:
+    respect the image transfer granularity requirements of
+    pname:commandBuffer's command pool's queue family, as described in
+    slink:VkQueueFamilyProperties
+  * [[VUID-{refpage}-imageOffset-10970]]
+    For each destination region, pname:imageOffset.x and
+    [eq]#(pname:imageExtent.width {plus} pname:imageOffset.x)# must: both be
+    greater than or equal to `0` and less than or equal to the width of the
+    specified subresource
+  * [[VUID-{refpage}-imageOffset-10971]]
+    For each destination region, pname:imageOffset.y and
+    [eq]#(pname:imageExtent.height {plus} pname:imageOffset.y)# must: both
+    be greater than or equal to `0` and less than or equal to the height of
+    the specified subresource
+  * [[VUID-{refpage}-imageSubresource-12284]]
+    The members of pname:imageSubresource must: be identical to the members
+    of the slink:VkImageSubresourceLayers structure specified in the
+    corresponding index of the
+    pname:pCopyMemoryToImageIndirectInfo->pImageSubresources array of
+    flink:vkCmdCopyMemoryToImageIndirectKHR during command recording
+  * [[VUID-{refpage}-dstImage-12285]]
+    If pname:dstImage is of type ename:VK_IMAGE_TYPE_1D, pname:imageOffset.y
+    must: be `0` and pname:imageExtent.height must: be `1`
+  * [[VUID-{refpage}-dstImage-12286]]
+    If pname:dstImage is of type ename:VK_IMAGE_TYPE_1D or
+    ename:VK_IMAGE_TYPE_2D, pname:imageOffset.z must: be `0` and
+    pname:imageExtent.depth must: be `1`
+// Common Valid Usage

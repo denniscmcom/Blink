@@ -36,6 +36,6 @@ Result transfer_texture(
 	Texture_Device& texture
 );
 /// Unloads a `texture` from device.
-// TODO (Bug): not implemented.
+/// @warning The device must not be using `texture`. Call `wait_renderer_idle` first.
 void unload_texture_from_device(const Context& context, Arena& arena, Texture_Device& texture);
 }  // namespace blk

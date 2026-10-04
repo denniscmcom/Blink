@@ -16,7 +16,6 @@
 #include "Engine/Platform/Result.hpp"
 #include "Engine/Platform/Window_Internal.hpp"
 #include "Engine/Renderer/Helpers.hpp"
-#include "Engine/Renderer/Lifetime/Command.hpp"
 #include "Engine/Renderer/Lifetime/Context.hpp"
 #include "Engine/Renderer/Lifetime/Descriptor.hpp"
 #include "Engine/Renderer/Lifetime/Draw_Command.hpp"
@@ -28,10 +27,12 @@
 #include "Engine/Renderer/Resource/Arena.hpp"
 #include "Engine/Renderer/Resource/Material_Device.hpp"
 #include "Engine/Renderer/Resource/Mesh_Device.hpp"
+#include "Engine/Renderer/Resource/Texture_Device.hpp"
 #include "Engine/Renderer/Skybox.hpp"
 #include "Engine/Resource/Mesh.hpp"
+#include "Engine/Resource/Texture.hpp"
 #include "Engine/Scene/Graph.hpp"
-#include "Engine/Scene/Mesh_Instance.hpp"
+#include "Engine/Scene/Mesh_Ref.hpp"
 #include "Engine/Scene/Node.hpp"
 #include "Engine/Scene/Point_Light.hpp"
 #include "Engine/Scene/Transform.hpp"
@@ -52,6 +53,8 @@ struct Renderer
 
 	/// Pipeline to render meshes.
 	blk::Pipeline mesh_pipeline;
+	/// Pipeline to render terrain.
+	blk::Pipeline terrain_pipeline;
 	/// Pipeline to render the dynamic skybox.
 	blk::Pipeline skybox_pipeline;
 	/// Pipeline to compute the skybox transmittance LUT.
@@ -60,6 +63,12 @@ struct Renderer
 	blk::Pipeline skybox_multiscattering_pipeline;
 	/// Pipeline to compute the skybox sky-view LUT.
 	blk::Pipeline skybox_sky_view_pipeline;
+	/// Pipeline to compute the skybox aerial perspective LUT.
+	blk::Pipeline skybox_aerial_pipeline;
+	/// Pipeline to visualize mesh triangles.
+	blk::Pipeline debug_mesh_triangles_pipeline;
+	/// Pipeline to visualize terrain triangles.
+	blk::Pipeline debug_terrain_triangles_pipeline;
 
 	/// Descriptor layouts.
 	blk::Descriptor_Layouts descriptor_layouts;
@@ -68,6 +77,9 @@ struct Renderer
 
 	/// Image for depth testing.
 	blk::Image depth_image;
+
+	/// Terrain heightmap `bake_renderer` wrote into `global_descriptor_set`. Terrain is not drawn without one.
+	blk::Pool_Handle<blk::Texture> terrain_heightmap_handle;
 
 	/// Frame data.
 	blk::Array<blk::Frame, blk::MAX_FRAMES_IN_FLIGHT> frames;
@@ -82,10 +94,11 @@ Renderer renderer = {};
 
 }  // namespace
 
-// TODO (Feature): `rect` is currently not used. Swapchain creation is using surface capabilities to get it's size.
+// TODO (Feature): `width` and `height` are currently not used. Swapchain creation is using surface capabilities to get
+// it's size.
 
 blk::Result
-blk::create_renderer(const Rect<unsigned>& /*rect*/)
+blk::create_renderer(size_t width, size_t height)
 {
 	// ============================================================================
 	// Create renderer allocator.
@@ -205,17 +218,20 @@ blk::create_renderer(const Rect<unsigned>& /*rect*/)
 		return Result::DEVICE_ERROR;
 	}
 
-	// No descriptors writes because it is currently empty.
+	// Its descriptors are written by `bake_renderer`, once the world settings they come from exist.
 
 	// Create shader modules;
 
 	VkShaderModule fs_mesh = VK_NULL_HANDLE;
 	VkShaderModule vs_mesh = VK_NULL_HANDLE;
+	VkShaderModule vs_terrain = VK_NULL_HANDLE;
 	VkShaderModule vs_skybox = VK_NULL_HANDLE;
 	VkShaderModule fs_skybox = VK_NULL_HANDLE;
 	VkShaderModule cs_skybox_transmittance = VK_NULL_HANDLE;
 	VkShaderModule cs_skybox_multiscattering = VK_NULL_HANDLE;
 	VkShaderModule cs_skybox_sky_view = VK_NULL_HANDLE;
+	VkShaderModule cs_skybox_aerial = VK_NULL_HANDLE;
+	VkShaderModule fs_debug_triangles = VK_NULL_HANDLE;
 
 	if (const Result result = create_shader_module(context, "FS_Mesh", fs_mesh); result != Result::SUCCESS)
 	{
@@ -228,6 +244,14 @@ blk::create_renderer(const Rect<unsigned>& /*rect*/)
 	if (const Result result = create_shader_module(context, "VS_Mesh", vs_mesh); result != Result::SUCCESS)
 	{
 		BLK_ERROR("Failed to create `VS_Mesh` shader module\n");
+		destroy_renderer();
+
+		return result;
+	}
+
+	if (const Result result = create_shader_module(context, "VS_Terrain", vs_terrain); result != Result::SUCCESS)
+	{
+		BLK_ERROR("Failed to create `VS_Terrain` shader module\n");
 		destroy_renderer();
 
 		return result;
@@ -276,12 +300,32 @@ blk::create_renderer(const Rect<unsigned>& /*rect*/)
 		return result;
 	}
 
+	if (const Result result = create_shader_module(context, "CS_Skybox_Aerial", cs_skybox_aerial);
+		result != Result::SUCCESS)
+	{
+		BLK_ERROR("Failed to create `CS_Skybox_Aerial` shader module\n");
+		destroy_renderer();
+
+		return result;
+	}
+
+	if (const Result result = create_shader_module(context, "FS_Debug_Triangles", fs_debug_triangles);
+		result != Result::SUCCESS)
+	{
+		BLK_ERROR("Failed to create `FS_Debug_Triangles` shader module\n");
+		destroy_renderer();
+
+		return result;
+	}
+
 	// Initialize pipeline shader stage infos.
 
 	const VkPipelineShaderStageCreateInfo fs_mesh_stage_info =
 		get_pipeline_shader_stage_create_info(fs_mesh, VK_SHADER_STAGE_FRAGMENT_BIT, "fs_main");
 	const VkPipelineShaderStageCreateInfo vs_mesh_stage_info =
 		get_pipeline_shader_stage_create_info(vs_mesh, VK_SHADER_STAGE_VERTEX_BIT, "vs_main");
+	const VkPipelineShaderStageCreateInfo vs_terrain_stage_info =
+		get_pipeline_shader_stage_create_info(vs_terrain, VK_SHADER_STAGE_VERTEX_BIT, "vs_main");
 	const VkPipelineShaderStageCreateInfo vs_skybox_stage_info =
 		get_pipeline_shader_stage_create_info(vs_skybox, VK_SHADER_STAGE_VERTEX_BIT, "vs_main");
 	const VkPipelineShaderStageCreateInfo fs_skybox_stage_info =
@@ -292,9 +336,19 @@ blk::create_renderer(const Rect<unsigned>& /*rect*/)
 		get_pipeline_shader_stage_create_info(cs_skybox_multiscattering, VK_SHADER_STAGE_COMPUTE_BIT, "cs_main");
 	const VkPipelineShaderStageCreateInfo cs_skybox_sky_view_stage_info =
 		get_pipeline_shader_stage_create_info(cs_skybox_sky_view, VK_SHADER_STAGE_COMPUTE_BIT, "cs_main");
+	const VkPipelineShaderStageCreateInfo cs_skybox_aerial_stage_info =
+		get_pipeline_shader_stage_create_info(cs_skybox_aerial, VK_SHADER_STAGE_COMPUTE_BIT, "cs_main");
+	const VkPipelineShaderStageCreateInfo fs_debug_triangles_stage_info =
+		get_pipeline_shader_stage_create_info(fs_debug_triangles, VK_SHADER_STAGE_FRAGMENT_BIT, "fs_main");
 
 	const Array mesh_pipeline_shader_stages = {{
 		vs_mesh_stage_info,
+		fs_mesh_stage_info,
+	}};
+
+	// Terrain is shaded like any mesh, so it shares `FS_Mesh`.
+	const Array terrain_pipeline_shader_stages = {{
+		vs_terrain_stage_info,
 		fs_mesh_stage_info,
 	}};
 
@@ -303,11 +357,21 @@ blk::create_renderer(const Rect<unsigned>& /*rect*/)
 		fs_skybox_stage_info,
 	}};
 
+	const Array debug_mesh_triangles_pipeline_shader_stages = {{
+		vs_mesh_stage_info,
+		fs_debug_triangles_stage_info,
+	}};
+
+	const Array debug_terrain_triangles_pipeline_shader_stages = {{
+		vs_terrain_stage_info,
+		fs_debug_triangles_stage_info,
+	}};
+
 	// Initialize vertex descriptions.
 
-	const Array<VkVertexInputBindingDescription, 1> vertex_input_descriptions =
+	const Array<VkVertexInputBindingDescription, 1> vertex_uv_input_descriptions =
 		get_vertex_uv_input_binding_descriptions();
-	const Array<VkVertexInputAttributeDescription, 5> vertex_attribute_descriptions =
+	const Array<VkVertexInputAttributeDescription, 5> vertex_uv_attribute_descriptions =
 		get_vertex_uv_input_attribute_descriptions();
 
 	// Initialize push constants.
@@ -321,6 +385,15 @@ blk::create_renderer(const Rect<unsigned>& /*rect*/)
 		mesh_push_contant_range,
 	}};
 
+	VkPushConstantRange terrain_push_contant_range = {};
+	terrain_push_contant_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	terrain_push_contant_range.offset = 0;
+	terrain_push_contant_range.size = sizeof(Terrain_Constants);
+
+	const Array terrain_pipeline_push_constant_ranges = {{
+		terrain_push_contant_range,
+	}};
+
 	// Create mesh pipeline.
 
 	if (const Result result = create_graphics_pipeline(
@@ -329,8 +402,8 @@ blk::create_renderer(const Rect<unsigned>& /*rect*/)
 			renderer.depth_image.format,
 			to_array_view(mesh_pipeline_layouts),
 			to_array_view(mesh_pipeline_shader_stages),
-			to_array_view(vertex_input_descriptions),
-			to_array_view(vertex_attribute_descriptions),
+			to_array_view(vertex_uv_input_descriptions),
+			to_array_view(vertex_uv_attribute_descriptions),
 			to_array_view(pipeline_push_constant_ranges),
 			VK_TRUE,
 			VK_TRUE,
@@ -340,6 +413,31 @@ blk::create_renderer(const Rect<unsigned>& /*rect*/)
 		result != Result::SUCCESS)
 	{
 		BLK_ERROR("Failed to create mesh pipeline\n");
+		destroy_renderer();
+
+		return result;
+	}
+
+	// Create terrain pipeline.
+	// It reads the same `Vertex_UV` grid as a mesh, and only its push constants differ.
+
+	if (const Result result = create_graphics_pipeline(
+			context,
+			renderer.swapchain.surface_format,
+			renderer.depth_image.format,
+			to_array_view(mesh_pipeline_layouts),
+			to_array_view(terrain_pipeline_shader_stages),
+			to_array_view(vertex_uv_input_descriptions),
+			to_array_view(vertex_uv_attribute_descriptions),
+			to_array_view(terrain_pipeline_push_constant_ranges),
+			VK_TRUE,
+			VK_TRUE,
+			VK_COMPARE_OP_LESS,
+			renderer.terrain_pipeline
+		);
+		result != Result::SUCCESS)
+	{
+		BLK_ERROR("Failed to create terrain pipeline\n");
 		destroy_renderer();
 
 		return result;
@@ -425,6 +523,71 @@ blk::create_renderer(const Rect<unsigned>& /*rect*/)
 		return result;
 	}
 
+	// Create skybox aerial perspective compute pipeline.
+
+	if (const Result result = create_compute_pipeline(
+			context,
+			to_array_view(frame_pipeline_layouts),
+			cs_skybox_aerial_stage_info,
+			{},
+			renderer.skybox_aerial_pipeline
+		);
+		result != Result::SUCCESS)
+	{
+		BLK_ERROR("Failed to create skybox aerial pipeline\n");
+		destroy_renderer();
+
+		return result;
+	}
+
+	// Create debug mesh triangles pipeline.
+
+	if (const Result result = create_graphics_pipeline(
+			context,
+			renderer.swapchain.surface_format,
+			renderer.depth_image.format,
+			to_array_view(mesh_pipeline_layouts),
+			to_array_view(debug_mesh_triangles_pipeline_shader_stages),
+			to_array_view(vertex_uv_input_descriptions),
+			to_array_view(vertex_uv_attribute_descriptions),
+			to_array_view(pipeline_push_constant_ranges),
+			VK_TRUE,
+			VK_TRUE,
+			VK_COMPARE_OP_LESS,
+			renderer.debug_mesh_triangles_pipeline
+		);
+		result != Result::SUCCESS)
+	{
+		BLK_ERROR("Failed to create debug mesh triangles pipeline\n");
+		destroy_renderer();
+
+		return result;
+	}
+
+	// Create debug terrain triangles pipeline.
+
+	if (const Result result = create_graphics_pipeline(
+			context,
+			renderer.swapchain.surface_format,
+			renderer.depth_image.format,
+			to_array_view(mesh_pipeline_layouts),
+			to_array_view(debug_terrain_triangles_pipeline_shader_stages),
+			to_array_view(vertex_uv_input_descriptions),
+			to_array_view(vertex_uv_attribute_descriptions),
+			to_array_view(terrain_pipeline_push_constant_ranges),
+			VK_TRUE,
+			VK_TRUE,
+			VK_COMPARE_OP_LESS,
+			renderer.debug_terrain_triangles_pipeline
+		);
+		result != Result::SUCCESS)
+	{
+		BLK_ERROR("Failed to create debug terrain triangles pipeline\n");
+		destroy_renderer();
+
+		return result;
+	}
+
 	// Create frame data.
 
 	for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
@@ -443,24 +606,57 @@ blk::create_renderer(const Rect<unsigned>& /*rect*/)
 }
 
 blk::Result
-blk::bake_renderer()
+blk::bake_renderer(const World_Settings& settings)
 {
-	// Bake the skybox transmittance LUT.
+	// Write the terrain heightmap into the global set.
 
-	// Create transient command buffer.
+	// Only the editor can change the heightmap at runtime, so we just wait for the GPU to finish and then upload it.
+	// This may cause a temporary hiccup in the editor.
+	wait_renderer_idle();
 
-	VkCommandBuffer command_buffer = VK_NULL_HANDLE;
-	BLK_SUCCESS_OR_RETURN(create_command_buffer(context, context.transient_command_pool, command_buffer));
+	// Unload the previous heightmap, so that an edited heightmap is uploaded again even if its handle did not change.
 
-	// Record commands.
+	if (Texture_Device* previous_heightmap_device = get(arena.textures, renderer.terrain_heightmap_handle))
+	{
+		unload_texture_from_device(context, arena, *previous_heightmap_device);
+	}
 
-	BLK_SUCCESS_OR_ERROR_RETURN(begin_one_time_commands(command_buffer), "Failed to begin one time commands\n");
+	renderer.terrain_heightmap_handle = {};
+	const Pool_Handle<Texture> heightmap_handle = settings.terrain.heightmap_handle;
 
-	// Finish recording commands.
-	BLK_SUCCESS_OR_ERROR_RETURN(end_one_time_commands(context, command_buffer), "Failed to end one time commands\n");
+	if (const Texture* heightmap = get_texture(heightmap_handle))
+	{
+		if (!BLK_VERIFY(heightmap->format == Texture_Format::R16))
+		{
+			return Result::INVALID_ARGUMENTS;
+		}
 
-	// Destroy transient command buffer.
-	destroy_command_buffer(context, context.transient_command_pool, command_buffer);
+		Texture_Device heightmap_device = {};
+
+		BLK_SUCCESS_OR_ERROR_RETURN(
+			transfer_texture(context, arena, heightmap_handle, VK_FORMAT_R16_UNORM, heightmap_device),
+			"Failed to transfer the terrain heightmap to device\n"
+		);
+
+		VkDescriptorImageInfo heightmap_image_info = {};
+		heightmap_image_info.sampler = context.texture_sampler;
+		heightmap_image_info.imageView = heightmap_device.image.view;
+		heightmap_image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+		// The binding has to match `Descriptor_Layouts::global_layout`.
+		VkWriteDescriptorSet heightmap_write = {};
+		heightmap_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		heightmap_write.dstSet = renderer.global_descriptor_set;
+		heightmap_write.dstBinding = 0;
+		heightmap_write.dstArrayElement = 0;
+		heightmap_write.descriptorCount = 1;
+		heightmap_write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		heightmap_write.pImageInfo = &heightmap_image_info;
+
+		vkUpdateDescriptorSets(context.logical_device, 1, &heightmap_write, 0, nullptr);
+
+		renderer.terrain_heightmap_handle = heightmap_handle;
+	}
 
 	return Result::SUCCESS;
 }
@@ -493,20 +689,25 @@ blk::destroy_renderer()
 }
 
 void
-blk::update_frame(const Scene_Graph& scene_graph, const Camera_View& camera_view, const World_Settings& settings)
+blk::update_frame(
+	const Scene_Graph& scene_graph,
+	const Renderer_Settings& renderer_settings,
+	const World_Settings& settings
+)
 {
 	// Empty draw command of the current frame.
 
 	Frame& frame = renderer.frames.buffer[renderer.frame_index];
 	empty(frame.mesh_draw_commands);
+	empty(frame.terrain_draw_commands);
 	empty(frame.skybox_draw_commands);
 
 	// Initialize `Camera_UBO`.
 
 	Camera_UBO camera_ubo = {};
-	camera_ubo.view = camera_view.view;
-	camera_ubo.projection = camera_view.projection;
-	camera_ubo.view_position.vector = camera_view.view_position;
+	camera_ubo.view = renderer_settings.view;
+	camera_ubo.projection = renderer_settings.projection;
+	camera_ubo.view_position.vector = renderer_settings.view_position;
 
 	// Initialize empty `Light_UBO`.
 
@@ -516,9 +717,30 @@ blk::update_frame(const Scene_Graph& scene_graph, const Camera_View& camera_view
 
 	Skybox_UBO skybox_ubo = {};
 
-	// We only can have one sun in the scene, so we use this variable to keep that invariant and report the possible
-	// error.
-	bool sun_exists = false;
+	const Atmosphere_Settings& atmosphere = settings.atmosphere;
+
+	skybox_ubo.rayleigh_scattering = atmosphere.rayleigh_scattering;
+	skybox_ubo.ozone_absorption = atmosphere.ozone_absorption;
+	skybox_ubo.mie_scattering = atmosphere.mie_scattering;
+	skybox_ubo.mie_absorption = atmosphere.mie_absorption;
+	skybox_ubo.rayleigh_scale = atmosphere.rayleigh_scale;
+	skybox_ubo.mie_scale = atmosphere.mie_scale;
+	skybox_ubo.ozone_mid_point = atmosphere.ozone_mid_point;
+	skybox_ubo.ozone_low_point = atmosphere.ozone_low_point;
+	skybox_ubo.planet_radius = atmosphere.planet_radius;
+	skybox_ubo.atmosphere_radius = atmosphere.atmosphere_radius;
+	skybox_ubo.mie_asymmetry = atmosphere.mie_asymmetry;
+
+	// The ground albedo is picked as a color, so it has to be converted to linear space, as the light colors are.
+	const Color_RGB<float> linear_ground_albedo = convert_srgb_to_linear(atmosphere.ground_albedo);
+	skybox_ubo.ground_albedo =
+		Vector3{.x = linear_ground_albedo.r, .y = linear_ground_albedo.g, .z = linear_ground_albedo.b};
+
+	// Initialize terrain UBO.
+
+	Terrain_UBO terrain_ubo = {};
+	terrain_ubo.chunk_size = compute_chunk_size(settings.terrain);
+	terrain_ubo.terrain_height = settings.terrain.height;
 
 	// Now, we iterate over all the `Node`s in the scene and compute new draw commands.
 
@@ -551,7 +773,7 @@ blk::update_frame(const Scene_Graph& scene_graph, const Camera_View& camera_view
 		// not really a `Node_Type::MESH_INSTANCE` because the gizmo mesh is only used by the `Editor/`.
 
 		// Initialize mesh transform matrix.
-		draw_command.mesh_constants.model = init_transform_matrix(node->transform);
+		draw_command.mesh_constants.model = node->world_matrix;
 
 		// Initialize mesh normal matrix.
 		if (Matrix4 model_inverse = {}; inverse(draw_command.mesh_constants.model, model_inverse) == Result::SUCCESS)
@@ -565,54 +787,52 @@ blk::update_frame(const Scene_Graph& scene_graph, const Camera_View& camera_view
 
 		switch (node->type)
 		{
-		case Node_Type::MESH_INSTANCE: {
+		case Node_Type::MESH_REF: {
 			// Set `Draw_Command::Pipeline`.
 
-			draw_command.pipeline = &renderer.mesh_pipeline;
-
-			// Now, we have to iterate over all mesh handles in `Node::Mesh_Instance` and emit a draw command for each
-			// one.
-
-			for (size_t mesh_handle_index = 0; mesh_handle_index < node->mesh_instance.mesh_handles.count;
-				 ++mesh_handle_index)
+			if (renderer_settings.is_debug_triangle_enabled)
 			{
-				// Set `Draw_Command::Mesh_Device`.
-
-				const Pool_Handle<Mesh> host_handle_mesh = node->mesh_instance.mesh_handles.buffer[mesh_handle_index];
-
-				if (host_handle_mesh == POOL_HANDLE_NONE<Mesh>)
-				{
-					continue;
-				}
-
-				// Transfer host mesh to device. `transfer_mesh` will handle duplicated meshes correctly.
-				BLK_IF_NOT_SUCCESS(transfer_mesh(context, arena, host_handle_mesh, draw_command.mesh_device))
-				{
-					BLK_ERROR("Failed to transfer host mesh #%u to device\n", mesh_handle_index);
-					continue;
-				}
-
-				// Set `Draw_Command::Material_Device`.
-
-				// A `Mesh_Instance` has always the same mesh handles than material handles.
-				const Pool_Handle<Material> host_material_handle =
-					node->mesh_instance.material_handles.buffer[mesh_handle_index];
-
-				BLK_IF_NOT_SUCCESS(transfer_material(
-					context,
-					renderer.descriptor_layouts,
-					arena,
-					host_material_handle,
-					draw_command.material_device
-				))
-				{
-					BLK_ERROR("Failed to transfer host material #%u to device\n", mesh_handle_index);
-					continue;
-				}
-
-				// Push `draw_command` to the current `frame`.
-				push(frame.mesh_draw_commands, draw_command);
+				draw_command.pipeline = &renderer.debug_mesh_triangles_pipeline;
 			}
+			else
+			{
+				draw_command.pipeline = &renderer.mesh_pipeline;
+			}
+
+			// Set `Draw_Command::mesh_device`.
+
+			const Pool_Handle<Mesh> host_handle_mesh = node->mesh_ref.mesh_handle;
+
+			if (host_handle_mesh == POOL_HANDLE_NONE<Mesh>)
+			{
+				continue;
+			}
+
+			// Transfer host mesh to device. `transfer_mesh` will handle duplicated meshes correctly.
+			BLK_IF_NOT_SUCCESS(transfer_mesh(context, arena, host_handle_mesh, draw_command.mesh_device))
+			{
+				BLK_ERROR("Failed to transfer host mesh to device\n");
+				continue;
+			}
+
+			// Set `Draw_Command::material_device`.
+
+			const Pool_Handle<Material> host_material_handle = node->mesh_ref.material_handle;
+
+			BLK_IF_NOT_SUCCESS(transfer_material(
+				context,
+				renderer.descriptor_layouts,
+				arena,
+				host_material_handle,
+				draw_command.material_device
+			))
+			{
+				BLK_ERROR("Failed to transfer host material to device\n");
+				continue;
+			}
+
+			// Push `draw_command` to the current `frame`.
+			push(frame.mesh_draw_commands, draw_command);
 		}
 		break;
 		case Node_Type::POINT_LIGHT: {
@@ -627,6 +847,7 @@ blk::update_frame(const Scene_Graph& scene_graph, const Camera_View& camera_view
 			// A point light contributes no geometry, so it emits no draw command. We only store its position and
 			// color in the arrays declared at the start of this function.
 
+			// TODO (Bug): this is the position relative to the parent, not the world position from `world_matrix`.
 			light_ubo.light_positions[light_ubo.light_count].vector = node->transform.position;
 
 			// We have to convert the light color to linear space.
@@ -643,28 +864,23 @@ blk::update_frame(const Scene_Graph& scene_graph, const Camera_View& camera_view
 		}
 		break;
 		case Node_Type::DIRECTIONAL_LIGHT: {
-			if (node->directional_light.is_sun)
-			{
-				if (sun_exists)
-				{
-					BLK_ERROR("A sun in the scene already exists\n");
-					continue;
-				}
+			// Rebuild this node's handle to find out whether it is the sun.
 
+			if (const Pool_Handle<Node> node_handle = {.id = node_slot_index, .version = node_slot.version};
+				node_handle == settings.atmosphere.sun_node_handle)
+			{
 				// We strip the translation component from the view matrix.
 
-				if (const Matrix4 view_no_translation = init_matrix4(init_matrix3(camera_view.view));
-					inverse(camera_view.projection * view_no_translation, skybox_ubo.inversed_view_projection) !=
+				if (const Matrix4 view_no_translation = init_matrix4(init_matrix3(renderer_settings.view));
+					inverse(renderer_settings.projection * view_no_translation, skybox_ubo.inversed_view_projection) !=
 					Result::SUCCESS)
 				{
 					BLK_ERROR("Failed to compute the inverse matrix for the sun\n");
 					continue;
 				}
 
-				sun_exists = true;
-
 				// Set skybox UBO.
-				skybox_ubo.view_height = camera_view.view_position.y;
+				skybox_ubo.view_height = renderer_settings.view_position.y;
 
 				// Compute sun forward vector.
 				const Vector3 forward = to_cartesian(node->transform.rotation);
@@ -675,6 +891,16 @@ blk::update_frame(const Scene_Graph& scene_graph, const Camera_View& camera_view
 				// Convert sun radius to radians.
 				skybox_ubo.sun_radius = to_radians(Degrees{node->transform.scale.x});
 
+				// The sun color tints its intensity. We have to convert it to linear space.
+				const Color_RGB<float> linear_color = convert_srgb_to_linear(node->directional_light.color);
+				const float intensity = node->directional_light.intensity;
+
+				skybox_ubo.sun_intensity = Vector3{
+					.x = linear_color.r * intensity,
+					.y = linear_color.g * intensity,
+					.z = linear_color.b * intensity,
+				};
+
 				// Create draw command.
 				draw_command.pipeline = &renderer.skybox_pipeline;
 				push(frame.skybox_draw_commands, draw_command);
@@ -683,6 +909,67 @@ blk::update_frame(const Scene_Graph& scene_graph, const Camera_View& camera_view
 			{
 				// TODO (Feature): normal directional lights are not implemented yet.
 			}
+		}
+		break;
+		case Node_Type::TERRAIN: {
+			if (renderer.terrain_heightmap_handle == POOL_HANDLE_NONE<Texture>)
+			{
+				// There is no heightmap to displace the grid with.
+				continue;
+			}
+
+			// Set `Draw_Command::Pipeline`.
+
+			if (renderer_settings.is_debug_triangle_enabled)
+			{
+				draw_command.pipeline = &renderer.debug_terrain_triangles_pipeline;
+			}
+			else
+			{
+				draw_command.pipeline = &renderer.terrain_pipeline;
+			}
+
+			// Set `Draw_Command::terrain_constants`.
+
+			draw_command.terrain_constants.model = node->world_matrix;
+			draw_command.terrain_constants.uv_offset = node->terrain_ref.uv_offset;
+			draw_command.terrain_constants.uv_scale = node->terrain_ref.uv_scale;
+
+			// Set `Draw_Command::mesh_device`.
+
+			const Pool_Handle<Mesh> host_grid_handle =
+				settings.terrain.chunk_grid_handles.buffer[node->terrain_ref.lod];
+
+			if (host_grid_handle == POOL_HANDLE_NONE<Mesh>)
+			{
+				continue;
+			}
+
+			// Transfer host grid to device. `transfer_mesh` will handle duplicated meshes correctly.
+			BLK_IF_NOT_SUCCESS(transfer_mesh(context, arena, host_grid_handle, draw_command.mesh_device))
+			{
+				BLK_ERROR("Failed to transfer host terrain grid to device\n");
+				continue;
+			}
+
+			// Set `Draw_Command::material_device`.
+			// TODO (Feature): Terrain is shaded with the fallback material, which `get_material` returns for a none
+			// handle. It should blend several material layers with masks.
+
+			BLK_IF_NOT_SUCCESS(transfer_material(
+				context,
+				renderer.descriptor_layouts,
+				arena,
+				POOL_HANDLE_NONE<Material>,
+				draw_command.material_device
+			))
+			{
+				BLK_ERROR("Failed to transfer terrain material to device\n");
+				continue;
+			}
+
+			// Push `draw_command` to the current `frame`.
+			push(frame.terrain_draw_commands, draw_command);
 		}
 		break;
 		}
@@ -720,6 +1007,15 @@ blk::update_frame(const Scene_Graph& scene_graph, const Camera_View& camera_view
 	BLK_IF_NOT_SUCCESS(update_buffer(frame.skybox_buffer, &skybox_ubo, sizeof(Skybox_UBO), 0))
 	{
 		BLK_ERROR("Failed to update skybox UBO\n");
+
+		return;
+	}
+
+	// Update terrain UBO.
+
+	BLK_IF_NOT_SUCCESS(update_buffer(frame.terrain_buffer, &terrain_ubo, sizeof(Terrain_UBO), 0))
+	{
+		BLK_ERROR("Failed to update terrain UBO\n");
 
 		return;
 	}
@@ -783,7 +1079,13 @@ blk::render_frame(const World_Settings& settings)
 		frame.descriptor_set,
 	}};
 
-	if (settings.enable_skybox_transmittance)
+	// TODO (Bug): the skybox passes below run even when `Atmosphere_Settings::sun_node_handle` does not resolve to a
+	// live node. `update_frame` then leaves the sun-dependent `Skybox_UBO` fields zeroed (`inversed_view_projection`,
+	// `sun_direction`, `sun_intensity`, `view_height`), so the shaders compute on `normalize(0)` and the device is lost
+	// within the first frames. Without a sun, every LUT should be cleared with `clear_skybox_lut` instead of
+	// dispatched.
+
+	if (settings.atmosphere.enable_transmittance)
 	{
 		// Compute the skybox transmittance LUT.
 
@@ -847,11 +1149,12 @@ blk::render_frame(const World_Settings& settings)
 		clear_skybox_lut(
 			frame.command_buffer,
 			frame.skybox_transmittance_lut.image,
+			SKYBOX_LUT_CLEAR_COLOR,
 			VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT
 		);
 	}
 
-	if (settings.enable_skybox_multiscattering)
+	if (settings.atmosphere.enable_multiscattering)
 	{
 		// Compute the skybox multiscattering LUT.
 		//
@@ -917,11 +1220,12 @@ blk::render_frame(const World_Settings& settings)
 		clear_skybox_lut(
 			frame.command_buffer,
 			frame.skybox_multiscattering_lut.image,
+			SKYBOX_LUT_CLEAR_COLOR,
 			VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT
 		);
 	}
 
-	if (settings.enable_skybox_sky_view)
+	if (settings.atmosphere.enable_sky_view)
 	{
 		// Compute skybox sky-view LUT.
 
@@ -982,7 +1286,83 @@ blk::render_frame(const World_Settings& settings)
 	}
 	else
 	{
-		clear_skybox_lut(frame.command_buffer, frame.skybox_sky_view_lut.image, VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT);
+		clear_skybox_lut(
+			frame.command_buffer,
+			frame.skybox_sky_view_lut.image,
+			SKYBOX_LUT_CLEAR_COLOR,
+			VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT
+		);
+	}
+
+	if (settings.atmosphere.enable_aerial)
+	{
+		// Compute the skybox aerial perspective LUT.
+		//
+		// It samples the transmittance and multiscattering LUTs, so it runs after both passes above.
+
+		// Transition skybox aerial image to write.
+		transition_image_layout(
+			frame.command_buffer,
+			frame.skybox_aerial_lut.image,
+			VK_IMAGE_LAYOUT_UNDEFINED,
+			VK_IMAGE_LAYOUT_GENERAL,
+			{},
+			VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
+			VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
+			VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+			VK_IMAGE_ASPECT_COLOR_BIT
+		);
+
+		// Bind skybox aerial pipeline.
+		vkCmdBindPipeline(
+			frame.command_buffer,
+			VK_PIPELINE_BIND_POINT_COMPUTE,
+			renderer.skybox_aerial_pipeline.pipeline
+		);
+
+		// Bind skybox aerial descriptor sets.
+		vkCmdBindDescriptorSets(
+			frame.command_buffer,
+			VK_PIPELINE_BIND_POINT_COMPUTE,
+			renderer.skybox_aerial_pipeline.layout,
+			0,
+			frame_descriptor_sets.capacity,
+			frame_descriptor_sets.buffer,
+			0,
+			nullptr
+		);
+
+		// Dispatch.
+		// One thread per froxel column, which walks every depth slice itself.
+		vkCmdDispatch(
+			frame.command_buffer,
+			SKYBOX_AERIAL_LUT_WIDTH / SKYBOX_AERIAL_WORKGROUP_SIZE,
+			SKYBOX_AERIAL_LUT_HEIGHT / SKYBOX_AERIAL_WORKGROUP_SIZE,
+			1
+		);
+
+		// Transition the skybox aerial LUT so that it can be sampled. Section 5.4 applies it from the fragment stage,
+		// over opaque geometry after lighting.
+		transition_image_layout(
+			frame.command_buffer,
+			frame.skybox_aerial_lut.image,
+			VK_IMAGE_LAYOUT_GENERAL,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
+			VK_ACCESS_2_SHADER_READ_BIT,
+			VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+			VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+			VK_IMAGE_ASPECT_COLOR_BIT
+		);
+	}
+	else
+	{
+		clear_skybox_lut(
+			frame.command_buffer,
+			frame.skybox_aerial_lut.image,
+			SKYBOX_AERIAL_LUT_CLEAR_COLOR,
+			VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT
+		);
 	}
 
 	// Transition current swapchain image to write.
@@ -1149,6 +1529,76 @@ blk::render_frame(const World_Settings& settings)
 			1,
 			mesh_draw_command.mesh_device.first_index,
 			static_cast<int32_t>(mesh_draw_command.mesh_device.first_vertex),
+			0
+		);
+	}
+
+	// Iterate over frame terrain draw commands and emit draw calls.
+
+	if (frame.terrain_draw_commands.count > 0)
+	{
+		// The terrain pipeline layout has different push constant ranges than the mesh one, so it is not compatible for
+		// any set and the sets bound above are disturbed (see "compatible for set N" in
+		// `External/Vulkan-Docs-main/chapters/descriptorsets.adoc`). We rebind them, and the debug terrain triangles
+		// pipeline shares the same layout definition, so they stay valid for it.
+
+		vkCmdBindDescriptorSets(
+			frame.command_buffer,
+			VK_PIPELINE_BIND_POINT_GRAPHICS,
+			renderer.terrain_pipeline.layout,
+			0,
+			frame_descriptor_sets.capacity,
+			frame_descriptor_sets.buffer,
+			0,
+			nullptr
+		);
+	}
+
+	for (size_t terrain_draw_command_index = 0; terrain_draw_command_index < frame.terrain_draw_commands.count;
+		 ++terrain_draw_command_index)
+	{
+		const Draw_Command& terrain_draw_command = frame.terrain_draw_commands.buffer[terrain_draw_command_index];
+
+		// Bind pipeline.
+
+		// This should not fail unless something is wrong with the implementation.
+		BLK_CHECK(terrain_draw_command.pipeline);
+		vkCmdBindPipeline(
+			frame.command_buffer,
+			VK_PIPELINE_BIND_POINT_GRAPHICS,
+			terrain_draw_command.pipeline->pipeline
+		);
+
+		// Bind descriptor sets specific for terrain.
+
+		vkCmdBindDescriptorSets(
+			frame.command_buffer,
+			VK_PIPELINE_BIND_POINT_GRAPHICS,
+			terrain_draw_command.pipeline->layout,
+			2,
+			1,
+			&terrain_draw_command.material_device.descriptor_set,
+			0,
+			nullptr
+		);
+
+		// Push `Terrain_Constants`.
+
+		vkCmdPushConstants(
+			frame.command_buffer,
+			terrain_draw_command.pipeline->layout,
+			VK_SHADER_STAGE_VERTEX_BIT,
+			0,
+			sizeof(Terrain_Constants),
+			&terrain_draw_command.terrain_constants
+		);
+
+		vkCmdDrawIndexed(
+			frame.command_buffer,
+			terrain_draw_command.mesh_device.index_count,
+			1,
+			terrain_draw_command.mesh_device.first_index,
+			static_cast<int32_t>(terrain_draw_command.mesh_device.first_vertex),
 			0
 		);
 	}

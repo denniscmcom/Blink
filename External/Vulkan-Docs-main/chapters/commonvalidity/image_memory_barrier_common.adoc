@@ -1,0 +1,47 @@
+// Copyright 2019-2026 The Khronos Group Inc.
+//
+// SPDX-License-Identifier: CC-BY-4.0
+
+// Common Valid Usage
+// Common to VkImageMemoryBarrier* structs
+// This relies on the following additional attributes set by the command which
+// includes this file:
+//
+//  - {imagelayoutnotignored}, a text that specifies when the image layout is not ignored.
+  * [[VUID-{refpage}-oldLayout-01197]]
+    If {imagelayoutnotignored} pname:oldLayout must: be
+    ename:VK_IMAGE_LAYOUT_UNDEFINED or the current layout of the image
+    subresources affected by the barrier
+  * [[VUID-{refpage}-newLayout-01198]]
+    If {imagelayoutnotignored} pname:newLayout must: not be
+    ename:VK_IMAGE_LAYOUT_UNDEFINED or
+ifdef::VK_EXT_zero_initialize_device_memory[ename:VK_IMAGE_LAYOUT_ZERO_INITIALIZED_EXT or]
+    ename:VK_IMAGE_LAYOUT_PREINITIALIZED
+  * [[VUID-{refpage}-image-09117]]
+    If pname:image was created with a sharing mode of
+    ename:VK_SHARING_MODE_EXCLUSIVE, and pname:srcQueueFamilyIndex and
+    pname:dstQueueFamilyIndex are not equal, pname:srcQueueFamilyIndex must:
+    be
+ifdef::VK_BASE_VERSION_1_1,VK_KHR_external_memory[]
+    ename:VK_QUEUE_FAMILY_EXTERNAL,
+ifdef::VK_EXT_queue_family_foreign[]
+    ename:VK_QUEUE_FAMILY_FOREIGN_EXT,
+endif::VK_EXT_queue_family_foreign[]
+    or
+endif::VK_BASE_VERSION_1_1,VK_KHR_external_memory[]
+    a valid queue family
+  * [[VUID-{refpage}-image-09118]]
+    If pname:image was created with a sharing mode of
+    ename:VK_SHARING_MODE_EXCLUSIVE, and pname:srcQueueFamilyIndex and
+    pname:dstQueueFamilyIndex are not equal, pname:dstQueueFamilyIndex must:
+    be
+ifdef::VK_BASE_VERSION_1_1,VK_KHR_external_memory[]
+    ename:VK_QUEUE_FAMILY_EXTERNAL,
+ifdef::VK_EXT_queue_family_foreign[]
+    ename:VK_QUEUE_FAMILY_FOREIGN_EXT,
+endif::VK_EXT_queue_family_foreign[]
+    or
+endif::VK_BASE_VERSION_1_1,VK_KHR_external_memory[]
+    a valid queue family
+include::{chapters}/commonvalidity/barrier_queue_family_common.adoc[]
+// Common Valid Usage

@@ -5,47 +5,71 @@
 
 #include "Engine/Editor/Menu.hpp"
 
+#include "Engine/Core/Array.hpp"
 #include "Engine/Editor/Console.hpp"
 #include "Engine/Editor/Context.hpp"
-#include "Engine/Editor/Material/Settings.hpp"
+#include "Engine/Editor/Scene_Graph.hpp"
+#include "Engine/Editor/Settings.hpp"
+#include "Engine/Editor/Stats.hpp"
 #include "Engine/Editor/Toolbar.hpp"
-#include "Engine/Editor/World/Outliner.hpp"
-#include "Engine/Editor/World/Stats.hpp"
 #include "Engine/Platform/Assert.hpp"
-#include "Engine/World/World.hpp"
 
 #include <imgui.h>
+
+namespace
+{
+/// Menu entry that shows or hides a widget.
+struct Widget_Toggle
+{
+	/// Menu item label.
+	const char* label;
+	/// Visibility flag of the widget.
+	bool* is_shown;
+	/// Pointer to a function to draw the widget.
+	void (*draw)(blk::Editor_Context& context);
+	/// Pointer to widget size. Reset when hidden so it does not take up space.
+	ImVec2* size;
+};
+}  // namespace
 
 void
 blk::draw_menu(Editor_Context& context)
 {
-	if (!BLK_VERIFY(context.world_context.game_world) || !BLK_VERIFY(context.input_state))
-	{
-		return;
-	}
-
-	// First we draw the options and store the action.
+	const Array widget_toggles = {{
+		Widget_Toggle{
+			.label = "Show toolbar",
+			.is_shown = &context.is_showing_toolbar,
+			.draw = draw_toolbar,
+			.size = &context.toolbar_size,
+		},
+		Widget_Toggle{
+			.label = "Show scene graph",
+			.is_shown = &context.is_showing_scene_graph,
+			.draw = draw_scene_graph,
+			.size = &context.scene_graph_size,
+		},
+		Widget_Toggle{
+			.label = "Show settings",
+			.is_shown = &context.is_showing_settings,
+			.draw = draw_settings,
+			.size = &context.settings_size,
+		},
+		Widget_Toggle{
+			.label = "Show console",
+			.is_shown = &context.is_showing_console,
+			.draw = draw_console,
+			.size = &context.console_size,
+		},
+		Widget_Toggle{
+			.label = "Show stats",
+			.is_shown = &context.is_showing_stats,
+			.draw = draw_stats,
+			.size = &context.stats_size,
+		},
+	}};
 
 	if (ImGui::BeginMainMenuBar())
 	{
-		// File category.
-		// Anything related to create, or open files that affect the entire engine context should be here.
-
-		if (ImGui::BeginMenu("File"))
-		{
-			if (ImGui::MenuItem("Create project", "Ctrl+N"))
-			{
-				BLK_NOT_IMPLEMENTED();
-			}
-
-			if (ImGui::MenuItem("Load project", "Ctrl+O"))
-			{
-				BLK_NOT_IMPLEMENTED();
-			}
-
-			ImGui::EndMenu();
-		}
-
 		// Edit category.
 		// Anything related to editting the general engine context.
 
@@ -69,58 +93,37 @@ blk::draw_menu(Editor_Context& context)
 
 		if (ImGui::BeginMenu("View"))
 		{
-			const bool show_all = context.world_context.show_outliner && context.world_context.show_stats &&
-								  context.world_context.show_console;
-			const bool hide_all = !context.world_context.show_outliner && !context.world_context.show_stats &&
-								  !context.world_context.show_console;
 
-			if (ImGui::MenuItem("Show all", "Ctrl+Shift+H", show_all))
+			bool is_all_shown = true;
+			bool is_all_hidden = true;
+
+			for (size_t i = 0; i < widget_toggles.capacity; ++i)
 			{
-				context.show_toolbar = true;
-
-				context.world_context.show_console = true;
-				context.world_context.show_outliner = true;
-				context.world_context.show_stats = true;
-
-				context.material_context.show_material_settings = true;
+				is_all_shown &= *widget_toggles.buffer[i].is_shown;
+				is_all_hidden &= !*widget_toggles.buffer[i].is_shown;
 			}
 
-			if (ImGui::MenuItem("Hide all", "Ctrl+H", hide_all))
+			if (ImGui::MenuItem("Show all", "Ctrl+Shift+H", is_all_shown))
 			{
-				context.show_toolbar = false;
+				for (size_t i = 0; i < widget_toggles.capacity; ++i)
+				{
+					*widget_toggles.buffer[i].is_shown = true;
+				}
+			}
 
-				context.world_context.show_console = false;
-				context.world_context.show_outliner = false;
-				context.world_context.show_stats = false;
-
-				context.material_context.show_material_settings = false;
+			if (ImGui::MenuItem("Hide all", "Ctrl+H", is_all_hidden))
+			{
+				for (size_t i = 0; i < widget_toggles.capacity; ++i)
+				{
+					*widget_toggles.buffer[i].is_shown = false;
+				}
 			}
 
 			ImGui::Separator();
 
-			switch (context.mode)
+			for (size_t i = 0; i < widget_toggles.capacity; ++i)
 			{
-			case Editor_Mode::WORLD:
-				ImGui::MenuItem("Show outliner", nullptr, &context.world_context.show_outliner);
-				ImGui::MenuItem("Show stats", nullptr, &context.world_context.show_stats);
-				ImGui::MenuItem("Show console", nullptr, &context.world_context.show_console);
-				break;
-			case Editor_Mode::MATERIAL:
-				ImGui::MenuItem("Show material settings", nullptr, &context.material_context.show_material_settings);
-				break;
-			}
-
-			ImGui::EndMenu();
-		}
-
-		// Help category.
-		// Anything related to helping the user use the engine.
-
-		if (ImGui::BeginMenu("Help"))
-		{
-			if (ImGui::MenuItem("About", nullptr))
-			{
-				BLK_NOT_IMPLEMENTED();
+				ImGui::MenuItem(widget_toggles.buffer[i].label, nullptr, widget_toggles.buffer[i].is_shown);
 			}
 
 			ImGui::EndMenu();
@@ -129,38 +132,19 @@ blk::draw_menu(Editor_Context& context)
 		ImGui::EndMainMenuBar();
 	}
 
-	// Then we draw widgets based on the user's intentions stored previously.
+	// Widgets are laid out around each other's sizes, so a hidden widget resets its size to not take up space.
 
-	if (context.show_toolbar)
+	for (size_t i = 0; i < widget_toggles.capacity; ++i)
 	{
-		draw_toolbar(context);
-	}
-
-	switch (context.mode)
-	{
-	case Editor_Mode::WORLD: {
-		if (context.world_context.show_outliner)
+		if (*widget_toggles.buffer[i].is_shown)
 		{
-			draw_outliner(context);
+			BLK_CHECK(widget_toggles.buffer[i].draw);
+			widget_toggles.buffer[i].draw(context);
 		}
-
-		if (context.world_context.show_stats)
+		else
 		{
-			draw_stats(context);
+			BLK_CHECK(widget_toggles.buffer[i].size);
+			*widget_toggles.buffer[i].size = {};
 		}
-
-		if (context.world_context.show_console)
-		{
-			draw_console(context);
-		}
-	}
-	break;
-	case Editor_Mode::MATERIAL: {
-		if (context.material_context.show_material_settings)
-		{
-			draw_material_settings(context);
-		}
-	}
-	break;
 	}
 }

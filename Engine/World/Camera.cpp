@@ -15,7 +15,7 @@
 blk::Matrix4
 blk::init_view_matrix(Scene_Graph& scene_graph, const Camera& camera)
 {
-	const Node* node = get(scene_graph.nodes, camera.node_handle);
+	const Node* node = get_node(scene_graph, camera.node_handle);
 
 	if (!BLK_VERIFY(node))
 	{
@@ -23,12 +23,14 @@ blk::init_view_matrix(Scene_Graph& scene_graph, const Camera& camera)
 		return init_identity_matrix();
 	}
 
-	const Matrix4 rotation_matrix = init_rotation_matrix(node->transform.rotation);
+	// The camera can be parented to any node, so we use its world matrix instead of its local transform. Columns 1, 2
+	// and 3 are its up axis, forward axis and position.
 
-	const Vector4 forward4 = rotation_matrix * Vector4{.x = 0.0f, .y = 0.0f, .z = 1.0f, .w = 0.0f};
-	const Vector4 up4 = rotation_matrix * Vector4{.x = 0.0f, .y = 1.0f, .z = 0.0f, .w = 0.0f};
+	const Vector4& up4 = node->world_matrix.columns[1];
+	const Vector4& forward4 = node->world_matrix.columns[2];
+	const Vector4& eye4 = node->world_matrix.columns[3];
 
-	const Vector3 eye = node->transform.position;
+	const Vector3 eye = {.x = eye4.x, .y = eye4.y, .z = eye4.z};
 	const Vector3 forward = {.x = forward4.x, .y = forward4.y, .z = forward4.z};
 	const Vector3 up = {.x = up4.x, .y = up4.y, .z = up4.z};
 

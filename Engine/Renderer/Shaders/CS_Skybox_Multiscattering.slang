@@ -37,14 +37,21 @@ cs_main(uint3 thread_id : SV_DispatchThreadID)
 
 	float height = 0.0f;
 	float cos_sun_zenith_angle = 0.0f;
-	multiscattering_uv_to_parameters(uv, lut_size, height, cos_sun_zenith_angle);
+	multiscattering_uv_to_parameters(
+		uv,
+		lut_size,
+		skybox_ubo.planet_radius,
+		skybox_ubo.atmosphere_radius,
+		height,
+		cos_sun_zenith_angle
+	);
 
 	// On the ground a downward ray meets the planet at a distance of zero, which reads as a miss and lets the march
 	// run straight through it. Lift the sample point off the surface, as the sky-view LUT lifts the view.
 	height = max(height, MINIMUM_VIEW_HEIGHT);
 
 	// Only the altitude matters, so the sample point `x_s` can sit on the zenith axis with the sun swung down from it.
-	float3 sample_position = float3(0.0f, PLANET_RADIUS + height, 0.0f);
+	float3 sample_position = float3(0.0f, skybox_ubo.planet_radius + height, 0.0f);
 
 	float sin_sun_zenith_angle = sqrt(saturate(1.0f - cos_sun_zenith_angle * cos_sun_zenith_angle));
 	float3 sun_direction = float3(sin_sun_zenith_angle, cos_sun_zenith_angle, 0.0f);
@@ -85,7 +92,7 @@ cs_main(uint3 thread_id : SV_DispatchThreadID)
 		// The sample point is always inside the atmosphere, so `t0` is behind us and the exit point `t1` is the far
 		// end of the segment we have to integrate over.
 
-		if (!intersect_ray_sphere(sample_position, direction, ATMOSPHERE_RADIUS, t0, t1))
+		if (!intersect_ray_sphere(sample_position, direction, skybox_ubo.atmosphere_radius, t0, t1))
 		{
 			// There is no atmosphere, so nothing to integrate.
 			continue;
@@ -97,7 +104,8 @@ cs_main(uint3 thread_id : SV_DispatchThreadID)
 		// There are two things that can stop a ray:
 		// - It runs out of air (no atmosphere): atmosphere's far root `t1`.
 		// - It hits the ground: planet's near root `t0`.
-		bool hits_ground = intersect_ray_sphere(sample_position, direction, PLANET_RADIUS, t0, t1) && t0 > 0.0f;
+		bool hits_ground =
+			intersect_ray_sphere(sample_position, direction, skybox_ubo.planet_radius, t0, t1) && t0 > 0.0f;
 
 		if (hits_ground)
 		{
@@ -121,10 +129,20 @@ cs_main(uint3 thread_id : SV_DispatchThreadID)
 
 			// Distance from the planet center, and the altitude above its surface, of the sample point.
 			float step_radius = length(step_position);
-			float step_height = step_radius - PLANET_RADIUS;
+			float step_height = step_radius - skybox_ubo.planet_radius;
 
 			// We sample the medium at the current height.
-			Medium_Sample medium_sample = sample_medium(step_height);
+			Medium_Sample medium_sample = sample_medium(
+				step_height,
+				skybox_ubo.rayleigh_scattering,
+				skybox_ubo.rayleigh_scale,
+				skybox_ubo.mie_scattering,
+				skybox_ubo.mie_absorption,
+				skybox_ubo.mie_scale,
+				skybox_ubo.ozone_absorption,
+				skybox_ubo.ozone_mid_point,
+				skybox_ubo.ozone_low_point
+			);
 
 			// From this sample point, we march a ray toward the sun. So we have to repeat the previous process but now
 			// from the sample point towards the sun.
@@ -138,8 +156,8 @@ cs_main(uint3 thread_id : SV_DispatchThreadID)
 
 			// Sample point is in the planet shadow, the `Vis` of Eq. 4. Only the planet's own shadow is kept:
 			// shadowing from mountains is dropped, as light scatters around them anyway. Section 5.5.1.
-			bool in_shadow =
-				intersect_ray_sphere(step_position, sun_direction, PLANET_RADIUS, sun_t0, sun_t1) && sun_t0 > 0.0f;
+			bool in_shadow = intersect_ray_sphere(step_position, sun_direction, skybox_ubo.planet_radius, sun_t0, sun_t1)
+				&& sun_t0 > 0.0f;
 
 			if (!in_shadow)
 			{
@@ -147,8 +165,13 @@ cs_main(uint3 thread_id : SV_DispatchThreadID)
 				// Sample from transmittance LUT.
 
 				float sun_step_cos_angle = dot(step_position / step_radius, sun_direction);
-				float2 transmittance_uv =
-					transmittance_parameters_to_uv(step_radius, sun_step_cos_angle, transmittance_lut_size);
+				float2 transmittance_uv = transmittance_parameters_to_uv(
+					step_radius,
+					sun_step_cos_angle,
+					transmittance_lut_size,
+					skybox_ubo.planet_radius,
+					skybox_ubo.atmosphere_radius
+				);
 
 				// A compute shader has no quads to take derivatives across, so picking the level implicitly would make
 				// the shader require `SPV_KHR_compute_shader_derivatives`. The LUT has a single level, so asking for it
@@ -188,12 +211,17 @@ cs_main(uint3 thread_id : SV_DispatchThreadID)
 			// transmittance LUT holds.
 			float ground_cos_sun_angle = saturate(dot(ground_normal, sun_direction));
 
-			float2 transmittance_uv =
-				transmittance_parameters_to_uv(ground_radius, ground_cos_sun_angle, transmittance_lut_size);
+			float2 transmittance_uv = transmittance_parameters_to_uv(
+				ground_radius,
+				ground_cos_sun_angle,
+				transmittance_lut_size,
+				skybox_ubo.planet_radius,
+				skybox_ubo.atmosphere_radius
+			);
 			float3 sun_transmittance = skybox_transmittance_lut.SampleLevel(transmittance_uv, 0.0f).rgb;
 
 			// Lambertian, so the albedo spreads the reflected light over the hemisphere.
-			luminance += transmittance * sun_transmittance * ground_cos_sun_angle * GROUND_ALBEDO / float(PI);
+			luminance += transmittance * sun_transmittance * ground_cos_sun_angle * skybox_ubo.ground_albedo / float(PI);
 		}
 
 		second_order_luminance += luminance;

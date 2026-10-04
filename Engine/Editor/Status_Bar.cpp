@@ -6,10 +6,7 @@
 #include "Engine/Editor/Status_Bar.hpp"
 
 #include "Engine/Editor/Context.hpp"
-#include "Engine/Editor/World/Stats.hpp"
-#include "Engine/Platform/Application.hpp"
-#include "Engine/Platform/Assert.hpp"
-#include "Engine/World/World.hpp"
+#include "Stats.hpp"
 
 #include <imgui.h>
 
@@ -22,10 +19,6 @@ void draw_horizontal_separator();
 void
 blk::draw_status_bar(Editor_Context& context)
 {
-	if (!BLK_VERIFY(context.world_context.game_world) || !BLK_VERIFY(context.input_state))
-	{
-		return;
-	}
 
 	// Get the ImGui viewport.
 	const ImGuiViewport* viewport = ImGui::GetMainViewport();
@@ -33,23 +26,21 @@ blk::draw_status_bar(Editor_Context& context)
 	// Compute the status bar size and position.
 	// The status bar should fill the entire width of the viewport. It's height is just enough to fit text.
 
-	context.viewport_context.status_bar_size = ImVec2(viewport->WorkSize.x, ImGui::GetFrameHeight());
+	context.status_bar_size = ImVec2(viewport->WorkSize.x, ImGui::GetFrameHeight());
 
-	context.viewport_context.status_bar_position.x = viewport->WorkPos.x;
-	context.viewport_context.status_bar_position.y =
-		viewport->WorkPos.y + viewport->WorkSize.y - context.viewport_context.status_bar_size.y;
+	context.status_bar_position.x = viewport->WorkPos.x;
+	context.status_bar_position.y = viewport->WorkPos.y + viewport->WorkSize.y - context.status_bar_size.y;
 
-	context.viewport_context.status_bar_padding.x = ImGui::GetStyle().WindowPadding.x;
-	context.viewport_context.status_bar_padding.y =
-		(context.viewport_context.status_bar_size.y - ImGui::GetTextLineHeight()) * 0.5f;
+	context.status_bar_padding.x = ImGui::GetStyle().WindowPadding.x;
+	context.status_bar_padding.y = (context.status_bar_size.y - ImGui::GetTextLineHeight()) * 0.5f;
 
 	// Pass size and position information to ImGui.
 
-	ImGui::SetNextWindowPos(context.viewport_context.status_bar_position);
-	ImGui::SetNextWindowSize(context.viewport_context.status_bar_size);
+	ImGui::SetNextWindowPos(context.status_bar_position);
+	ImGui::SetNextWindowSize(context.status_bar_size);
 
 	// Set padding.
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, context.viewport_context.status_bar_padding);
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, context.status_bar_padding);
 
 	// The status bar is not movable by the user, should not have any decorations and it is always visible.
 
@@ -76,12 +67,7 @@ blk::draw_status_bar(Editor_Context& context)
 		draw_horizontal_separator();
 
 		// Display which camera is used; editor or in-game.
-		ImGui::Text(
-			"Camera: %s",
-			context.world_context.editor_camera_handle == context.world_context.game_world->active_camera_handle
-				? "Editor"
-				: "Game"
-		);
+		ImGui::Text("Camera: %s", context.world_context.is_editor_camera_active ? "Editor" : "Game");
 
 		draw_horizontal_separator();
 
@@ -93,6 +79,9 @@ blk::draw_status_bar(Editor_Context& context)
 	}
 	break;
 	case Editor_Mode::MATERIAL: {
+	}
+	break;
+	case Editor_Mode::PREFAB: {
 	}
 	break;
 	}

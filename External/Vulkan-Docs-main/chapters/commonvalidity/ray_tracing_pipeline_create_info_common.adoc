@@ -1,0 +1,32 @@
+// Copyright 2019-2026 The Khronos Group Inc.
+//
+// SPDX-License-Identifier: CC-BY-4.0
+
+// Common Valid Usage
+// common to VkRayTracingPipelineCreateInfo* structures
+  * [[VUID-{refpage}-pStages-03426]]
+    The shader code for the entry points identified by pname:pStages, and
+    the rest of the state identified by this structure must: adhere to the
+    pipeline linking rules described in the <<interfaces,Shader Interfaces>>
+    chapter
+  * [[VUID-{refpage}-layout-03428]]
+    The number of resources in pname:layout accessible to each shader stage
+    that is used by the pipeline must: be less than or equal to
+    slink:VkPhysicalDeviceLimits::pname:maxPerStageResources
+ifdef::VK_NV_device_generated_commands[]
+  * [[VUID-{refpage}-flags-02904]]
+    pname:flags must: not include
+    ename:VK_PIPELINE_CREATE_INDIRECT_BINDABLE_BIT_NV
+endif::VK_NV_device_generated_commands[]
+ifdef::VK_COMPUTE_VERSION_1_4,VK_EXT_pipeline_protected_access[]
+  * [[VUID-{refpage}-flags-12341]]
+    pname:flags must: not include
+    ename:VK_PIPELINE_CREATE_NO_PROTECTED_ACCESS_BIT nor
+    ename:VK_PIPELINE_CREATE_PROTECTED_ACCESS_ONLY_BIT
+endif::VK_COMPUTE_VERSION_1_4,VK_EXT_pipeline_protected_access[]
+ifdef::VK_EXT_graphics_pipeline_library[]
+  * [[VUID-{refpage}-layout-12402]]
+    If pname:layout is not dlink:VK_NULL_HANDLE, it must: not have been
+    created with ename:VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT
+endif::VK_EXT_graphics_pipeline_library[]
+// Common Valid Usage

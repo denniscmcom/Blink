@@ -16,17 +16,11 @@ struct Transform
 {
 	/// Position data.
 	Vector3 position;
-	// TODO: Use quaternions.
-	/// Rotation data.
+	/// Rotation data. TODO (Feature): Use quaternions.
 	Vector3 rotation;
 	/// Scale data.
 	Vector3 scale = {.x = 1.0f, .y = 1.0f, .z = 1.0f};
 };
-
-// TODO (Bug): `Node` transforms are not inherited. This composes a single `Transform` with no knowledge of the tree,
-// and `Renderer.cpp` feeds its result straight to the draw command, so moving a parent node does not move its
-// children. `Scene_Graph` should own a `world_transform` per `Node` and a pass that walks the tree root-down filling
-// it -`world = parent_world * local`-, and `Renderer/` should read that instead of composing per node.
 
 /// Initializes the transform matrix given a `Transform`.
 Matrix4 init_transform_matrix(const Transform& transform);

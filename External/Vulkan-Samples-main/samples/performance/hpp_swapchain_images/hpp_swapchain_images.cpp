@@ -1,0 +1,90 @@
+/* Copyright (c) 2022-2026, NVIDIA CORPORATION. All rights reserved.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Licensed under the Apache License, Version 2.0 the "License";
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#include "hpp_swapchain_images.h"
+#include "common/hpp_utils.h"
+#include "rendering/subpasses/forward_subpass.h"
+
+HPPSwapchainImages::HPPSwapchainImages()
+{
+	auto &config = get_configuration();
+
+	config.insert<vkb::IntSetting>(0, swapchain_image_count, 3);
+	config.insert<vkb::IntSetting>(1, swapchain_image_count, 2);
+}
+
+bool HPPSwapchainImages::prepare(const vkb::ApplicationOptions &options)
+{
+	if (!vkb::VulkanSampleCpp::prepare(options))
+	{
+		return false;
+	}
+
+	load_scene("scenes/sponza/Sponza01.gltf");
+
+	auto &camera_node = vkb::common::add_free_camera(get_scene(), "main_camera", get_render_context().get_surface_extent());
+	camera            = &camera_node.get_component<vkb::sg::Camera>();
+
+	vkb::core::HPPShaderSource vert_shader("base.vert.spv");
+	vkb::core::HPPShaderSource frag_shader("base.frag.spv");
+	auto                       scene_subpass = std::make_unique<vkb::rendering::subpasses::ForwardSubpassCpp>(
+        get_render_context(), std::move(vert_shader), std::move(frag_shader), get_scene(), *camera);
+
+	auto render_pipeline = std::make_unique<vkb::rendering::RenderPipelineCpp>();
+	render_pipeline->add_subpass(std::move(scene_subpass));
+
+	set_render_pipeline(std::move(render_pipeline));
+
+	get_stats().request_stats({vkb::StatIndex::frame_times});
+	create_gui(*window, &get_stats());
+
+	return true;
+}
+
+void HPPSwapchainImages::update(float delta_time)
+{
+	// Process GUI input
+	if (swapchain_image_count != last_swapchain_image_count)
+	{
+		get_device().get_handle().waitIdle();
+
+		// Create a new swapchain with a new swapchain image count
+		get_render_context().update_swapchain(swapchain_image_count);
+
+		last_swapchain_image_count = swapchain_image_count;
+	}
+
+	vkb::VulkanSampleCpp::update(delta_time);
+}
+
+void HPPSwapchainImages::draw_gui()
+{
+	get_gui().show_options_window(
+	    /* body = */
+	    [this]() {
+		    ImGui::RadioButton("Double buffering", &swapchain_image_count, 2);
+		    ImGui::SameLine();
+		    ImGui::RadioButton("Triple buffering", &swapchain_image_count, 3);
+		    ImGui::SameLine();
+	    },
+	    /* lines = */ 1);
+}
+
+std::unique_ptr<vkb::Application> create_hpp_swapchain_images()
+{
+	return std::make_unique<HPPSwapchainImages>();
+}

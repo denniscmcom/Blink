@@ -1,0 +1,86 @@
+/* Copyright (c) 2021-2026, Arm Limited and Contributors
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Licensed under the Apache License, Version 2.0 the "License";
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#pragma once
+
+#include "api_vulkan_sample.h"
+#include <random>
+#include <vector>
+
+class DescriptorIndexing : public ApiVulkanSample
+{
+  public:
+	DescriptorIndexing();
+	~DescriptorIndexing();
+
+  private:
+	void request_gpu_features(vkb::core::PhysicalDeviceC &gpu) override;
+	void render(float delta_time) override;
+	void build_command_buffers() override;
+	void on_update_ui_overlay(vkb::Drawer &drawer) override;
+	bool prepare(const vkb::ApplicationOptions &options) override;
+#if defined(PLATFORM__MACOS)
+	void request_instance_extensions(std::unordered_map<std::string, vkb::RequestMode> &requested_extensions) const override;
+	void request_layer_settings(std::vector<VkLayerSettingEXT> &requested_layer_settings, vkb::StructureChainBuilderC<VkInstanceCreateInfo> &scb) const override;
+#endif
+
+	void create_bindless_descriptors();
+	void create_immutable_sampler_descriptor_set();
+	void create_pipelines();
+
+	struct DescriptorHeap
+	{
+		VkDescriptorSetLayout set_layout{};
+		VkDescriptorPool      descriptor_pool{};
+		VkDescriptorSet       descriptor_set_update_after_bind{};
+		VkDescriptorSet       descriptor_set_nonuniform{};
+	} descriptors;
+
+	struct ImmutableSampler
+	{
+		VkSampler             sampler{};
+		VkDescriptorSetLayout set_layout{};
+		VkDescriptorPool      descriptor_pool{};
+		VkDescriptorSet       descriptor_set{};
+	} sampler;
+
+	struct Pipelines
+	{
+		VkPipelineLayout pipeline_layout{};
+		VkPipeline       update_after_bind{};
+		VkPipeline       non_uniform_indexing{};
+	} pipelines;
+
+	struct TestImage
+	{
+		VkImage        image{};
+		VkImageView    image_view{};
+		VkDeviceMemory memory{};
+	};
+	std::vector<TestImage> test_images;
+	void                   create_images();
+	TestImage              create_image(const float rgb[3], unsigned image_seed);
+
+	VkPhysicalDeviceDescriptorIndexingPropertiesEXT descriptor_indexing_properties{};
+	std::default_random_engine                      rnd{42};
+	std::uniform_real_distribution<float>           distribution{0.0f, 0.1f};
+	uint32_t                                        descriptor_offset{};
+	float                                           accumulated_time{};
+	const VkFormat                                  format = VK_FORMAT_R8G8B8A8_UNORM;
+};
+
+std::unique_ptr<vkb::VulkanSampleC> create_descriptor_indexing();

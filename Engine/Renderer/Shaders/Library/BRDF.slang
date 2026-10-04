@@ -28,6 +28,22 @@ float geometry_smith(float normal_dot_view_direction, float normal_dot_light_dir
 /// @param F0 Reflectance at normal incidence.
 float3 fresnel_schlick(float cos_theta, float3 F0);
 
+/// Cook-Torrance BRDF.
+/// @param normal Normalized surface normal.
+/// @param view_direction Normalized direction from the surface toward the camera.
+/// @param light_direction Normalized direction from the surface toward the light.
+/// @param albedo Base color of the surface.
+/// @param F0 Reflectance at normal incidence.
+float3 cook_torrance(
+	float3 normal,
+	float3 view_direction,
+	float3 light_direction,
+	float3 albedo,
+	float3 F0,
+	float roughness,
+	float metallic
+);
+
 float
 distribution_ggx(float normal_dot_halfway_direction, float roughness)
 {
@@ -61,4 +77,34 @@ float3
 fresnel_schlick(float cos_theta, float3 F0)
 {
 	return F0 + (1.0 - F0) * pow(clamp(1.0 - cos_theta, 0.0, 1.0), 5.0);
+}
+
+float3
+cook_torrance(
+	float3 normal,
+	float3 view_direction,
+	float3 light_direction,
+	float3 albedo,
+	float3 F0,
+	float roughness,
+	float metallic
+)
+{
+	float3 halfway_direction = normalize(light_direction + view_direction);
+
+	float normal_dot_halfway_direction = max(dot(normal, halfway_direction), 0.0);
+	float normal_dot_view_direction = max(dot(normal, view_direction), 0.0);
+	float normal_dot_light_direction = max(dot(normal, light_direction), 0.0);
+	float halfway_direction_dot_view_direction = max(dot(halfway_direction, view_direction), 0.0);
+
+	float NDF = distribution_ggx(normal_dot_halfway_direction, roughness);
+	float G = geometry_smith(normal_dot_view_direction, normal_dot_light_direction, roughness);
+	float3 F = fresnel_schlick(halfway_direction_dot_view_direction, F0);
+
+	float3 reflection = F;
+	float3 refraction = (float3(1.0) - reflection) * (1.0 - metallic);
+
+	float3 specular = (NDF * G * F) / (4.0 * normal_dot_view_direction * normal_dot_light_direction + 0.0001);
+
+	return refraction * albedo / (float)PI + specular;
 }

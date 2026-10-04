@@ -9,10 +9,11 @@
 
 namespace blk
 {
-/// Represents a light that gets emitted from a single point in all directions.
+/// A light that is emitted from a single point in all directions.
 struct Point_Light
 {
-	/// Light color. The default value is full white.
+	/// Light color.
+	/// The default value is full white.
 	Color_RGB<float> color = {.r = 1.0f, .g = 1.0f, .b = 1.0f};
 };
 }  // namespace blk

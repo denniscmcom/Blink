@@ -1,0 +1,93 @@
+// Copyright 2025-2026 The Khronos Group Inc.
+//
+// SPDX-License-Identifier: CC-BY-4.0
+
+// Common Valid Usage
+// Common to vkCmdCopyMemoryToImageIndirect* commands
+  * [[VUID-{refpage}-dstImage-07661]]
+    pname:dstImage must: not be a protected image
+  * [[VUID-{refpage}-aspectMask-07662]]
+    The pname:aspectMask member for every subresource in
+    pname:pImageSubresources must: only have a single bit set
+  * [[VUID-{refpage}-aspectMask-12287]]
+    The pname:aspectMask member for every subresource in
+    pname:pImageSubresources must: specify an aspect present in
+    pname:dstImage
+  * [[VUID-{refpage}-dstImage-07664]]
+    pname:dstImage must: have been created with the
+    ename:VK_IMAGE_USAGE_TRANSFER_DST_BIT usage flag set
+  * [[VUID-{refpage}-dstImage-07665]]
+    If pname:dstImage is non-sparse then the image
+ifdef::VK_BASE_VERSION_1_1,VK_KHR_sampler_ycbcr_conversion[]
+    or each specified _disjoint_ plane
+endif::VK_BASE_VERSION_1_1,VK_KHR_sampler_ycbcr_conversion[]
+    must: be bound completely and contiguously to a single
+    sname:VkDeviceMemory object
+include::{chapters}/commonvalidity/copy_anyimage_to_imageany_single_sampled_common.adoc[]
+  * [[VUID-{refpage}-dstImageLayout-07667]]
+    pname:dstImageLayout must: specify the layout of the image subresources
+    of pname:dstImage at the time this command is executed on a
+    sname:VkDevice
+  * [[VUID-{refpage}-dstImageLayout-07669]]
+    pname:dstImageLayout must: be
+    ename:VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+ifdef::VK_KHR_shared_presentable_image[]
+    ename:VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR,
+endif::VK_KHR_shared_presentable_image[]
+    or ename:VK_IMAGE_LAYOUT_GENERAL
+  * [[VUID-{refpage}-mipLevel-07670]]
+    The specified pname:mipLevel of each region in pname:pImageSubresources
+    must: be less than the pname:mipLevels specified in
+    slink:VkImageCreateInfo when pname:dstImage was created
+  * [[VUID-{refpage}-dstImage-12288]]
+    If pname:dstImage is not of type ename:VK_IMAGE_TYPE_3D, and the
+    specified pname:layerCount of each region in pname:pImageSubresources is
+    not ename:VK_REMAINING_ARRAY_LAYERS, the specified pname:baseArrayLayer
+    {plus} pname:layerCount of each region in pname:pImageSubresources must:
+    be less than or equal to the pname:arrayLayers specified in
+    slink:VkImageCreateInfo when pname:dstImage was created
+  * [[VUID-{refpage}-dstImage-12289]]
+    If pname:dstImage is of type ename:VK_IMAGE_TYPE_3D, and the specified
+    pname:layerCount of each region in pname:pImageSubresources is not
+    ename:VK_REMAINING_ARRAY_LAYERS, for each destination region,
+    [eq]#(pname:imageSubresource.baseArrayLayer {plus}
+    pname:imageSubresource.layerCount)# must: be less than or equal to the
+    depth of the specified subresource
+  * [[VUID-{refpage}-dstImage-12290]]
+    If pname:dstImage is of type ename:VK_IMAGE_TYPE_3D, and the specified
+    pname:layerCount of each region in pname:pImageSubresources is not
+    ename:VK_REMAINING_ARRAY_LAYERS, for each destination region, if
+    [eq]#(pname:imageSubresource.baseArrayLayer {plus}
+    pname:imageSubresource.layerCount)# does not equal the depth of the
+    specified subresource, pname:imageSubresource.layerCount must: be a
+    multiple of the <<formats-compatibility-classes,texel block extent
+    depth>> of the elink:VkFormat of pname:dstImage
+  * [[VUID-{refpage}-dstImage-12291]]
+    If pname:dstImage is of type ename:VK_IMAGE_TYPE_3D, for each
+    destination region, pname:imageSubresource.baseArrayLayer must: be a
+    multiple of the <<formats-compatibility-classes,texel block extent
+    depth>> of the elink:VkFormat of pname:dstImage
+  * [[VUID-{refpage}-dstImage-12292]]
+    If pname:dstImage is of type ename:VK_IMAGE_TYPE_3D, for each
+    destination region, pname:imageSubresource.baseArrayLayer must: be less
+    than or equal to the depth of the specified subresource
+ifdef::VK_EXT_fragment_density_map[]
+  * [[VUID-{refpage}-dstImage-07673]]
+    pname:dstImage must: not have been created with pname:flags containing
+    ename:VK_IMAGE_CREATE_SUBSAMPLED_BIT_EXT
+endif::VK_EXT_fragment_density_map[]
+  * [[VUID-{refpage}-commandBuffer-07674]]
+    If the queue family used to create the slink:VkCommandPool which
+    pname:commandBuffer was allocated from does not support
+    ename:VK_QUEUE_GRAPHICS_BIT, for each region, the pname:aspectMask
+    member of pname:pImageSubresources must: not be
+    ename:VK_IMAGE_ASPECT_DEPTH_BIT or ename:VK_IMAGE_ASPECT_STENCIL_BIT
+  * [[VUID-{refpage}-dstImage-10974]]
+    The format features of pname:dstImage must: contain
+    ename:VK_FORMAT_FEATURE_TRANSFER_DST_BIT
+  * [[VUID-{refpage}-{copyparam}-10975]]
+    Any of the source or destination memory regions specified in
+    pname:{copyparam} must: not overlap with any of the specified
+    destination memory regions at the time this command is executed on
+    device
+// Common Valid Usage

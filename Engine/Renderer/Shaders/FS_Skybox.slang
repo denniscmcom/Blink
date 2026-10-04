@@ -46,7 +46,7 @@ fs_main(VS_Skybox_Output input) : SV_Target
 		float view_height = max(skybox_ubo.view_height / 1000.0f, MINIMUM_VIEW_HEIGHT);
 
 		// Compute view position in planet space.
-		float3 view_position = float3(0.0f, PLANET_RADIUS + view_height, 0.0f);
+		float3 view_position = float3(0.0f, skybox_ubo.planet_radius + view_height, 0.0f);
 
 		float t0 = 0.0f;
 		float t1 = 0.0f;
@@ -54,7 +54,8 @@ fs_main(VS_Skybox_Output input) : SV_Target
 		// The planet hides the sun whenever the ray toward it reaches the ground first. Without this the disk stays
 		// visible through the ground after it has set, since the atmosphere alone barely dims it over the short
 		// distance to the surface.
-		bool hits_ground = intersect_ray_sphere(view_position, direction, PLANET_RADIUS, t0, t1) && t0 > 0.0f;
+		bool hits_ground =
+			intersect_ray_sphere(view_position, direction, skybox_ubo.planet_radius, t0, t1) && t0 > 0.0f;
 
 		if (!hits_ground)
 		{
@@ -64,14 +65,16 @@ fs_main(VS_Skybox_Output input) : SV_Target
 
 			// The view sits on the planet's up axis, so the zenith cosine of the ray is its own Y component.
 			float2 transmittance_uv = transmittance_parameters_to_uv(
-				PLANET_RADIUS + view_height,
+				skybox_ubo.planet_radius + view_height,
 				direction.y,
-				float2(transmittance_lut_width, transmittance_lut_height)
+				float2(transmittance_lut_width, transmittance_lut_height),
+				skybox_ubo.planet_radius,
+				skybox_ubo.atmosphere_radius
 			);
 
 			// The level is named because only part of a quad reaches this branch, which leaves the derivatives an
 			// implicit lookup would need undefined. The LUT has a single level, so it samples the same texels anyway.
-			luminance += skybox_transmittance_lut.SampleLevel(transmittance_uv, 0.0f).rgb * SUN_INTENSITY;
+			luminance += skybox_transmittance_lut.SampleLevel(transmittance_uv, 0.0f).rgb * skybox_ubo.sun_intensity;
 		}
 	}
 

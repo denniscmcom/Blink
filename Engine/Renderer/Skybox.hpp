@@ -66,13 +66,26 @@ static_assert(SKYBOX_SKY_VIEW_LUT_HEIGHT % SKYBOX_SKY_VIEW_WORKGROUP_SIZE == 0);
 static_assert(SKYBOX_AERIAL_LUT_WIDTH % SKYBOX_AERIAL_WORKGROUP_SIZE == 0);
 static_assert(SKYBOX_AERIAL_LUT_HEIGHT % SKYBOX_AERIAL_WORKGROUP_SIZE == 0);
 
-/// Clears a skybox LUT to black and leaves it in `VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL`.
+/// What the transmittance, multiscattering and sky-view LUTs hold while their pass is disabled: no light.
+constexpr VkClearColorValue SKYBOX_LUT_CLEAR_COLOR = {};
+
+/// What the aerial LUT holds while its pass is disabled: no in-scattering and full transmittance. Black would store a
+/// transmittance of zero in its alpha and hide every object behind it instead of leaving them untouched.
+constexpr VkClearColorValue SKYBOX_AERIAL_LUT_CLEAR_COLOR = {.float32 = {0.0f, 0.0f, 0.0f, 1.0f}};
+
+/// Clears a skybox LUT and leaves it in `VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL`.
 ///
 /// A LUT outlives the frame that filled it, so a pass that `World_Settings` disables cannot just skip its dispatch: the
 /// image would keep the texels the last enabled frame wrote, which are the same ones the skipped pass would have
 /// recomputed, and nothing on screen would change. Clearing it is what makes the pass's contribution visible, and it
 /// also gives whoever samples the LUT a defined layout on a pass that has not run since startup.
 ///
+/// @param clear_color What the LUT holds while its pass is disabled.
 /// @param destination_stage The pipeline stages that sample the LUT after the clear.
-void clear_skybox_lut(VkCommandBuffer command_buffer, VkImage image, VkPipelineStageFlags2 destination_stage);
+void clear_skybox_lut(
+	VkCommandBuffer command_buffer,
+	VkImage image,
+	const VkClearColorValue& clear_color,
+	VkPipelineStageFlags2 destination_stage
+);
 }  // namespace blk

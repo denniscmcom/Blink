@@ -40,6 +40,10 @@ struct Input_State
 	///
 	/// Frame-type event.
 	int32_t mouse_delta_y;
+	/// Mouse wheel rotation in notches. Positive away from the user.
+	///
+	/// Frame-type event.
+	float mouse_wheel_delta;
 };
 
 /// Updates `state` with new user input. It is called by `Launcher/` once per frame.

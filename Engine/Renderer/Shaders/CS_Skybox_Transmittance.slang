@@ -29,7 +29,14 @@ cs_main(uint3 thread_id : SV_DispatchThreadID)
 
 	float radius = 0.0f;
 	float cos_angle = 0.0f;
-	transmittance_uv_to_parameters(uv, lut_size, radius, cos_angle);
+	transmittance_uv_to_parameters(
+		uv,
+		lut_size,
+		skybox_ubo.planet_radius,
+		skybox_ubo.atmosphere_radius,
+		radius,
+		cos_angle
+	);
 
 	float3 origin = float3(0.0f, radius, 0.0f);
 	float sin_angle = sqrt(1.0f - cos_angle * cos_angle);
@@ -43,7 +50,7 @@ cs_main(uint3 thread_id : SV_DispatchThreadID)
 	// The ray always starts inside the atmosphere for now, so `t0` is behind us and the exit point `t1 ` is the far end
 	// of the segment we have to integrate over.
 
-	if (!intersect_ray_sphere(origin, direction, ATMOSPHERE_RADIUS, t0, t1))
+	if (!intersect_ray_sphere(origin, direction, skybox_ubo.atmosphere_radius, t0, t1))
 	{
 		// There is no atmosphere, so nothing to integrate.
 		skybox_transmittance_storage_image[thread_id.xy] = float4(1.0f);
@@ -69,9 +76,19 @@ cs_main(uint3 thread_id : SV_DispatchThreadID)
 		float t = dt * (float(i) + 0.5f);
 
 		float3 sample_position = origin + direction * t;
-		float sample_height = length(sample_position) - PLANET_RADIUS;
+		float sample_height = length(sample_position) - skybox_ubo.planet_radius;
 
-		Medium_Sample medium_sample = sample_medium(sample_height);
+		Medium_Sample medium_sample = sample_medium(
+			sample_height,
+			skybox_ubo.rayleigh_scattering,
+			skybox_ubo.rayleigh_scale,
+			skybox_ubo.mie_scattering,
+			skybox_ubo.mie_absorption,
+			skybox_ubo.mie_scale,
+			skybox_ubo.ozone_absorption,
+			skybox_ubo.ozone_mid_point,
+			skybox_ubo.ozone_low_point
+		);
 		optical_depth += medium_sample.S_t * dt;
 	}
 

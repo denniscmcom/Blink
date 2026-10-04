@@ -1,0 +1,45 @@
+// Copyright 2019-2026 The Khronos Group Inc.
+//
+// SPDX-License-Identifier: CC-BY-4.0
+
+// Common Valid Usage
+// Common to VkBufferMemoryBarrier* structs
+  * [[VUID-{refpage}-offset-01187]]
+    pname:offset must: be less than the size of pname:buffer
+  * [[VUID-{refpage}-size-01188]]
+    If pname:size is not equal to ename:VK_WHOLE_SIZE, pname:size must: be
+    greater than `0`
+  * [[VUID-{refpage}-size-01189]]
+    If pname:size is not equal to ename:VK_WHOLE_SIZE, pname:size must: be
+    less than or equal to than the size of pname:buffer minus pname:offset
+  * [[VUID-{refpage}-buffer-01931]]
+    If pname:buffer is non-sparse then it must: be bound completely and
+    contiguously to a single sname:VkDeviceMemory object
+  * [[VUID-{refpage}-buffer-09095]]
+    If pname:buffer was created with a sharing mode of
+    ename:VK_SHARING_MODE_EXCLUSIVE, and pname:srcQueueFamilyIndex and
+    pname:dstQueueFamilyIndex are not equal, pname:srcQueueFamilyIndex must:
+    be
+ifdef::VK_BASE_VERSION_1_1,VK_KHR_external_memory[]
+    ename:VK_QUEUE_FAMILY_EXTERNAL,
+ifdef::VK_EXT_queue_family_foreign[]
+    ename:VK_QUEUE_FAMILY_FOREIGN_EXT,
+endif::VK_EXT_queue_family_foreign[]
+    or
+endif::VK_BASE_VERSION_1_1,VK_KHR_external_memory[]
+    a valid queue family
+  * [[VUID-{refpage}-buffer-09096]]
+    If pname:buffer was created with a sharing mode of
+    ename:VK_SHARING_MODE_EXCLUSIVE, and pname:srcQueueFamilyIndex and
+    pname:dstQueueFamilyIndex are not equal, pname:dstQueueFamilyIndex must:
+    be
+ifdef::VK_BASE_VERSION_1_1,VK_KHR_external_memory[]
+    ename:VK_QUEUE_FAMILY_EXTERNAL,
+ifdef::VK_EXT_queue_family_foreign[]
+    ename:VK_QUEUE_FAMILY_FOREIGN_EXT,
+endif::VK_EXT_queue_family_foreign[]
+    or
+endif::VK_BASE_VERSION_1_1,VK_KHR_external_memory[]
+    a valid queue family
+include::{chapters}/commonvalidity/barrier_queue_family_common.adoc[]
+// Common Valid Usage

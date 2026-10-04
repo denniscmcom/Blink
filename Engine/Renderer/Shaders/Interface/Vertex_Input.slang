@@ -5,13 +5,18 @@
 
 #pragma once
 
-/// Vertex attributes read by the mesh pipeline.
-/// The members should match `get_vertex_uv_input_attribute_descriptions` in `Helpers.cpp`, in both order and format.
-struct VS_Mesh_Input
+/// It should match the host-side `Vertex_UV` struct.
+struct VS_Vertex_UV
 {
 	float3 position;
 	float3 normal;
 	float3 tangent;
 	float3 bitangent;
 	float2 texture_coord;
+};
+
+/// It should match the host-side `Vertex_Spatial` struct.
+struct VS_Vertex_Spatial
+{
+	float3 position;
 };

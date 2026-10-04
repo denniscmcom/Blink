@@ -1,0 +1,2835 @@
+// Copyright 2015-2026 The Khronos Group Inc.
+// Copyright (c) 2020-2023 Huawei Technologies Co. Ltd.
+// Copyright (c) 2018-2020 NVIDIA Corporation
+// SPDX-License-Identifier: CC-BY-4.0
+
+[[drawing]]
+= Drawing Commands
+
+_Drawing commands_ (commands with ftext:Draw in the name) provoke work in a
+graphics pipeline.
+Drawing commands are recorded into a command buffer and when executed by a
+queue, will produce work which executes according to the bound graphics
+ifndef::VK_EXT_shader_object[pipeline.]
+ifdef::VK_EXT_shader_object[]
+pipeline, or if the <<features-shaderObject, pname:shaderObject>> feature is
+enabled, any <<shaders-objects, shader objects>> bound to graphics stages.
+endif::VK_EXT_shader_object[]
+A graphics pipeline
+ifdef::VK_EXT_shader_object[]
+or a combination of one or more graphics shader objects
+endif::VK_EXT_shader_object[]
+must: be bound to a command buffer before any drawing commands are recorded
+in that command buffer.
+
+[open,refpage='VkPipelineInputAssemblyStateCreateInfo',desc='Structure specifying parameters of a newly created pipeline input assembly state',type='structs']
+--
+ifdef::VK_NV_mesh_shader,VK_EXT_mesh_shader[]
+Drawing can be achieved in two modes:
+
+  * <<drawing-mesh-shading,Programmable Mesh Shading>>, the mesh shader
+    assembles primitives, or
+  * <<drawing-primitive-shading,Programmable Primitive Shading>>, the input
+    primitives are assembled as follows.
+
+endif::VK_NV_mesh_shader,VK_EXT_mesh_shader[]
+
+Each draw is made up of zero or more vertices and zero or more instances,
+which are processed by the device and result in the assembly of primitives.
+Primitives are assembled according to the pname:pInputAssemblyState member
+of the slink:VkGraphicsPipelineCreateInfo structure, which is of type
+sname:VkPipelineInputAssemblyStateCreateInfo:
+
+include::{generated}/api/structs/VkPipelineInputAssemblyStateCreateInfo.adoc[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:flags is reserved for future use.
+  * pname:topology is a elink:VkPrimitiveTopology defining the primitive
+    topology, as described below.
+  * pname:primitiveRestartEnable controls whether a special vertex index
+    value is treated as restarting the assembly of primitives.
+    This enable only applies to indexed draws (flink:vkCmdDrawIndexed,
+ifdef::VK_EXT_multi_draw[]
+    flink:vkCmdDrawMultiIndexedEXT,
+endif::VK_EXT_multi_draw[]
+    and flink:vkCmdDrawIndexedIndirect), and the special index value is
+    either 0xFFFFFFFF when the pname:indexType parameter of
+ifdef::VK_GRAPHICS_VERSION_1_4[Vulkan 1.4 or]
+ifdef::VK_KHR_maintenance5[fname:vkCmdBindIndexBuffer2 or]
+    fname:vkCmdBindIndexBuffer is equal to ename:VK_INDEX_TYPE_UINT32;
+ifdef::VK_GRAPHICS_VERSION_1_4,VK_KHR_index_type_uint8,VK_EXT_index_type_uint8[]
+    0xFF when pname:indexType is equal to ename:VK_INDEX_TYPE_UINT8;
+endif::VK_GRAPHICS_VERSION_1_4,VK_KHR_index_type_uint8,VK_EXT_index_type_uint8[]
+    or 0xFFFF when pname:indexType is equal to ename:VK_INDEX_TYPE_UINT16.
+ifndef::VK_EXT_primitive_topology_list_restart[]
+    Primitive restart is not allowed for "`list`" topologies.
+endif::VK_EXT_primitive_topology_list_restart[]
+ifdef::VK_EXT_primitive_topology_list_restart[]
+    Primitive restart is not allowed for "`list`" topologies, unless one of
+    the features <<features-primitiveTopologyPatchListRestart,
+    pname:primitiveTopologyPatchListRestart>> (for
+    ename:VK_PRIMITIVE_TOPOLOGY_PATCH_LIST) or
+    <<features-primitiveTopologyListRestart,
+    pname:primitiveTopologyListRestart>> (for all other list topologies) is
+    enabled.
+endif::VK_EXT_primitive_topology_list_restart[]
+ifdef::VK_EXT_primitive_restart_index[]
+    If the <<features-primitiveRestartIndex, pname:primitiveRestartIndex>>
+    feature is enabled, flink:vkCmdSetPrimitiveRestartIndexEXT can: be used
+    to set a custom index for primitive restart.
+endif::VK_EXT_primitive_restart_index[]
+
+Restarting the assembly of primitives discards the most recent index values
+if those elements formed an incomplete primitive, and restarts the primitive
+assembly using the subsequent indices, but only assembling the immediately
+following element through the end of the originally specified elements.
+The primitive restart index value comparison is performed before adding the
+pname:vertexOffset value to the index value.
+
+.Valid Usage
+****
+  * [[VUID-VkPipelineInputAssemblyStateCreateInfo-topology-06252]]
+    If
+ifdef::VK_EXT_primitive_topology_list_restart[]
+    the <<features-primitiveTopologyListRestart,
+    pname:primitiveTopologyListRestart>> feature is not enabled, and
+endif::VK_EXT_primitive_topology_list_restart[]
+    pname:topology is ename:VK_PRIMITIVE_TOPOLOGY_POINT_LIST,
+    ename:VK_PRIMITIVE_TOPOLOGY_LINE_LIST,
+    ename:VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+    ename:VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY, or
+    ename:VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY,
+    pname:primitiveRestartEnable must: be ename:VK_FALSE
+  * [[VUID-VkPipelineInputAssemblyStateCreateInfo-topology-06253]]
+    If
+ifdef::VK_EXT_primitive_topology_list_restart[]
+    the <<features-primitiveTopologyPatchListRestart,
+    pname:primitiveTopologyPatchListRestart>> feature is not enabled, and
+endif::VK_EXT_primitive_topology_list_restart[]
+    pname:topology is ename:VK_PRIMITIVE_TOPOLOGY_PATCH_LIST,
+    pname:primitiveRestartEnable must: be ename:VK_FALSE
+  * [[VUID-VkPipelineInputAssemblyStateCreateInfo-topology-00429]]
+    If the <<features-geometryShader, pname:geometryShader>> feature is not
+    enabled, pname:topology must: not be any of
+    ename:VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY,
+    ename:VK_PRIMITIVE_TOPOLOGY_LINE_STRIP_WITH_ADJACENCY,
+    ename:VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY or
+    ename:VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP_WITH_ADJACENCY
+  * [[VUID-VkPipelineInputAssemblyStateCreateInfo-topology-00430]]
+    If the <<features-tessellationShader, pname:tessellationShader>> feature
+    is not enabled, pname:topology must: not be
+    ename:VK_PRIMITIVE_TOPOLOGY_PATCH_LIST
+ifdef::VK_KHR_portability_subset[]
+  * [[VUID-VkPipelineInputAssemblyStateCreateInfo-triangleFans-04452]]
+    If the `apiext:VK_KHR_portability_subset` extension is enabled, and
+    slink:VkPhysicalDevicePortabilitySubsetFeaturesKHR::pname:triangleFans
+    is ename:VK_FALSE, pname:topology must: not be
+    ename:VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN
+endif::VK_KHR_portability_subset[]
+****
+
+include::{generated}/validity/structs/VkPipelineInputAssemblyStateCreateInfo.adoc[]
+--
+
+[open,refpage='VkPipelineInputAssemblyStateCreateFlags',desc='Reserved for future use',type='flags']
+--
+include::{generated}/api/flags/VkPipelineInputAssemblyStateCreateFlags.adoc[]
+
+tname:VkPipelineInputAssemblyStateCreateFlags is a bitmask type for setting
+a mask, but is currently reserved for future use.
+--
+
+ifdef::VK_GRAPHICS_VERSION_1_3,VK_EXT_extended_dynamic_state2,VK_EXT_shader_object[]
+[open,refpage='vkCmdSetPrimitiveRestartEnable',desc='Set primitive assembly restart state dynamically for a command buffer',type='protos']
+--
+To <<pipelines-dynamic-state, dynamically control>> whether a special vertex
+index value is treated as restarting the assembly of primitives, call:
+
+ifdef::VK_GRAPHICS_VERSION_1_3[]
+include::{generated}/api/protos/vkCmdSetPrimitiveRestartEnable.adoc[]
+endif::VK_GRAPHICS_VERSION_1_3[]
+
+ifdef::VK_EXT_extended_dynamic_state2,VK_EXT_shader_object[]
+include::{generated}/api/protos/vkCmdSetPrimitiveRestartEnableEXT.adoc[]
+endif::VK_EXT_extended_dynamic_state2,VK_EXT_shader_object[]
+
+  * pname:commandBuffer is the command buffer into which the command will be
+    recorded.
+  * pname:primitiveRestartEnable controls whether a special vertex index
+    value is treated as restarting the assembly of primitives.
+    It behaves in the same way as
+    sname:VkPipelineInputAssemblyStateCreateInfo::pname:primitiveRestartEnable
+
+This command sets the primitive restart enable for subsequent drawing
+commands
+ifdef::VK_EXT_shader_object[]
+ifdef::VK_GRAPHICS_VERSION_1_3,VK_EXT_extended_dynamic_state2[when drawing using <<shaders-objects, shader objects>>, or]
+ifndef::VK_GRAPHICS_VERSION_1_3,VK_EXT_extended_dynamic_state2[when drawing using <<shaders-objects, shader objects>>.]
+endif::VK_EXT_shader_object[]
+ifdef::VK_GRAPHICS_VERSION_1_3,VK_EXT_extended_dynamic_state2[]
+when the graphics pipeline is created with
+ename:VK_DYNAMIC_STATE_PRIMITIVE_RESTART_ENABLE set in
+slink:VkPipelineDynamicStateCreateInfo::pname:pDynamicStates.
+endif::VK_GRAPHICS_VERSION_1_3,VK_EXT_extended_dynamic_state2[]
+Otherwise, this state is specified by the
+slink:VkPipelineInputAssemblyStateCreateInfo::pname:primitiveRestartEnable
+value used to create the currently active pipeline.
+
+:refpage: vkCmdSetPrimitiveRestartEnable
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/dynamic_state2_feature_common.adoc[]
+****
+
+include::{generated}/validity/protos/vkCmdSetPrimitiveRestartEnable.adoc[]
+--
+endif::VK_GRAPHICS_VERSION_1_3,VK_EXT_extended_dynamic_state2,VK_EXT_shader_object[]
+
+ifdef::VK_EXT_primitive_restart_index[]
+[open,refpage='vkCmdSetPrimitiveRestartIndexEXT',desc='Set primitive assembly restart index dynamically for a command buffer',type='protos']
+--
+To <<pipelines-dynamic-state, dynamically control>> which special vertex
+index value is treated as restarting the assembly of primitives, call:
+
+include::{generated}/api/protos/vkCmdSetPrimitiveRestartIndexEXT.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command will be
+    recorded.
+  * pname:primitiveRestartIndex controls which special vertex index value is
+    treated as restarting the assembly of primitives.
+    This overrides the default restart index value as defined as part of the
+    description of the
+    slink:VkPipelineInputAssemblyStateCreateInfo::pname:primitiveRestartEnable
+    state.
+    Default values are applied when binding an index buffer.
+
+This command sets a custom primitive restart index for subsequent drawing
+commands.
+Binding an index buffer invalidates the custom index value.
+
+:refpage: vkCmdSetPrimitiveRestartIndexEXT
+
+.Valid Usage
+****
+  * [[VUID-vkCmdSetPrimitiveRestartIndexEXT-primitiveRestartIndex-12395]]
+    The <<features-primitiveRestartIndex, pname:primitiveRestartIndex>>
+    feature must: be enabled
+****
+
+include::{generated}/validity/protos/vkCmdSetPrimitiveRestartIndexEXT.adoc[]
+--
+endif::VK_EXT_primitive_restart_index[]
+
+
+[[drawing-primitive-topologies]]
+== Primitive Topologies
+
+_Primitive topology_ determines how consecutive vertices are organized into
+primitives, and determines the type of primitive that is used at the
+beginning of the graphics pipeline.
+The effective topology for later stages of the pipeline is altered by
+tessellation or geometry shading (if either is in use) and depends on the
+execution modes of those shaders.
+ifdef::VK_NV_mesh_shader,VK_EXT_mesh_shader[]
+In the case of mesh shading the only effective topology is defined by the
+execution mode of the mesh shader.
+endif::VK_NV_mesh_shader,VK_EXT_mesh_shader[]
+
+[open,refpage='VkPrimitiveTopology',desc='Supported primitive topologies',type='enums']
+--
+The primitive topologies defined by elink:VkPrimitiveTopology are:
+
+include::{generated}/api/enums/VkPrimitiveTopology.adoc[]
+
+  * ename:VK_PRIMITIVE_TOPOLOGY_POINT_LIST specifies a series of
+    <<drawing-point-lists,separate point primitives>>.
+  * ename:VK_PRIMITIVE_TOPOLOGY_LINE_LIST specifies a series of
+    <<drawing-line-lists,separate line primitives>>.
+  * ename:VK_PRIMITIVE_TOPOLOGY_LINE_STRIP specifies a series of
+    <<drawing-line-strips,connected line primitives>> with consecutive lines
+    sharing a vertex.
+  * ename:VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST specifies a series of
+    <<drawing-triangle-lists,separate triangle primitives>>.
+  * ename:VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP specifies a series of
+    <<drawing-triangle-strips,connected triangle primitives>> with
+    consecutive triangles sharing an edge.
+  * ename:VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN specifies a series of
+    <<drawing-triangle-fans,connected triangle primitives>> with all
+    triangles sharing a common vertex.
+ifdef::VK_KHR_portability_subset[]
+    If the `apiext:VK_KHR_portability_subset` extension is enabled, and
+    slink:VkPhysicalDevicePortabilitySubsetFeaturesKHR::pname:triangleFans
+    is ename:VK_FALSE, then triangle fans are not supported by the
+    implementation, and ename:VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN must: not
+    be used.
+endif::VK_KHR_portability_subset[]
+  * ename:VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY specifies a series
+    of <<drawing-line-lists-with-adjacency,separate line primitives with
+    adjacency>>.
+  * ename:VK_PRIMITIVE_TOPOLOGY_LINE_STRIP_WITH_ADJACENCY specifies a series
+    of <<drawing-line-strips-with-adjacency,connected line primitives with
+    adjacency>>, with consecutive primitives sharing three vertices.
+  * ename:VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY specifies a
+    series of <<drawing-triangle-lists-with-adjacency,separate triangle
+    primitives with adjacency>>.
+  * ename:VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP_WITH_ADJACENCY specifies
+    <<drawing-triangle-strips-with-adjacency,connected triangle primitives
+    with adjacency>>, with consecutive triangles sharing an edge.
+  * ename:VK_PRIMITIVE_TOPOLOGY_PATCH_LIST specifies
+    <<drawing-patch-lists,separate patch primitives>>.
+
+Each primitive topology, and its construction from a list of vertices, is
+described in detail below with a supporting diagram, according to the
+following key:
+
+[cols="1,2,9"]
+|====
+^.^| image:{images}/primitive_topology_key_vertex.svg[pdfwidth=6pt,align="center",opts="{imageopts}"]
+.^| Vertex
+| A point in 3-dimensional space.
+  Positions chosen within the diagrams are arbitrary and for
+  illustration only.
+
+^.^| image:{images}/primitive_topology_key_vertex_number.svg[pdfwidth=6pt,align="center",opts="{imageopts}"]
+.^| Vertex Number
+| Sequence position of a vertex within the provided vertex data.
+
+^.^| image:{images}/primitive_topology_key_provoking_vertex.svg[pdfwidth=30pt,align="center",opts="{imageopts}"]
+.^| Provoking Vertex
+| Provoking vertex within the main primitive.
+  The tail is angled towards the relevant primitive.
+  Used in <<vertexpostproc-flatshading, flat shading>>.
+
+^.^| image:{images}/primitive_topology_key_edge.svg[pdfwidth=30pt,align="center",opts="{imageopts}"]
+.^| Primitive Edge
+| An edge connecting the points of a main primitive.
+
+^.^| image:{images}/primitive_topology_key_adjacency_edge.svg[pdfwidth=30pt,align="center",opts="{imageopts}"]
+.^| Adjacency Edge
+| Points connected by these lines do not contribute to a main primitive,
+  and are only accessible in a <<geometry,geometry shader>>.
+
+^.^| image:{images}/primitive_topology_key_winding_order.svg[pdfwidth=30pt,align="center",opts="{imageopts}"]
+.^| Winding Order
+| The relative order in which vertices are defined within a primitive,
+  used in the <<primsrast-polygons-basic,facing determination>>.
+  This ordering has no specific start or end point.
+|====
+
+The diagrams are supported with mathematical definitions where the vertices
+([eq]#v#) and primitives ([eq]#p#) are numbered starting from [eq]#0#;
+[eq]#v~0~# is the first vertex in the provided data and [eq]#p~0~# is the
+first primitive in the set of primitives defined by the vertices and
+topology.
+--
+
+ifdef::VK_GRAPHICS_VERSION_1_3,VK_EXT_extended_dynamic_state,VK_EXT_shader_object[]
+[open,refpage='vkCmdSetPrimitiveTopology',desc='Set primitive topology state dynamically for a command buffer',type='protos']
+--
+To <<pipelines-dynamic-state, dynamically set>> primitive topology, call:
+
+ifdef::VK_GRAPHICS_VERSION_1_3[]
+include::{generated}/api/protos/vkCmdSetPrimitiveTopology.adoc[]
+endif::VK_GRAPHICS_VERSION_1_3[]
+
+ifdef::VK_EXT_extended_dynamic_state,VK_EXT_shader_object[]
+include::{generated}/api/protos/vkCmdSetPrimitiveTopologyEXT.adoc[]
+endif::VK_EXT_extended_dynamic_state,VK_EXT_shader_object[]
+
+  * pname:commandBuffer is the command buffer into which the command will be
+    recorded.
+  * pname:primitiveTopology specifies the primitive topology to use for
+    drawing.
+
+This command sets the primitive topology for subsequent drawing commands
+ifdef::VK_EXT_shader_object[]
+ifdef::VK_GRAPHICS_VERSION_1_3,VK_EXT_extended_dynamic_state[when drawing using <<shaders-objects, shader objects>>, or]
+ifndef::VK_GRAPHICS_VERSION_1_3,VK_EXT_extended_dynamic_state[when drawing using <<shaders-objects, shader objects>>.]
+endif::VK_EXT_shader_object[]
+ifdef::VK_GRAPHICS_VERSION_1_3,VK_EXT_extended_dynamic_state[]
+when the graphics pipeline is created with
+ename:VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY set in
+slink:VkPipelineDynamicStateCreateInfo::pname:pDynamicStates.
+endif::VK_GRAPHICS_VERSION_1_3,VK_EXT_extended_dynamic_state[]
+Otherwise, this state is specified by the
+slink:VkPipelineInputAssemblyStateCreateInfo::pname:topology value used to
+create the currently active pipeline.
+
+:refpage: vkCmdSetPrimitiveTopology
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/dynamic_state_feature_common.adoc[]
+****
+
+include::{generated}/validity/protos/vkCmdSetPrimitiveTopology.adoc[]
+--
+
+
+[[drawing-primitive-topology-class]]
+=== Topology Class
+
+The primitive topologies are grouped into the following topology classes:
+
+[[topology-classes-table]]
+.Topology Classes
+[options="header"]
+|====
+| Topology Class  | Primitive Topology
+| Point           | ename:VK_PRIMITIVE_TOPOLOGY_POINT_LIST
+| Line            | ename:VK_PRIMITIVE_TOPOLOGY_LINE_LIST,
+                    ename:VK_PRIMITIVE_TOPOLOGY_LINE_STRIP,
+                    ename:VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY,
+                    ename:VK_PRIMITIVE_TOPOLOGY_LINE_STRIP_WITH_ADJACENCY
+| Triangle        | ename:VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+                    ename:VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
+                    ename:VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN,
+                    ename:VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY,
+                    ename:VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP_WITH_ADJACENCY
+| Patch           | ename:VK_PRIMITIVE_TOPOLOGY_PATCH_LIST
+|====
+endif::VK_GRAPHICS_VERSION_1_3,VK_EXT_extended_dynamic_state,VK_EXT_shader_object[]
+
+
+[[drawing-point-lists]]
+=== Point Lists
+
+When the topology is ename:VK_PRIMITIVE_TOPOLOGY_POINT_LIST, each
+consecutive vertex defines a single point primitive, according to the
+equation:
+
+  {empty}:: [eq]#p~i~ = {v~i~}#
+
+As there is only one vertex, that vertex is the provoking vertex.
+The number of primitives generated is equal to [eq]#pname:vertexCount#.
+
+image::{images}/primitive_topology_point_list.svg[align="center",opts="{imageopts}"]
+
+
+[[drawing-line-lists]]
+=== Line Lists
+
+When the primitive topology is ename:VK_PRIMITIVE_TOPOLOGY_LINE_LIST, each
+consecutive pair of vertices defines a single line primitive, according to
+the equation:
+
+  {empty}:: [eq]#p~i~ = {v~2i~, v~2i+1~}#
+
+The number of primitives generated is equal to
+[eq]#{lfloor}pname:vertexCount/2{rfloor}#.
+
+ifdef::VK_EXT_provoking_vertex[]
+When the pname:provokingVertexMode is
+ename:VK_PROVOKING_VERTEX_MODE_FIRST_VERTEX_EXT, the
+endif::VK_EXT_provoking_vertex[]
+ifndef::VK_EXT_provoking_vertex[]
+The
+endif::VK_EXT_provoking_vertex[]
+provoking vertex for [eq]#p~i~# is [eq]#v~2i~#.
+
+image::{images}/primitive_topology_line_list.svg[align="center",opts="{imageopts}"]
+
+ifdef::VK_EXT_provoking_vertex[]
+When the pname:provokingVertexMode is
+ename:VK_PROVOKING_VERTEX_MODE_LAST_VERTEX_EXT, the provoking vertex for
+[eq]#p~i~# is [eq]#v~2i+1~#.
+
+image::{images}/primitive_topology_line_list_last.svg[align="center",opts="{imageopts}"]
+endif::VK_EXT_provoking_vertex[]
+
+
+[[drawing-line-strips]]
+=== Line Strips
+
+When the primitive topology is ename:VK_PRIMITIVE_TOPOLOGY_LINE_STRIP, one
+line primitive is defined by each vertex and the following vertex, according
+to the equation:
+
+  {empty}:: [eq]#p~i~ = {v~i~, v~i+1~}#
+
+The number of primitives generated is equal to
+[eq]#max(0,pname:vertexCount-1)#.
+
+ifdef::VK_EXT_provoking_vertex[]
+When the pname:provokingVertexMode is
+ename:VK_PROVOKING_VERTEX_MODE_FIRST_VERTEX_EXT, the
+endif::VK_EXT_provoking_vertex[]
+ifndef::VK_EXT_provoking_vertex[]
+The
+endif::VK_EXT_provoking_vertex[]
+provoking vertex for [eq]#p~i~# is [eq]#v~i~#.
+
+image::{images}/primitive_topology_line_strip.svg[align="center",opts="{imageopts}"]
+
+ifdef::VK_EXT_provoking_vertex[]
+When the pname:provokingVertexMode is
+ename:VK_PROVOKING_VERTEX_MODE_LAST_VERTEX_EXT, the provoking vertex for
+[eq]#p~i~# is [eq]#v~i+1~#.
+
+image::{images}/primitive_topology_line_strip_last.svg[align="center",opts="{imageopts}"]
+endif::VK_EXT_provoking_vertex[]
+
+
+[[drawing-triangle-lists]]
+=== Triangle Lists
+
+When the primitive topology is ename:VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+each consecutive set of three vertices defines a single triangle primitive,
+according to the equation:
+
+  {empty}:: [eq]#p~i~ = {v~3i~, v~3i+1~, v~3i+2~}#
+
+The number of primitives generated is equal to
+[eq]#{lfloor}pname:vertexCount/3{rfloor}#.
+
+ifdef::VK_EXT_provoking_vertex[]
+When the pname:provokingVertexMode is
+ename:VK_PROVOKING_VERTEX_MODE_FIRST_VERTEX_EXT, the
+endif::VK_EXT_provoking_vertex[]
+ifndef::VK_EXT_provoking_vertex[]
+The
+endif::VK_EXT_provoking_vertex[]
+provoking vertex for [eq]#p~i~# is [eq]#v~3i~#.
+
+image::{images}/primitive_topology_triangle_list.svg[align="center",opts="{imageopts}"]
+
+ifdef::VK_EXT_provoking_vertex[]
+When the pname:provokingVertexMode is
+ename:VK_PROVOKING_VERTEX_MODE_LAST_VERTEX_EXT, the provoking vertex for
+[eq]#p~i~# is [eq]#v~3i+2~#.
+
+image::{images}/primitive_topology_triangle_list_last.svg[align="center",opts="{imageopts}"]
+endif::VK_EXT_provoking_vertex[]
+
+
+[[drawing-triangle-strips]]
+=== Triangle Strips
+
+When the primitive topology is ename:VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
+one triangle primitive is defined by each vertex and the two vertices that
+follow it, according to the equation:
+
+  {empty}:: [eq]#p~i~ = {v~i~, v~i+(1+i%2)~, v~i+(2-i%2)~}#
+
+The number of primitives generated is equal to
+[eq]#max(0,pname:vertexCount-2)#.
+
+ifdef::VK_EXT_provoking_vertex[]
+When the pname:provokingVertexMode is
+ename:VK_PROVOKING_VERTEX_MODE_FIRST_VERTEX_EXT, the
+endif::VK_EXT_provoking_vertex[]
+ifndef::VK_EXT_provoking_vertex[]
+The
+endif::VK_EXT_provoking_vertex[]
+provoking vertex for [eq]#p~i~# is [eq]#v~i~#.
+
+image::{images}/primitive_topology_triangle_strip.svg[align="center",opts="{imageopts}"]
+
+ifdef::VK_EXT_provoking_vertex[]
+When the pname:provokingVertexMode is
+ename:VK_PROVOKING_VERTEX_MODE_LAST_VERTEX_EXT, the provoking vertex for
+[eq]#p~i~# is [eq]#v~i+2~#.
+
+image::{images}/primitive_topology_triangle_strip_last.svg[align="center",opts="{imageopts}"]
+endif::VK_EXT_provoking_vertex[]
+
+[NOTE]
+====
+The ordering of the vertices in each successive triangle is reversed, so
+that the winding order is consistent throughout the strip.
+====
+
+
+[[drawing-triangle-fans]]
+=== Triangle Fans
+
+When the primitive topology is ename:VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN,
+triangle primitives are defined around a shared common vertex, according to
+the equation:
+
+  {empty}:: [eq]#p~i~ = {v~i+1~, v~i+2~, v~0~}#
+
+The number of primitives generated is equal to
+[eq]#max(0,pname:vertexCount-2)#.
+
+ifdef::VK_EXT_provoking_vertex[]
+When the pname:provokingVertexMode is
+ename:VK_PROVOKING_VERTEX_MODE_FIRST_VERTEX_EXT, the
+endif::VK_EXT_provoking_vertex[]
+ifndef::VK_EXT_provoking_vertex[]
+The
+endif::VK_EXT_provoking_vertex[]
+provoking vertex for [eq]#p~i~# is [eq]#v~i+1~#.
+
+image::{images}/primitive_topology_triangle_fan.svg[align="center",opts="{imageopts}"]
+
+ifdef::VK_EXT_provoking_vertex[]
+When the pname:provokingVertexMode is
+ename:VK_PROVOKING_VERTEX_MODE_LAST_VERTEX_EXT, the provoking vertex for
+[eq]#p~i~# is [eq]#v~i+2~#.
+
+image::{images}/primitive_topology_triangle_fan_last.svg[align="center",opts="{imageopts}"]
+endif::VK_EXT_provoking_vertex[]
+
+ifdef::VK_KHR_portability_subset[]
+[NOTE]
+====
+If the `apiext:VK_KHR_portability_subset` extension is enabled, and
+slink:VkPhysicalDevicePortabilitySubsetFeaturesKHR::pname:triangleFans is
+ename:VK_FALSE, then triangle fans are not supported by the implementation,
+and ename:VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN must: not be used.
+====
+endif::VK_KHR_portability_subset[]
+
+
+[[drawing-line-lists-with-adjacency]]
+=== Line Lists With Adjacency
+
+When the primitive topology is
+ename:VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY, each consecutive set
+of four vertices defines a single line primitive with adjacency, according
+to the equation:
+
+  {empty}:: [eq]#p~i~ = {v~4i~, v~4i+1~, v~4i+2~,v~4i+3~}#
+
+A line primitive is described by the second and third vertices of the total
+primitive, with the remaining two vertices only accessible in a
+<<geometry,geometry shader>>.
+
+The number of primitives generated is equal to
+[eq]#{lfloor}pname:vertexCount/4{rfloor}#.
+
+ifdef::VK_EXT_provoking_vertex[]
+When the pname:provokingVertexMode is
+ename:VK_PROVOKING_VERTEX_MODE_FIRST_VERTEX_EXT, the
+endif::VK_EXT_provoking_vertex[]
+ifndef::VK_EXT_provoking_vertex[]
+The
+endif::VK_EXT_provoking_vertex[]
+provoking vertex for [eq]#p~i~# is [eq]#v~4i+1~#.
+
+image::{images}/primitive_topology_line_list_with_adjacency.svg[align="center",opts="{imageopts}"]
+
+ifdef::VK_EXT_provoking_vertex[]
+When the pname:provokingVertexMode is
+ename:VK_PROVOKING_VERTEX_MODE_LAST_VERTEX_EXT, the provoking vertex for
+[eq]#p~i~# is [eq]#v~4i+2~#.
+
+image::{images}/primitive_topology_line_list_with_adjacency_last.svg[align="center",opts="{imageopts}"]
+endif::VK_EXT_provoking_vertex[]
+
+
+[[drawing-line-strips-with-adjacency]]
+=== Line Strips With Adjacency
+
+When the primitive topology is
+ename:VK_PRIMITIVE_TOPOLOGY_LINE_STRIP_WITH_ADJACENCY, one line primitive
+with adjacency is defined by each vertex and the following vertex, according
+to the equation:
+
+  {empty}:: [eq]#p~i~ = {v~i~, v~i+1~, v~i+2~, v~i+3~}#
+
+A line primitive is described by the second and third vertices of the total
+primitive, with the remaining two vertices only accessible in a
+<<geometry,geometry shader>>.
+
+The number of primitives generated is equal to
+[eq]#max(0,pname:vertexCount-3)#.
+
+ifdef::VK_EXT_provoking_vertex[]
+When the pname:provokingVertexMode is
+ename:VK_PROVOKING_VERTEX_MODE_FIRST_VERTEX_EXT, the
+endif::VK_EXT_provoking_vertex[]
+ifndef::VK_EXT_provoking_vertex[]
+The
+endif::VK_EXT_provoking_vertex[]
+provoking vertex for [eq]#p~i~# is [eq]#v~i+1~#.
+
+image::{images}/primitive_topology_line_strip_with_adjacency.svg[align="center",opts="{imageopts}"]
+
+ifdef::VK_EXT_provoking_vertex[]
+When the pname:provokingVertexMode is
+ename:VK_PROVOKING_VERTEX_MODE_LAST_VERTEX_EXT, the provoking vertex for
+[eq]#p~i~# is [eq]#v~i+2~#.
+
+image::{images}/primitive_topology_line_strip_with_adjacency_last.svg[align="center",opts="{imageopts}"]
+endif::VK_EXT_provoking_vertex[]
+
+
+[[drawing-triangle-lists-with-adjacency]]
+=== Triangle Lists With Adjacency
+
+When the primitive topology is
+ename:VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY, each consecutive
+set of six vertices defines a single triangle primitive with adjacency,
+according to the equations:
+
+  {empty}:: [eq]#p~i~ = {v~6i~, v~6i+1~, v~6i+2~, v~6i+3~, v~6i+4~,
+            v~6i+5~}#
+
+A triangle primitive is described by the first, third, and fifth vertices of
+the total primitive, with the remaining three vertices only accessible in a
+<<geometry,geometry shader>>.
+
+The number of primitives generated is equal to
+[eq]#{lfloor}pname:vertexCount/6{rfloor}#.
+
+ifdef::VK_EXT_provoking_vertex[]
+When the pname:provokingVertexMode is
+ename:VK_PROVOKING_VERTEX_MODE_FIRST_VERTEX_EXT, the
+endif::VK_EXT_provoking_vertex[]
+ifndef::VK_EXT_provoking_vertex[]
+The
+endif::VK_EXT_provoking_vertex[]
+provoking vertex for [eq]#p~i~# is [eq]#v~6i~#.
+
+image::{images}/primitive_topology_triangle_list_with_adjacency.svg[align="center",opts="{imageopts}"]
+
+ifdef::VK_EXT_provoking_vertex[]
+When the pname:provokingVertexMode is
+ename:VK_PROVOKING_VERTEX_MODE_LAST_VERTEX_EXT, the provoking vertex for
+[eq]#p~i~# is [eq]#v~6i+4~#.
+
+image::{images}/primitive_topology_triangle_list_with_adjacency_last.svg[align="center",opts="{imageopts}"]
+endif::VK_EXT_provoking_vertex[]
+
+
+[[drawing-triangle-strips-with-adjacency]]
+=== Triangle Strips With Adjacency
+
+When the primitive topology is
+ename:VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP_WITH_ADJACENCY, one triangle
+primitive with adjacency is defined by each vertex and the following 5
+vertices.
+
+The number of primitives generated, [eq]#n#, is equal to [eq]#{lfloor}max(0,
+pname:vertexCount - 4)/2{rfloor}#.
+
+If [eq]#n=1#, the primitive is defined as:
+
+  {empty}:: [eq]#p = {v~0~, v~1~, v~2~, v~5~, v~4~, v~3~}#
+
+If [eq]#n>1#, the total primitive consists of different vertices according
+to where it is in the strip:
+
+  {empty}:: [eq]#p~i~ = {v~2i~, v~2i+1~, v~2i+2~, v~2i+6~, v~2i+4~,
+            v~2i+3~}# when [eq]#i=0#
+  {empty}:: [eq]#p~i~ = {v~2i~, v~2i+3~, v~2i+4~, v~2i+6~, v~2i+2~,
+            v~2i-2~}# when [eq]#i>0#, [eq]#i<n-1#, and [eq]#i%2=1#
+  {empty}:: [eq]#p~i~ = {v~2i~, v~2i-2~, v~2i+2~, v~2i+6~, v~2i+4~,
+            v~2i+3~}# when [eq]#i>0#, [eq]#i<n-1#, and [eq]#i%2=0#
+  {empty}:: [eq]#p~i~ = {v~2i~, v~2i+3~, v~2i+4~, v~2i+5~, v~2i+2~,
+            v~2i-2~}# when [eq]#i=n-1# and [eq]#i%2=1#
+  {empty}:: [eq]#p~i~ = {v~2i~, v~2i-2~, v~2i+2~, v~2i+5~, v~2i+4~,
+            v~2i+3~}# when [eq]#i=n-1# and [eq]#i%2=0#
+
+A triangle primitive is described by the first, third, and fifth vertices of
+the total primitive in all cases, with the remaining three vertices only
+accessible in a <<geometry,geometry shader>>.
+
+[NOTE]
+====
+The ordering of the vertices in each successive triangle is altered so that
+the winding order is consistent throughout the strip.
+====
+
+ifdef::VK_EXT_provoking_vertex[]
+When the pname:provokingVertexMode is
+ename:VK_PROVOKING_VERTEX_MODE_FIRST_VERTEX_EXT, the
+endif::VK_EXT_provoking_vertex[]
+ifndef::VK_EXT_provoking_vertex[]
+The
+endif::VK_EXT_provoking_vertex[]
+provoking vertex for [eq]#p~i~# is always [eq]#v~2i~#.
+
+image::{images}/primitive_topology_triangle_strip_with_adjacency.svg[align="center",opts="{imageopts}"]
+
+ifdef::VK_EXT_provoking_vertex[]
+When the pname:provokingVertexMode is
+ename:VK_PROVOKING_VERTEX_MODE_LAST_VERTEX_EXT, the provoking vertex for
+[eq]#p~i~# is always [eq]#v~2i+4~#.
+
+image::{images}/primitive_topology_triangle_strip_with_adjacency_last.svg[align="center",opts="{imageopts}"]
+endif::VK_EXT_provoking_vertex[]
+
+
+[[drawing-patch-lists]]
+=== Patch Lists
+
+When the primitive topology is ename:VK_PRIMITIVE_TOPOLOGY_PATCH_LIST, each
+consecutive set of [eq]#m# vertices defines a single patch primitive,
+according to the equation:
+
+  {empty}:: [eq]#p~i~ = {v~mi~, v~mi+1~, ..., v~mi+(m-2)~, v~mi+(m-1)~}#
+
+where [eq]#m# is equal to
+slink:VkPipelineTessellationStateCreateInfo::pname:patchControlPoints.
+
+Patch lists are never passed to <<vertexpostproc, vertex post-processing>>,
+and as such no provoking vertex is defined for patch primitives.
+The number of primitives generated is equal to
+[eq]#{lfloor}pname:vertexCount/m{rfloor}#.
+
+The vertices comprising a patch have no implied geometry, and are used as
+inputs to tessellation shaders and the fixed-function tessellator to
+generate new point, line, or triangle primitives.
+
+
+[[drawing-effective-primitive-topology]]
+== Effective Primitive Topology
+
+The effective primitive topology is the primitive topology that is consumed
+or produced by a given stage of the graphics pipeline.
+The interpretation of this topology depends on the active shader stages and
+other state set in the graphics pipeline.
+
+
+[[drawing-vertex-input-assembler-topology]]
+=== Vertex Input Assembler Topology
+
+This is the topology set when the ename:VK_SHADER_STAGE_VERTEX_BIT stage is
+used and <<drawing-primitive-shading,Programmable Primitive Shading>>
+occurs.
+It can: be set with
+slink:VkPipelineInputAssemblyStateCreateInfo::pname:topology
+ifdef::VK_GRAPHICS_VERSION_1_3,VK_EXT_extended_dynamic_state,VK_EXT_shader_object[]
+or flink:vkCmdSetPrimitiveTopology.
+endif::VK_GRAPHICS_VERSION_1_3,VK_EXT_extended_dynamic_state,VK_EXT_shader_object[]
+
+
+[[drawing-clip-space-topology]]
+=== Clip Space Topology
+
+This is the output of the last pre-rasterization shader stage involved.
+
+  * If ename:VK_SHADER_STAGE_VERTEX_BIT is the last pre-rasterization stage,
+    the topology is not changed from what was set in the
+    <<drawing-vertex-input-assembler-topology,input assembly>>.
+  * If ename:VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT is the last
+    pre-rasterization stage, the topology depends on the
+    code:OpExecutionMode found in either <<tessellation,tessellation
+    stage>>.
+  ** The code:Isolines {ExecutionMode} is in line
+     <<drawing-primitive-topology-class,topology class>>.
+  ** The code:Triangles and code:Quads {ExecutionMode} is in triangle
+     <<drawing-primitive-topology-class,topology class>>.
+  ** The code:PointMode {ExecutionMode} is in point
+     <<drawing-primitive-topology-class,topology class>> and will take
+     precedence over the other tessellation stage {ExecutionMode}.
+  * If ename:VK_SHADER_STAGE_GEOMETRY_BIT is the last pre-rasterization
+    stage, the topology depends on the code:OpExecutionMode found in this
+    shader stage.
+  ** The code:OutputPoints {ExecutionMode} is in point
+     <<drawing-primitive-topology-class,topology class>>.
+  ** The code:OutputLineStrip {ExecutionMode} is in line
+     <<drawing-primitive-topology-class,topology class>>.
+  ** The code:OutputTriangleStrip {ExecutionMode} is in triangle
+     <<drawing-primitive-topology-class,topology class>>.
+ifdef::VK_NV_mesh_shader,VK_EXT_mesh_shader[]
+  * If ename:VK_SHADER_STAGE_MESH_BIT_EXT is the last pre-rasterization
+    stage, the topology depends on the code:OpExecutionMode found in this
+    shader stage.
+  ** The code:OutputPoints {ExecutionMode} is in point
+     <<drawing-primitive-topology-class,topology class>>.
+  ** The code:OutputLinesEXT {ExecutionMode} is in line
+     <<drawing-primitive-topology-class,topology class>>.
+  ** The code:OutputTrianglesEXT {ExecutionMode} is in triangle
+     <<drawing-primitive-topology-class,topology class>>.
+endif::VK_NV_mesh_shader,VK_EXT_mesh_shader[]
+
+
+[[drawing-rasterization-input-topology]]
+=== Rasterization Input Topology
+
+After clipping and viewport transformations, the <<primsrast-polygonmode,
+Polygon Mode>> can: set a topology as an input for rasterization.
+This can: be different from what was used in <<drawing-clip-space-topology,
+Clip Space Topology>>.
+
+If
+slink:VkPipelineRasterizationStateCreateInfo::pname:rasterizerDiscardEnable
+ifdef::VK_GRAPHICS_VERSION_1_3,VK_EXT_extended_dynamic_state2,VK_EXT_shader_object[]
+or flink:vkCmdSetRasterizerDiscardEnable::pname:rasterizerDiscardEnable
+endif::VK_GRAPHICS_VERSION_1_3,VK_EXT_extended_dynamic_state2,VK_EXT_shader_object[]
+is set to ename:VK_FALSE, then this Rasterization Input Topology is not
+observed.
+
+If the <<drawing-clip-space-topology,clip space topology>> is in triangle
+<<drawing-primitive-topology-class,topology class>> then
+ename:VK_POLYGON_MODE_LINE will turn it into line topology and
+ename:VK_POLYGON_MODE_POINT will turn it into point topology.
+
+If the <<drawing-clip-space-topology,clip space topology>> is in line
+<<drawing-primitive-topology-class,topology class>> then
+ename:VK_POLYGON_MODE_POINT will turn it into point topology.
+
+
+[[drawing-primitive-order]]
+== Primitive Order
+
+Primitives generated by <<drawing, drawing commands>> progress through the
+stages of the <<synchronization-pipeline-graphics, graphics pipeline>> in
+_primitive order_.
+Primitive order is initially determined in the following way:
+
+  . Submission order determines the initial ordering
+  . For indirect drawing commands, the order in which accessed instances of
+    the slink:VkDrawIndirectCommand are stored in pname:buffer, from lower
+    indirect buffer addresses to higher addresses.
+  . If a drawing command includes multiple instances, the order in which
+    instances are executed, from lower numbered instances to higher.
+  . The order in which primitives are specified by a drawing command:
+  ** For non-indexed draws, from vertices with a lower numbered
+     code:vertexIndex to a higher numbered code:vertexIndex.
+  ** For indexed draws, vertices sourced from a lower index buffer addresses
+     to higher addresses.
+ifdef::VK_NV_mesh_shader,VK_EXT_mesh_shader[]
+  ** For draws using mesh shaders, the order is provided by <<mesh-ordering,
+     mesh shading>>.
+endif::VK_NV_mesh_shader,VK_EXT_mesh_shader[]
+ifdef::VK_HUAWEI_cluster_culling_shader[]
+  ** For draws using cluster culling shaders, the order is provided by
+     <<cluster-culling-cluster-ordering, cluster culling shading>>.
+endif::VK_HUAWEI_cluster_culling_shader[]
+
+Within this order implementations further sort primitives:
+
+[start=5]
+  . If tessellation shading is active, by an implementation-dependent order
+    of new primitives generated by <<tessellation-primitive-order,
+    tessellation>>.
+  . If geometry shading is active, by the order new primitives are generated
+    by <<geometry-ordering, geometry shading>>.
+  . If the <<primsrast-polygonmode,polygon mode>> is not
+    ename:VK_POLYGON_MODE_FILL,
+ifdef::VK_NV_fill_rectangle[]
+    or ename:VK_POLYGON_MODE_FILL_RECTANGLE_NV,
+endif::VK_NV_fill_rectangle[]
+    by an implementation-dependent ordering of the new primitives generated
+    within the original primitive.
+
+Primitive order is later used to define <<primsrast-order, rasterization
+order>>, which determines the order in which fragments output results to a
+framebuffer.
+
+
+[[drawing-primitive-shading]]
+== Programmable Primitive Shading
+
+Once primitives are assembled, they proceed to the vertex shading stage of
+the pipeline.
+If the draw includes multiple instances, then the set of primitives is sent
+to the vertex shading stage multiple times, once for each instance.
+
+It is implementation-dependent whether vertex shading occurs on vertices
+that are discarded as part of incomplete primitives, but if it does occur
+then it operates as if they were vertices in complete primitives and such
+invocations can: have side effects.
+
+Vertex shading receives two per-vertex inputs from the primitive assembly
+stage - the code:vertexIndex and the code:instanceIndex.
+How these values are generated is defined below, with each command.
+
+Drawing commands fall roughly into two categories:
+
+  * Non-indexed drawing commands present a sequential code:vertexIndex to
+    the vertex shader.
+    The sequential index is generated automatically by the device (see
+    <<fxvertex,Fixed-Function Vertex Processing>> for details on both
+    specifying the vertex attributes indexed by code:vertexIndex, as well as
+    binding vertex buffers containing those attributes to a command buffer).
+    These commands are:
+  ** flink:vkCmdDraw
+  ** flink:vkCmdDrawIndirect
+ifdef::VK_GRAPHICS_VERSION_1_2[]
+  ** flink:vkCmdDrawIndirectCount
+endif::VK_GRAPHICS_VERSION_1_2[]
+ifdef::VK_KHR_draw_indirect_count[]
+  ** flink:vkCmdDrawIndirectCountKHR
+endif::VK_KHR_draw_indirect_count[]
+ifdef::VK_AMD_draw_indirect_count[]
+  ** flink:vkCmdDrawIndirectCountAMD
+endif::VK_AMD_draw_indirect_count[]
+ifdef::VK_EXT_multi_draw[]
+  ** flink:vkCmdDrawMultiEXT
+endif::VK_EXT_multi_draw[]
+  * Indexed drawing commands read index values from an _index buffer_ and
+    use this to compute the code:vertexIndex value for the vertex shader.
+    These commands are:
+  ** flink:vkCmdDrawIndexed
+  ** flink:vkCmdDrawIndexedIndirect
+ifdef::VK_GRAPHICS_VERSION_1_2[]
+  ** flink:vkCmdDrawIndexedIndirectCount
+endif::VK_GRAPHICS_VERSION_1_2[]
+ifdef::VK_KHR_draw_indirect_count[]
+  ** flink:vkCmdDrawIndexedIndirectCountKHR
+endif::VK_KHR_draw_indirect_count[]
+ifdef::VK_AMD_draw_indirect_count[]
+  ** flink:vkCmdDrawIndexedIndirectCountAMD
+endif::VK_AMD_draw_indirect_count[]
+ifdef::VK_EXT_multi_draw[]
+  ** flink:vkCmdDrawMultiIndexedEXT
+endif::VK_EXT_multi_draw[]
+
+[[index-buffer-range]]
+For indexed drawing commands, indices are sourced from a range of memory
+bound to the command buffer, referred to as the _bound index buffer range_,
+and specified by one of the following commands.
+
+ifdef::VK_KHR_device_address_commands[]
+[open,refpage='vkCmdBindIndexBuffer3KHR',desc='Bind an address range as an index buffer to a command buffer',type='protos']
+--
+:refpage: vkCmdBindIndexBuffer3KHR
+
+To bind an address range as an index buffer to a command buffer, call:
+
+include::{generated}/api/protos/vkCmdBindIndexBuffer3KHR.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command is
+    recorded.
+  * pname:pInfo is a pointer to a slink:VkBindIndexBuffer3InfoKHR structure
+    defining parameters of this command.
+
+The <<index-buffer-range,bound index buffer range>> is set to the range of
+memory indicated by pname:pInfo->addressRange.
+
+ifdef::VK_EXT_robustness2,VK_KHR_robustness2[]
+If the <<features-nullDescriptor, pname:nullDescriptor>> feature is enabled,
+pname:pInfo->addressRange.size and pname:pInfo->addressRange.address can: be 0.
+When the size and address are 0, every index read from this binding will
+return a value of zero.
+endif::VK_EXT_robustness2,VK_KHR_robustness2[]
+
+include::{generated}/validity/protos/vkCmdBindIndexBuffer3KHR.adoc[]
+--
+
+[open,refpage='VkBindIndexBuffer3InfoKHR',desc='Index buffer binding info',type='structs']
+--
+:refpage: VkBindIndexBuffer3InfoKHR
+
+sname:VkBindIndexBuffer3InfoKHR is defined as:
+
+include::{generated}/api/structs/VkBindIndexBuffer3InfoKHR.adoc[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:addressRange is the slink:VkDeviceAddressRangeKHR of the address
+    range to bind.
+  * pname:addressFlags is a tlink:VkAddressCommandFlagsKHR value defining
+    the flags for the address range.
+  * pname:indexType is a elink:VkIndexType value specifying the size of the
+    indices.
+
+.Valid Usage
+****
+:addressRange: addressRange
+:addressFlags: addressFlags
+include::{chapters}/commonvalidity/address_flags_common.adoc[]
+  * [[VUID-VkBindIndexBuffer3InfoKHR-addressRange-13051]]
+    If pname:addressRange.address is not 0, the buffer from which
+    pname:addressRange was queried must: have been created with
+    ename:VK_BUFFER_USAGE_INDEX_BUFFER_BIT
+  * [[VUID-VkBindIndexBuffer3InfoKHR-addressRange-13052]]
+    pname:addressRange.address must: be a multiple of the size of the type
+    indicated by pname:indexType
+ifdef::VK_NV_ray_tracing,VK_KHR_acceleration_structure[]
+  * [[VUID-VkBindIndexBuffer3InfoKHR-indexType-13053]]
+    pname:indexType must: not be ename:VK_INDEX_TYPE_NONE_KHR
+endif::VK_NV_ray_tracing,VK_KHR_acceleration_structure[]
+ifdef::VK_KHR_index_type_uint8,VK_EXT_index_type_uint8[]
+  * [[VUID-VkBindIndexBuffer3InfoKHR-indexType-13054]]
+    If pname:indexType is ename:VK_INDEX_TYPE_UINT8_KHR, the
+    <<features-indexTypeUint8, pname:indexTypeUint8>> feature must: be
+    enabled
+endif::VK_KHR_index_type_uint8,VK_EXT_index_type_uint8[]
+  * [[VUID-VkBindIndexBuffer3InfoKHR-None-13055]]
+    {empty}
+ifdef::VK_EXT_robustness2,VK_KHR_robustness2[]
+    If the <<features-nullDescriptor, pname:nullDescriptor>> feature is not
+    enabled,
+endif::VK_EXT_robustness2,VK_KHR_robustness2[]
+    pname:addressRange.size must: be greater than 0
+ifdef::VK_EXT_robustness2,VK_KHR_robustness2[]
+  * [[VUID-VkBindIndexBuffer3InfoKHR-addressRange-13056]]
+    If pname:addressRange.size is 0, pname:addressRange.address must: be 0
+endif::VK_EXT_robustness2,VK_KHR_robustness2[]
+****
+
+include::{generated}/validity/structs/VkBindIndexBuffer3InfoKHR.adoc[]
+--
+endif::VK_KHR_device_address_commands[]
+
+
+ifdef::VK_GRAPHICS_VERSION_1_4,VK_KHR_maintenance5[]
+[open,refpage='vkCmdBindIndexBuffer2',desc='Bind an index buffer to a command buffer',type='protos']
+--
+:refpage: vkCmdBindIndexBuffer2
+
+To bind an index buffer, along with its size, to a command buffer, call:
+
+ifdef::VK_GRAPHICS_VERSION_1_4[]
+include::{generated}/api/protos/vkCmdBindIndexBuffer2.adoc[]
+endif::VK_GRAPHICS_VERSION_1_4[]
+
+ifdef::VK_KHR_maintenance5[]
+include::{generated}/api/protos/vkCmdBindIndexBuffer2KHR.adoc[]
+endif::VK_KHR_maintenance5[]
+
+  * pname:commandBuffer is the command buffer into which the command is
+    recorded.
+  * pname:buffer is the buffer being bound.
+  * pname:offset is the starting offset in bytes within pname:buffer used in
+    index buffer address calculations.
+  * pname:size is the size in bytes of index data bound from pname:buffer.
+  * pname:indexType is a elink:VkIndexType value specifying the size of the
+    indices.
+
+pname:buffer, pname:offset, and pname:size specify the <<index-buffer-range,
+bound index buffer range>>, with a range of memory bound from
+[eq]#[code:base {plus} pname:offset, code:base {plus} pname:offset {plus}
+pname:size)#, where code:base is the start of pname:buffer.
+If pname:size is ename:VK_WHOLE_SIZE then the range is from pname:offset to
+the end of the pname:buffer.
+
+ifdef::VK_GRAPHICS_VERSION_1_4,VK_KHR_maintenance6[]
+If the <<features-maintenance6,pname:maintenance6>> feature is enabled,
+pname:buffer can: be dlink:VK_NULL_HANDLE.
+ifdef::VK_EXT_robustness2,VK_KHR_robustness2[]
+If pname:buffer is dlink:VK_NULL_HANDLE and the <<features-nullDescriptor,
+pname:nullDescriptor>> feature is enabled, every index fetched results in a
+value of zero.
+endif::VK_EXT_robustness2,VK_KHR_robustness2[]
+endif::VK_GRAPHICS_VERSION_1_4,VK_KHR_maintenance6[]
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/bind_index_buffer_common.adoc[]
+  * [[VUID-vkCmdBindIndexBuffer2-size-08767]]
+    If pname:size is not ename:VK_WHOLE_SIZE, pname:size must: be a multiple
+    of the size of the type indicated by pname:indexType
+  * [[VUID-vkCmdBindIndexBuffer2-size-08768]]
+    If pname:size is not ename:VK_WHOLE_SIZE, the sum of pname:offset and
+    pname:size must: be less than or equal to the size of pname:buffer
+****
+
+include::{generated}/validity/protos/vkCmdBindIndexBuffer2.adoc[]
+--
+endif::VK_GRAPHICS_VERSION_1_4,VK_KHR_maintenance5[]
+
+
+[open,refpage='vkCmdBindIndexBuffer',desc='Bind an index buffer to a command buffer',type='protos']
+--
+:refpage: vkCmdBindIndexBuffer
+
+To bind an index buffer to a command buffer, call:
+
+include::{generated}/api/protos/vkCmdBindIndexBuffer.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command is
+    recorded.
+  * pname:buffer is the buffer being bound.
+  * pname:offset is the starting offset in bytes within pname:buffer used in
+    index buffer address calculations.
+  * pname:indexType is a elink:VkIndexType value specifying the size of the
+    indices.
+
+pname:buffer and pname:offset specify the <<index-buffer-range, bound index
+buffer range>>, with a range of memory bound from [eq]#[code:base {plus}
+pname:offset, code:base {plus} pname:offset {plus} pname:size)#, where
+code:size is from pname:offset to the end of the pname:buffer.
+
+ifdef::VK_GRAPHICS_VERSION_1_4,VK_KHR_maintenance6[]
+If the <<features-maintenance6,pname:maintenance6>> feature is enabled,
+pname:buffer can: be dlink:VK_NULL_HANDLE.
+ifdef::VK_EXT_robustness2,VK_KHR_robustness2[]
+If pname:buffer is dlink:VK_NULL_HANDLE and the <<features-nullDescriptor,
+pname:nullDescriptor>> feature is enabled, every index fetched results in a
+value of zero.
+endif::VK_EXT_robustness2,VK_KHR_robustness2[]
+endif::VK_GRAPHICS_VERSION_1_4,VK_KHR_maintenance6[]
+
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/bind_index_buffer_common.adoc[]
+****
+
+include::{generated}/validity/protos/vkCmdBindIndexBuffer.adoc[]
+--
+
+
+[open,refpage='VkIndexType',desc='Type of index buffer indices',type='enums']
+--
+Possible values of
+ifdef::VK_GRAPHICS_VERSION_1_4,VK_KHR_maintenance5[flink:vkCmdBindIndexBuffer2::pname:indexType and]
+flink:vkCmdBindIndexBuffer::pname:indexType, specifying the size of indices,
+are:
+
+include::{generated}/api/enums/VkIndexType.adoc[]
+
+  * ename:VK_INDEX_TYPE_UINT16 specifies that indices are 16-bit unsigned
+    integer values.
+  * ename:VK_INDEX_TYPE_UINT32 specifies that indices are 32-bit unsigned
+    integer values.
+ifdef::VK_NV_ray_tracing,VK_KHR_acceleration_structure[]
+  * ename:VK_INDEX_TYPE_NONE_KHR specifies that no indices are provided.
+endif::VK_NV_ray_tracing,VK_KHR_acceleration_structure[]
+ifdef::VK_GRAPHICS_VERSION_1_4,VK_KHR_index_type_uint8,VK_EXT_index_type_uint8[]
+  * ename:VK_INDEX_TYPE_UINT8 specifies that indices are 8-bit unsigned
+    integer values.
+endif::VK_GRAPHICS_VERSION_1_4,VK_KHR_index_type_uint8,VK_EXT_index_type_uint8[]
+--
+
+The parameters for each drawing command are specified directly in the
+command or read from buffer memory, depending on the command.
+Drawing commands that source their parameters from buffer memory are known
+as _indirect_ drawing commands.
+
+All drawing commands interact with the <<features-robustBufferAccess,
+pname:robustBufferAccess>> feature.
+
+[open,refpage='vkCmdDraw',desc='Draw primitives',type='protos']
+--
+:refpage: vkCmdDraw
+
+To record a non-indexed draw, call:
+
+include::{generated}/api/protos/vkCmdDraw.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command is
+    recorded.
+  * pname:vertexCount is the number of vertices to draw.
+  * pname:instanceCount is the number of instances to draw.
+  * pname:firstVertex is the index of the first vertex to draw.
+  * pname:firstInstance is the instance ID of the first instance to draw.
+
+When the command is executed, primitives are assembled using the current
+primitive topology and pname:vertexCount consecutive vertex indices with the
+first code:vertexIndex value equal to pname:firstVertex.
+The primitives are drawn pname:instanceCount times with code:instanceIndex
+starting with pname:firstInstance and increasing sequentially for each
+instance.
+The assembled primitives execute the bound graphics pipeline.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/draw_common.adoc[]
+include::{chapters}/commonvalidity/draw_dispatch_nonindirect_common.adoc[]
+include::{chapters}/commonvalidity/draw_vertex_binding.adoc[]
+include::{chapters}/commonvalidity/draw_instance_common.adoc[]
+****
+
+include::{generated}/validity/protos/vkCmdDraw.adoc[]
+--
+
+[open,refpage='vkCmdDrawIndexed',desc='Draw primitives with indexed vertices',type='protos']
+--
+:refpage: vkCmdDrawIndexed
+
+To record an indexed draw, call:
+
+include::{generated}/api/protos/vkCmdDrawIndexed.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command is
+    recorded.
+  * pname:indexCount is the number of vertices to draw.
+  * pname:instanceCount is the number of instances to draw.
+  * pname:firstIndex is the base index within the index buffer.
+  * pname:vertexOffset is the value added to the vertex index before
+    indexing into the vertex buffer.
+  * pname:firstInstance is the instance ID of the first instance to draw.
+
+When the command is executed, primitives are assembled using the current
+primitive topology and pname:indexCount vertices whose indices are retrieved
+from the index buffer.
+The index buffer is treated as an array of tightly packed unsigned integers
+of size defined by the
+ifdef::VK_GRAPHICS_VERSION_1_4,VK_KHR_maintenance5[flink:vkCmdBindIndexBuffer2::pname:indexType or the]
+flink:vkCmdBindIndexBuffer::pname:indexType parameter with which the buffer
+was bound.
+
+The first vertex index is read from [eq]#code:indexAddress {plus}
+(pname:firstIndex {times} code:indexSize)#, where pname:indexAddress is the
+effective address specified for the index buffer by
+ifdef::VK_KHR_device_address_commands[flink:vkCmdBindIndexBuffer3KHR,]
+ifdef::VK_GRAPHICS_VERSION_1_4,VK_KHR_maintenance5[flink:vkCmdBindIndexBuffer2,]
+ifdef::VK_GRAPHICS_VERSION_1_4,VK_KHR_maintenance5,VK_KHR_device_address_commands[or]
+flink:vkCmdBindIndexBuffer, and code:indexSize is the byte size of the type
+specified by pname:indexType.
+Subsequent index values are retrieved from consecutive locations in the
+index buffer.
+Indices are first compared to the primitive restart value, then zero
+extended to 32 bits (if the code:indexType is
+ifdef::VK_GRAPHICS_VERSION_1_4,VK_KHR_index_type_uint8,VK_EXT_index_type_uint8[]
+ename:VK_INDEX_TYPE_UINT8 or
+endif::VK_GRAPHICS_VERSION_1_4,VK_KHR_index_type_uint8,VK_EXT_index_type_uint8[]
+ename:VK_INDEX_TYPE_UINT16) and have pname:vertexOffset added to them,
+before being supplied as the code:vertexIndex value.
+
+The primitives are drawn pname:instanceCount times with code:instanceIndex
+starting with pname:firstInstance and increasing sequentially for each
+instance.
+The assembled primitives execute the bound graphics pipeline.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/draw_common.adoc[]
+include::{chapters}/commonvalidity/draw_dispatch_nonindirect_common.adoc[]
+include::{chapters}/commonvalidity/draw_vertex_binding.adoc[]
+include::{chapters}/commonvalidity/draw_indexed_common.adoc[]
+include::{chapters}/commonvalidity/draw_instance_common.adoc[]
+include::{chapters}/commonvalidity/draw_index_binding.adoc[]
+****
+
+include::{generated}/validity/protos/vkCmdDrawIndexed.adoc[]
+--
+
+ifdef::VK_EXT_multi_draw[]
+[open,refpage='vkCmdDrawMultiEXT',desc='Draw primitives',type='protos']
+--
+:refpage: vkCmdDrawMultiEXT
+
+To record an ordered sequence of draws which have no state changes between
+them, call:
+
+include::{generated}/api/protos/vkCmdDrawMultiEXT.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command is
+    recorded.
+  * pname:drawCount is the number of draws to execute, and can: be zero.
+  * pname:pVertexInfo is a pointer to an array of slink:VkMultiDrawInfoEXT
+    with vertex information to be drawn.
+  * pname:instanceCount is the number of instances per draw.
+  * pname:firstInstance is the instance ID of the first instance in each
+    draw.
+  * pname:stride is the byte stride between consecutive elements of
+    pname:pVertexInfo.
+
+The number of draws recorded is pname:drawCount, with each draw reading,
+sequentially, a pname:firstVertex and a pname:vertexCount from
+pname:pVertexInfo.
+For each recorded draw, primitives are assembled as for flink:vkCmdDraw, and
+drawn pname:instanceCount times with code:instanceIndex starting with
+pname:firstInstance and sequentially for each instance.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/draw_common.adoc[]
+include::{chapters}/commonvalidity/draw_dispatch_nonindirect_common.adoc[]
+include::{chapters}/commonvalidity/draw_vertex_binding.adoc[]
+include::{chapters}/commonvalidity/draw_instance_common.adoc[]
+  * [[VUID-vkCmdDrawMultiEXT-None-04933]]
+    The <<features-multiDraw, pname:multiDraw>> feature must: be enabled
+  * [[VUID-vkCmdDrawMultiEXT-drawCount-04934]]
+    pname:drawCount must: be less than
+    sname:VkPhysicalDeviceMultiDrawPropertiesEXT::pname:maxMultiDrawCount
+  * [[VUID-vkCmdDrawMultiEXT-drawCount-04935]]
+    If pname:drawCount is greater than zero, pname:pVertexInfo must: be a
+    valid pointer to memory containing one or more valid instances of
+    slink:VkMultiDrawInfoEXT structures
+  * [[VUID-vkCmdDrawMultiEXT-drawCount-09628]]
+    If pname:drawCount is greater than `1`, pname:stride must: be a multiple
+    of `4` and must: be greater than or equal to
+    code:sizeof(sname:VkMultiDrawInfoEXT)
+****
+
+include::{generated}/validity/protos/vkCmdDrawMultiEXT.adoc[]
+--
+
+[open,refpage='vkCmdDrawMultiIndexedEXT',desc='Draw primitives',type='protos']
+--
+:refpage: vkCmdDrawMultiIndexedEXT
+
+To record an ordered sequence of indexed draws which have no state changes
+between them, call:
+
+include::{generated}/api/protos/vkCmdDrawMultiIndexedEXT.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command is
+    recorded.
+  * pname:drawCount is the number of draws to execute, and can: be zero.
+  * pname:pIndexInfo is a pointer to an array of
+    slink:VkMultiDrawIndexedInfoEXT with index information to be drawn.
+  * pname:instanceCount is the number of instances per draw.
+  * pname:firstInstance is the instance ID of the first instance in each
+    draw.
+  * pname:stride is the byte stride between consecutive elements of
+    pname:pIndexInfo.
+  * pname:pVertexOffset is `NULL` or a pointer to the value added to the
+    vertex index before indexing into the vertex buffer.
+    When specified, sname:VkMultiDrawIndexedInfoEXT::pname:offset is
+    ignored.
+
+The number of draws recorded is pname:drawCount, with each draw reading,
+sequentially, a pname:firstIndex and an pname:indexCount from
+pname:pIndexInfo.
+For each recorded draw, primitives are assembled as for
+flink:vkCmdDrawIndexed, and drawn pname:instanceCount times with
+code:instanceIndex starting with pname:firstInstance and sequentially for
+each instance.
+If pname:pVertexOffset is `NULL`, a pname:vertexOffset is also read from
+pname:pIndexInfo, otherwise the value from dereferencing pname:pVertexOffset
+is used.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/draw_common.adoc[]
+include::{chapters}/commonvalidity/draw_dispatch_nonindirect_common.adoc[]
+include::{chapters}/commonvalidity/draw_vertex_binding.adoc[]
+include::{chapters}/commonvalidity/draw_indexed_common.adoc[]
+include::{chapters}/commonvalidity/draw_instance_common.adoc[]
+include::{chapters}/commonvalidity/draw_index_binding.adoc[]
+  * [[VUID-vkCmdDrawMultiIndexedEXT-None-04937]]
+    The <<features-multiDraw, pname:multiDraw>> feature must: be enabled
+  * [[VUID-vkCmdDrawMultiIndexedEXT-drawCount-04939]]
+    pname:drawCount must: be less than
+    sname:VkPhysicalDeviceMultiDrawPropertiesEXT::pname:maxMultiDrawCount
+  * [[VUID-vkCmdDrawMultiIndexedEXT-drawCount-04940]]
+    If pname:drawCount is greater than zero, pname:pIndexInfo must: be a
+    valid pointer to memory containing one or more valid instances of
+    slink:VkMultiDrawIndexedInfoEXT structures
+  * [[VUID-vkCmdDrawMultiIndexedEXT-drawCount-09629]]
+    If pname:drawCount is greater than `1`, pname:stride must: be a multiple
+    of `4` and must: be greater than or equal to
+    code:sizeof(sname:VkMultiDrawIndexedInfoEXT)
+****
+
+include::{generated}/validity/protos/vkCmdDrawMultiIndexedEXT.adoc[]
+--
+
+[open,refpage='VkMultiDrawInfoEXT',desc='Structure specifying a multi-draw command',type='structs',xrefs='vkCmdDrawMultiEXT']
+--
+The sname:VkMultiDrawInfoEXT structure is defined as:
+
+include::{generated}/api/structs/VkMultiDrawInfoEXT.adoc[]
+
+  * pname:firstVertex is the first vertex to draw.
+  * pname:vertexCount is the number of vertices to draw.
+
+The members of sname:VkMultiDrawInfoEXT have the same meaning as the
+pname:firstVertex and pname:vertexCount parameters in flink:vkCmdDraw.
+
+include::{generated}/validity/structs/VkMultiDrawInfoEXT.adoc[]
+--
+
+[open,refpage='VkMultiDrawIndexedInfoEXT',desc='Structure specifying a multi-draw command',type='structs',xrefs='vkCmdDrawMultiIndexedEXT']
+--
+The sname:VkMultiDrawIndexedInfoEXT structure is defined as:
+
+include::{generated}/api/structs/VkMultiDrawIndexedInfoEXT.adoc[]
+
+  * pname:firstIndex is the first index to draw.
+  * pname:indexCount is the number of vertices to draw.
+  * pname:vertexOffset is the value added to the vertex index before
+    indexing into the vertex buffer for indexed multidraws.
+
+The pname:firstIndex, pname:indexCount, and pname:vertexOffset members of
+sname:VkMultiDrawIndexedInfoEXT have the same meaning as the
+pname:firstIndex, pname:indexCount, and pname:vertexOffset parameters,
+respectively, of flink:vkCmdDrawIndexed.
+
+include::{generated}/validity/structs/VkMultiDrawIndexedInfoEXT.adoc[]
+--
+endif::VK_EXT_multi_draw[]
+
+ifdef::VK_KHR_device_address_commands[]
+[open,refpage='VkDrawIndirect2InfoKHR',desc='Draw indirect info',type='structs']
+--
+:refpage: VkDrawIndirect2InfoKHR
+
+sname:VkDrawIndirect2InfoKHR is defined as:
+
+include::{generated}/api/structs/VkDrawIndirect2InfoKHR.adoc[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:addressRange is the slink:VkStridedDeviceAddressRangeKHR
+    containing draw parameters.
+  * pname:addressFlags is a tlink:VkAddressCommandFlagsKHR value defining
+    the flags for the address range.
+  * pname:drawCount is the number of draws to execute, and can: be zero.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/draw_dispatch_indirect_address_common.adoc[]
+include::{chapters}/commonvalidity/draw_indirect_drawcount.adoc[]
+****
+
+include::{generated}/validity/structs/VkDrawIndirect2InfoKHR.adoc[]
+--
+
+[open,refpage='vkCmdDrawIndirect2KHR',desc='Draw primitives with indirect parameters through an address range',type='protos']
+--
+:refpage: vkCmdDrawIndirect2KHR
+
+To record a non-indexed indirect drawing command, call:
+
+include::{generated}/api/protos/vkCmdDrawIndirect2KHR.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command is
+    recorded.
+  * pname:pInfo is a pointer to a slink:VkDrawIndirect2InfoKHR structure
+    defining parameters of this command.
+
+fname:vkCmdDrawIndirect2KHR behaves similarly to flink:vkCmdDraw except that
+the parameters are read by the device from an address range during
+execution.
+pname:pInfo->drawCount draws are executed by the command, with parameters
+taken from pname:pInfo->addressRange starting at pname:addressRange.address
+and increasing by pname:addressRange.stride bytes for each successive draw.
+The parameters of each draw are encoded in an array of
+slink:VkDrawIndirectCommand structures.
+
+:indirectStruct: VkDrawIndirectCommand
+:drawCount: drawCount
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/draw_common.adoc[]
+include::{chapters}/commonvalidity/draw_vertex_binding.adoc[]
+include::{chapters}/commonvalidity/draw_indirect_address_stride_common.adoc[]
+  * [[VUID-vkCmdDrawIndirect2KHR-commandBuffer-13057]]
+    pname:commandBuffer must: not be a protected command buffer
+****
+
+include::{generated}/validity/protos/vkCmdDrawIndirect2KHR.adoc[]
+--
+endif::VK_KHR_device_address_commands[]
+
+[open,refpage='vkCmdDrawIndirect',desc='Draw primitives with indirect parameters',type='protos']
+--
+:refpage: vkCmdDrawIndirect
+
+To record a non-indexed indirect drawing command, call:
+
+include::{generated}/api/protos/vkCmdDrawIndirect.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command is
+    recorded.
+  * pname:buffer is the buffer containing draw parameters.
+  * pname:offset is the byte offset into pname:buffer where parameters
+    begin.
+  * pname:drawCount is the number of draws to execute, and can: be zero.
+  * pname:stride is the byte stride between successive sets of draw
+    parameters.
+
+fname:vkCmdDrawIndirect behaves similarly to flink:vkCmdDraw except that the
+parameters are read by the device from a buffer during execution.
+pname:drawCount draws are executed by the command, with parameters taken
+from pname:buffer starting at pname:offset and increasing by pname:stride
+bytes for each successive draw.
+The parameters of each draw are encoded in an array of
+slink:VkDrawIndirectCommand structures.
+If pname:drawCount is less than or equal to one, pname:stride is ignored.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/draw_common.adoc[]
+include::{chapters}/commonvalidity/draw_vertex_binding.adoc[]
+include::{chapters}/commonvalidity/draw_dispatch_indirect_common.adoc[]
+include::{chapters}/commonvalidity/draw_indirect_drawcount.adoc[]
+  * [[VUID-vkCmdDrawIndirect-drawCount-00476]]
+    If pname:drawCount is greater than `1`, pname:stride must: be a multiple
+    of `4` and must: be greater than or equal to
+    code:sizeof(sname:VkDrawIndirectCommand)
+  * [[VUID-vkCmdDrawIndirect-drawCount-00487]]
+    If pname:drawCount is equal to `1`, [eq]#(pname:offset {plus}
+    code:sizeof(slink:VkDrawIndirectCommand))# must: be less than or equal
+    to the size of pname:buffer
+  * [[VUID-vkCmdDrawIndirect-drawCount-00488]]
+    If pname:drawCount is greater than `1`, [eq]#(pname:stride {times}
+    (pname:drawCount - 1) {plus} pname:offset {plus}
+    code:sizeof(slink:VkDrawIndirectCommand))# must: be less than or equal
+    to the size of pname:buffer
+****
+
+include::{generated}/validity/protos/vkCmdDrawIndirect.adoc[]
+--
+
+[open,refpage='VkDrawIndirectCommand',desc='Structure specifying an indirect drawing command',type='structs',xrefs='vkCmdDrawIndirect']
+--
+:refpage: VkDrawIndirectCommand
+
+The sname:VkDrawIndirectCommand structure is defined as:
+
+include::{generated}/api/structs/VkDrawIndirectCommand.adoc[]
+
+  * pname:vertexCount is the number of vertices to draw.
+  * pname:instanceCount is the number of instances to draw.
+  * pname:firstVertex is the index of the first vertex to draw.
+  * pname:firstInstance is the instance ID of the first instance to draw.
+
+The members of sname:VkDrawIndirectCommand have the same meaning as the
+similarly named parameters of flink:vkCmdDraw.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/draw_instance_common.adoc[]
+  * [[VUID-VkDrawIndirectCommand-firstInstance-00501]]
+    If the <<features-drawIndirectFirstInstance,
+    pname:drawIndirectFirstInstance>> feature is not enabled,
+    pname:firstInstance must: be code:0
+****
+
+include::{generated}/validity/structs/VkDrawIndirectCommand.adoc[]
+--
+
+ifdef::VK_GRAPHICS_VERSION_1_2,VK_KHR_draw_indirect_count,VK_AMD_draw_indirect_count[]
+
+ifdef::VK_KHR_device_address_commands[]
+[open,refpage='VkDrawIndirectCount2InfoKHR',desc='Draw indirect count info',type='structs']
+--
+:refpage: VkDrawIndirectCount2InfoKHR
+
+sname:VkDrawIndirectCount2InfoKHR is defined as:
+
+include::{generated}/api/structs/VkDrawIndirectCount2InfoKHR.adoc[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:addressRange is the slink:VkStridedDeviceAddressRangeKHR
+    containing draw parameters.
+  * pname:addressFlags is a tlink:VkAddressCommandFlagsKHR value defining
+    the flags for the address range.
+  * pname:countAddressRange is the slink:VkDeviceAddressRangeKHR containing
+    the draw count.
+  * pname:countAddressFlags is a tlink:VkAddressCommandFlagsKHR value
+    defining the flags for the count address range.
+  * pname:maxDrawCount specifies the maximum number of draws that will be
+    executed.
+    The actual number of executed draw calls is the minimum of the count
+    specified in pname:countAddressRange and pname:maxDrawCount.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/draw_dispatch_indirect_address_common.adoc[]
+include::{chapters}/commonvalidity/draw_indirect_count_address_common.adoc[]
+****
+
+include::{generated}/validity/structs/VkDrawIndirectCount2InfoKHR.adoc[]
+--
+
+[open,refpage='vkCmdDrawIndirectCount2KHR',desc='Draw primitives with indirect parameters and draw count through address ranges',type='protos']
+--
+:refpage: vkCmdDrawIndirectCount2KHR
+
+To record a non-indexed indirect drawing command, call:
+
+include::{generated}/api/protos/vkCmdDrawIndirectCount2KHR.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command is
+    recorded.
+  * pname:pInfo is a pointer to a slink:VkDrawIndirectCount2InfoKHR
+    structure defining parameters of this command.
+
+fname:vkCmdDrawIndirectCount2KHR behaves similarly to
+flink:vkCmdDrawIndirect2KHR except that the draw count is read by the device
+from an address range during execution.
+The command will read an unsigned 32-bit integer from
+pname:pInfo->countAddressRange and use this as the draw count.
+
+:indirectStruct: VkDrawIndirectCommand
+:drawCount: maxDrawCount
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/draw_common.adoc[]
+include::{chapters}/commonvalidity/draw_vertex_binding.adoc[]
+include::{chapters}/commonvalidity/draw_indirect_address_stride_common.adoc[]
+  * [[VUID-vkCmdDrawIndirectCount2KHR-commandBuffer-13058]]
+    pname:commandBuffer must: not be a protected command buffer
+  * [[VUID-vkCmdDrawIndirectCount2KHR-drawIndirectCount-13119]]
+    If the <<features-drawIndirectCount, pname:drawIndirectCount>> feature
+    is not enabled this function must: not be used
+****
+
+include::{generated}/validity/protos/vkCmdDrawIndirectCount2KHR.adoc[]
+--
+endif::VK_KHR_device_address_commands[]
+
+[open,refpage='vkCmdDrawIndirectCount',desc='Draw primitives with indirect parameters and draw count',type='protos']
+--
+:refpage: vkCmdDrawIndirectCount
+
+To record a non-indexed draw call with a draw call count sourced from a
+buffer, call:
+
+ifdef::VK_GRAPHICS_VERSION_1_2[]
+include::{generated}/api/protos/vkCmdDrawIndirectCount.adoc[]
+endif::VK_GRAPHICS_VERSION_1_2[]
+
+ifdef::VK_KHR_draw_indirect_count[]
+include::{generated}/api/protos/vkCmdDrawIndirectCountKHR.adoc[]
+endif::VK_KHR_draw_indirect_count[]
+
+ifdef::VK_AMD_draw_indirect_count[]
+include::{generated}/api/protos/vkCmdDrawIndirectCountAMD.adoc[]
+endif::VK_AMD_draw_indirect_count[]
+
+  * pname:commandBuffer is the command buffer into which the command is
+    recorded.
+  * pname:buffer is the buffer containing draw parameters.
+  * pname:offset is the byte offset into pname:buffer where parameters
+    begin.
+  * pname:countBuffer is the buffer containing the draw count.
+  * pname:countBufferOffset is the byte offset into pname:countBuffer where
+    the draw count begins.
+  * pname:maxDrawCount specifies the maximum number of draws that will be
+    executed.
+    The actual number of executed draw calls is the minimum of the count
+    specified in pname:countBuffer and pname:maxDrawCount.
+  * pname:stride is the byte stride between successive sets of draw
+    parameters.
+
+fname:vkCmdDrawIndirectCount behaves similarly to flink:vkCmdDrawIndirect
+except that the draw count is read by the device from a buffer during
+execution.
+The command will read an unsigned 32-bit integer from pname:countBuffer
+located at pname:countBufferOffset and use this as the draw count.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/draw_common.adoc[]
+include::{chapters}/commonvalidity/draw_vertex_binding.adoc[]
+include::{chapters}/commonvalidity/draw_dispatch_indirect_common.adoc[]
+include::{chapters}/commonvalidity/draw_indirect_count_common.adoc[]
+  * [[VUID-vkCmdDrawIndirectCount-stride-03110]]
+    pname:stride must: be a multiple of `4` and must: be greater than or
+    equal to sizeof(sname:VkDrawIndirectCommand)
+  * [[VUID-vkCmdDrawIndirectCount-maxDrawCount-03111]]
+    If pname:maxDrawCount is greater than or equal to `1`,
+    [eq]#(pname:stride {times} (pname:maxDrawCount - 1) {plus} pname:offset
+    {plus} sizeof(sname:VkDrawIndirectCommand))# must: be less than or equal
+    to the size of pname:buffer
+****
+
+include::{generated}/validity/protos/vkCmdDrawIndirectCount.adoc[]
+--
+endif::VK_GRAPHICS_VERSION_1_2,VK_KHR_draw_indirect_count,VK_AMD_draw_indirect_count[]
+
+ifdef::VK_KHR_device_address_commands[]
+[open,refpage='vkCmdDrawIndexedIndirect2KHR',desc='Draw primitives with indirect parameters through an address range and with indexed vertices',type='protos']
+--
+:refpage: vkCmdDrawIndexedIndirect2KHR
+
+To record an indexed indirect drawing command, call:
+
+include::{generated}/api/protos/vkCmdDrawIndexedIndirect2KHR.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command is
+    recorded.
+  * pname:pInfo is a pointer to a slink:VkDrawIndirect2InfoKHR structure
+    defining parameters of this command.
+
+fname:vkCmdDrawIndexedIndirect2KHR behaves similarly to
+flink:vkCmdDrawIndexed except that the parameters are read by the device
+from an address range during execution.
+pname:pInfo->drawCount draws are executed by the command, with parameters
+taken from pname:pInfo->addressRange starting at pname:addressRange.address
+and increasing by pname:addressRange.stride bytes for each successive draw.
+The parameters of each draw are encoded in an array of
+slink:VkDrawIndexedIndirectCommand structures.
+
+:indirectStruct: VkDrawIndexedIndirectCommand
+:drawCount: drawCount
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/draw_common.adoc[]
+include::{chapters}/commonvalidity/draw_vertex_binding.adoc[]
+include::{chapters}/commonvalidity/draw_indexed_common.adoc[]
+include::{chapters}/commonvalidity/draw_indirect_address_stride_common.adoc[]
+  * [[VUID-vkCmdDrawIndexedIndirect2KHR-commandBuffer-13059]]
+    pname:commandBuffer must: not be a protected command buffer
+****
+
+include::{generated}/validity/protos/vkCmdDrawIndexedIndirect2KHR.adoc[]
+--
+endif::VK_KHR_device_address_commands[]
+
+[open,refpage='vkCmdDrawIndexedIndirect',desc='Draw primitives with indirect parameters and indexed vertices',type='protos']
+--
+:refpage: vkCmdDrawIndexedIndirect
+
+To record an indexed indirect drawing command, call:
+
+include::{generated}/api/protos/vkCmdDrawIndexedIndirect.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command is
+    recorded.
+  * pname:buffer is the buffer containing draw parameters.
+  * pname:offset is the byte offset into pname:buffer where parameters
+    begin.
+  * pname:drawCount is the number of draws to execute, and can: be zero.
+  * pname:stride is the byte stride between successive sets of draw
+    parameters.
+
+fname:vkCmdDrawIndexedIndirect behaves similarly to flink:vkCmdDrawIndexed
+except that the parameters are read by the device from a buffer during
+execution.
+pname:drawCount draws are executed by the command, with parameters taken
+from pname:buffer starting at pname:offset and increasing by pname:stride
+bytes for each successive draw.
+The parameters of each draw are encoded in an array of
+slink:VkDrawIndexedIndirectCommand structures.
+If pname:drawCount is less than or equal to one, pname:stride is ignored.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/draw_common.adoc[]
+include::{chapters}/commonvalidity/draw_vertex_binding.adoc[]
+include::{chapters}/commonvalidity/draw_dispatch_indirect_common.adoc[]
+include::{chapters}/commonvalidity/draw_indirect_drawcount.adoc[]
+include::{chapters}/commonvalidity/draw_indexed_common.adoc[]
+  * [[VUID-vkCmdDrawIndexedIndirect-drawCount-00528]]
+    If pname:drawCount is greater than `1`, pname:stride must: be a multiple
+    of `4` and must: be greater than or equal to
+    code:sizeof(sname:VkDrawIndexedIndirectCommand)
+  * [[VUID-vkCmdDrawIndexedIndirect-drawCount-00539]]
+    If pname:drawCount is equal to `1`, [eq]#(pname:offset {plus}
+    code:sizeof(sname:VkDrawIndexedIndirectCommand))# must: be less than or
+    equal to the size of pname:buffer
+  * [[VUID-vkCmdDrawIndexedIndirect-drawCount-00540]]
+    If pname:drawCount is greater than `1`, [eq]#(pname:stride {times}
+    (pname:drawCount - 1) {plus} pname:offset {plus}
+    code:sizeof(sname:VkDrawIndexedIndirectCommand))# must: be less than or
+    equal to the size of pname:buffer
+****
+
+include::{generated}/validity/protos/vkCmdDrawIndexedIndirect.adoc[]
+--
+
+[open,refpage='VkDrawIndexedIndirectCommand',desc='Structure specifying an indexed indirect drawing command',type='structs',xrefs='vkCmdDrawIndexedIndirect']
+--
+:refpage: VkDrawIndexedIndirectCommand
+
+The sname:VkDrawIndexedIndirectCommand structure is defined as:
+
+include::{generated}/api/structs/VkDrawIndexedIndirectCommand.adoc[]
+
+  * pname:indexCount is the number of vertices to draw.
+  * pname:instanceCount is the number of instances to draw.
+  * pname:firstIndex is the base index within the index buffer.
+  * pname:vertexOffset is the value added to the vertex index before
+    indexing into the vertex buffer.
+  * pname:firstInstance is the instance ID of the first instance to draw.
+
+The members of sname:VkDrawIndexedIndirectCommand have the same meaning as
+the similarly named parameters of flink:vkCmdDrawIndexed.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/draw_instance_common.adoc[]
+include::{chapters}/commonvalidity/draw_index_binding.adoc[]
+  * [[VUID-VkDrawIndexedIndirectCommand-firstInstance-00554]]
+    If the <<features-drawIndirectFirstInstance,
+    pname:drawIndirectFirstInstance>> feature is not enabled,
+    pname:firstInstance must: be code:0
+****
+
+include::{generated}/validity/structs/VkDrawIndexedIndirectCommand.adoc[]
+--
+
+ifdef::VK_GRAPHICS_VERSION_1_2,VK_KHR_draw_indirect_count,VK_AMD_draw_indirect_count[]
+ifdef::VK_KHR_device_address_commands[]
+[open,refpage='vkCmdDrawIndexedIndirectCount2KHR',desc='Draw primitives with indirect parameters and draw count through address ranges and with indexed vertices',type='protos']
+--
+:refpage: vkCmdDrawIndexedIndirectCount2KHR
+
+To record a non-indexed indirect drawing command, call:
+
+include::{generated}/api/protos/vkCmdDrawIndexedIndirectCount2KHR.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command is
+    recorded.
+  * pname:pInfo is a pointer to a slink:VkDrawIndirectCount2InfoKHR
+    structure defining parameters of this command.
+
+fname:vkCmdDrawIndexedIndirectCount2KHR behaves similarly to
+flink:vkCmdDrawIndexedIndirect2KHR except that the draw count is read by the
+device from an address range during execution.
+The command will read an unsigned 32-bit integer from
+pname:pInfo->countAddressRange and use this as the draw count.
+
+:indirectStruct: VkDrawIndexedIndirectCommand
+:drawCount: maxDrawCount
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/draw_common.adoc[]
+include::{chapters}/commonvalidity/draw_vertex_binding.adoc[]
+include::{chapters}/commonvalidity/draw_indirect_address_stride_common.adoc[]
+include::{chapters}/commonvalidity/draw_indexed_common.adoc[]
+  * [[VUID-vkCmdDrawIndexedIndirectCount2KHR-commandBuffer-13060]]
+    pname:commandBuffer must: not be a protected command buffer
+  * [[VUID-vkCmdDrawIndexedIndirectCount2KHR-drawIndirectCount-13120]]
+    If the <<features-drawIndirectCount, pname:drawIndirectCount>> feature
+    is not enabled this function must: not be used
+****
+
+include::{generated}/validity/protos/vkCmdDrawIndexedIndirectCount2KHR.adoc[]
+--
+endif::VK_KHR_device_address_commands[]
+
+[open,refpage='vkCmdDrawIndexedIndirectCount',desc='Draw parameters with indirect parameters, indexed vertices, and draw count',type='protos']
+--
+:refpage: vkCmdDrawIndexedIndirectCount
+
+To record an indexed draw call with a draw call count sourced from a buffer,
+call:
+
+ifdef::VK_GRAPHICS_VERSION_1_2[]
+include::{generated}/api/protos/vkCmdDrawIndexedIndirectCount.adoc[]
+endif::VK_GRAPHICS_VERSION_1_2[]
+
+ifdef::VK_KHR_draw_indirect_count[]
+include::{generated}/api/protos/vkCmdDrawIndexedIndirectCountKHR.adoc[]
+endif::VK_KHR_draw_indirect_count[]
+
+ifdef::VK_AMD_draw_indirect_count[]
+include::{generated}/api/protos/vkCmdDrawIndexedIndirectCountAMD.adoc[]
+endif::VK_AMD_draw_indirect_count[]
+
+  * pname:commandBuffer is the command buffer into which the command is
+    recorded.
+  * pname:buffer is the buffer containing draw parameters.
+  * pname:offset is the byte offset into pname:buffer where parameters
+    begin.
+  * pname:countBuffer is the buffer containing the draw count.
+  * pname:countBufferOffset is the byte offset into pname:countBuffer where
+    the draw count begins.
+  * pname:maxDrawCount specifies the maximum number of draws that will be
+    executed.
+    The actual number of executed draw calls is the minimum of the count
+    specified in pname:countBuffer and pname:maxDrawCount.
+  * pname:stride is the byte stride between successive sets of draw
+    parameters.
+
+fname:vkCmdDrawIndexedIndirectCount behaves similarly to
+flink:vkCmdDrawIndexedIndirect except that the draw count is read by the
+device from a buffer during execution.
+The command will read an unsigned 32-bit integer from pname:countBuffer
+located at pname:countBufferOffset and use this as the draw count.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/draw_common.adoc[]
+include::{chapters}/commonvalidity/draw_vertex_binding.adoc[]
+include::{chapters}/commonvalidity/draw_dispatch_indirect_common.adoc[]
+include::{chapters}/commonvalidity/draw_indirect_count_common.adoc[]
+include::{chapters}/commonvalidity/draw_indexed_common.adoc[]
+  * [[VUID-vkCmdDrawIndexedIndirectCount-stride-03142]]
+    pname:stride must: be a multiple of `4` and must: be greater than or
+    equal to sizeof(sname:VkDrawIndexedIndirectCommand)
+  * [[VUID-vkCmdDrawIndexedIndirectCount-maxDrawCount-03143]]
+    If pname:maxDrawCount is greater than or equal to `1`,
+    [eq]#(pname:stride {times} (pname:maxDrawCount - 1) {plus} pname:offset
+    {plus} sizeof(sname:VkDrawIndexedIndirectCommand))# must: be less than
+    or equal to the size of pname:buffer
+****
+
+include::{generated}/validity/protos/vkCmdDrawIndexedIndirectCount.adoc[]
+--
+endif::VK_GRAPHICS_VERSION_1_2,VK_KHR_draw_indirect_count,VK_AMD_draw_indirect_count[]
+
+
+ifdef::VK_EXT_transform_feedback[]
+[[drawing-transform-feedback]]
+=== Drawing Transform Feedback
+
+It is possible to draw vertex data that was previously captured during
+active <<vertexpostproc-transform-feedback,transform feedback>> by binding
+one or more of the transform feedback buffers as vertex buffers.
+A pipeline barrier is required between using the buffers as transform
+feedback buffers and vertex buffers to ensure all writes to the transform
+feedback buffers are visible when the data is read as vertex attributes.
+The source access is ename:VK_ACCESS_TRANSFORM_FEEDBACK_WRITE_BIT_EXT and
+the destination access is ename:VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT for the
+pipeline stages ename:VK_PIPELINE_STAGE_TRANSFORM_FEEDBACK_BIT_EXT and
+ename:VK_PIPELINE_STAGE_VERTEX_INPUT_BIT respectively.
+The value written to the counter buffer by
+flink:vkCmdEndTransformFeedbackEXT can: be used to determine the vertex
+count for the draw.
+A pipeline barrier is required between using the counter buffer for
+fname:vkCmdEndTransformFeedbackEXT and fname:vkCmdDrawIndirectByteCountEXT
+where the source access is
+ename:VK_ACCESS_TRANSFORM_FEEDBACK_COUNTER_WRITE_BIT_EXT and the destination
+access is ename:VK_ACCESS_INDIRECT_COMMAND_READ_BIT for the pipeline stages
+ename:VK_PIPELINE_STAGE_TRANSFORM_FEEDBACK_BIT_EXT and
+ename:VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT respectively.
+
+ifdef::VK_KHR_device_address_commands[]
+[open,refpage='vkCmdDrawIndirectByteCount2EXT',desc='Draw primitives with indirect parameters where the vertex count is derived from the counter byte value in the counter memory range',type='protos']
+--
+:refpage: vkCmdDrawIndirectByteCount2EXT
+
+To record a non-indexed draw call, where the vertex count is based on a byte
+count read from a memory range and the passed in vertex stride parameter,
+call:
+
+include::{generated}/api/protos/vkCmdDrawIndirectByteCount2EXT.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command is
+    recorded.
+  * pname:instanceCount is the number of instances to draw.
+  * pname:firstInstance is the instance ID of the first instance to draw.
+  * pname:pCounterInfo is a pointer to a
+    slink:VkBindTransformFeedbackBuffer2InfoEXT defining the range of memory
+    that the byte count is read from.
+  * pname:counterOffset is subtracted from the byte count.
+  * pname:vertexStride is the stride in bytes between each element of the
+    vertex data that is used to calculate the vertex count from the counter
+    value.
+    This value is typically the same value that was used in the graphics
+    pipeline state when the transform feedback was captured as the
+    code:XfbStride.
+
+When the command is executed, primitives are assembled in the same way as
+done with flink:vkCmdDraw except the pname:vertexCount is calculated based
+on the byte count read from pname:counterBuffer at offset
+pname:counterBufferOffset.
+The assembled primitives execute the bound graphics pipeline.
+
+The effective pname:vertexCount is calculated as follows:
+
+[source,c]
+----
+const uint32_t * counterBufferPtr = (const uint8_t *)counterRange.address;
+vertexCount = floor(max(0, (*counterBufferPtr - counterOffset)) / vertexStride);
+----
+
+The effective pname:firstVertex is zero.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/draw_common.adoc[]
+include::{chapters}/commonvalidity/draw_vertex_binding.adoc[]
+include::{chapters}/commonvalidity/draw_instance_common.adoc[]
+include::{chapters}/commonvalidity/xform_feedback_draw_common.adoc[]
+  * [[VUID-vkCmdDrawIndirectByteCount2EXT-pInfo-13061]]
+    The slink:VkBuffer that pname:pInfo->counterRange was queried from must:
+    have been created with the ename:VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT bit
+    set
+  * [[VUID-vkCmdDrawIndirectByteCount2EXT-pInfo-13062]]
+    pname:pInfo->counterRange.address must: be a multiple of `4`
+****
+
+include::{generated}/validity/protos/vkCmdDrawIndirectByteCount2EXT.adoc[]
+--
+endif::VK_KHR_device_address_commands[]
+
+[open,refpage='vkCmdDrawIndirectByteCountEXT',desc='Draw primitives with indirect parameters where the vertex count is derived from the counter byte value in the counter buffer',type='protos']
+--
+:refpage: vkCmdDrawIndirectByteCountEXT
+
+To record a non-indexed draw call, where the vertex count is based on a byte
+count read from a buffer and the passed in vertex stride parameter, call:
+
+include::{generated}/api/protos/vkCmdDrawIndirectByteCountEXT.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command is
+    recorded.
+  * pname:instanceCount is the number of instances to draw.
+  * pname:firstInstance is the instance ID of the first instance to draw.
+  * pname:counterBuffer is the buffer handle from where the byte count is
+    read.
+  * pname:counterBufferOffset is the offset into the buffer used to read the
+    byte count, which is used to calculate the vertex count for this draw
+    call.
+  * pname:counterOffset is subtracted from the byte count read from the
+    pname:counterBuffer at the pname:counterBufferOffset
+  * pname:vertexStride is the stride in bytes between each element of the
+    vertex data that is used to calculate the vertex count from the counter
+    value.
+    This value is typically the same value that was used in the graphics
+    pipeline state when the transform feedback was captured as the
+    code:XfbStride.
+
+When the command is executed, primitives are assembled in the same way as
+done with flink:vkCmdDraw except the pname:vertexCount is calculated based
+on the byte count read from pname:counterBuffer at offset
+pname:counterBufferOffset.
+The assembled primitives execute the bound graphics pipeline.
+
+The effective pname:vertexCount is calculated as follows:
+
+[source,c]
+----
+const uint32_t * counterBufferPtr = (const uint8_t *)counterBuffer.address + counterBufferOffset;
+vertexCount = floor(max(0, (*counterBufferPtr - counterOffset)) / vertexStride);
+----
+
+The effective pname:firstVertex is zero.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/draw_common.adoc[]
+include::{chapters}/commonvalidity/draw_vertex_binding.adoc[]
+include::{chapters}/commonvalidity/draw_instance_common.adoc[]
+include::{chapters}/commonvalidity/xform_feedback_draw_common.adoc[]
+  * [[VUID-vkCmdDrawIndirectByteCountEXT-counterBuffer-04567]]
+    If pname:counterBuffer is non-sparse then it must: be bound completely
+    and contiguously to a single sname:VkDeviceMemory object
+  * [[VUID-vkCmdDrawIndirectByteCountEXT-counterBuffer-02290]]
+    pname:counterBuffer must: have been created with the
+    ename:VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT usage flag set
+  * [[VUID-vkCmdDrawIndirectByteCountEXT-counterBufferOffset-04568]]
+    pname:counterBufferOffset must: be a multiple of `4`
+****
+
+include::{generated}/validity/protos/vkCmdDrawIndirectByteCountEXT.adoc[]
+--
+endif::VK_EXT_transform_feedback[]
+
+
+ifdef::VK_EXT_conditional_rendering[]
+[[drawing-conditional-rendering]]
+== Conditional Rendering
+
+Certain rendering commands can: be executed conditionally based on a value
+in buffer memory.
+These rendering commands are limited to <<drawing,drawing commands>>,
+<<dispatch,dispatching commands>>, and clearing attachments with
+flink:vkCmdClearAttachments within a conditional rendering block which is
+defined by commands flink:vkCmdBeginConditionalRenderingEXT and
+flink:vkCmdEndConditionalRenderingEXT.
+Other rendering commands remain unaffected by conditional rendering.
+
+The complete list of commands affected by conditional rendering is:
+
+include::{generated}/validity/conditionalrendering.adoc[]
+
+[[active-conditional-rendering]]
+After beginning conditional rendering, it is considered _active_ within the
+command buffer it was called until it is ended with
+flink:vkCmdEndConditionalRenderingEXT.
+
+Conditional rendering must: begin and end in the same command buffer.
+When conditional rendering is active, a primary command buffer can: execute
+secondary command buffers if the <<features-inheritedConditionalRendering,
+pname:inheritedConditionalRendering>> feature is enabled.
+For a secondary command buffer to be executed while conditional rendering is
+active in the primary command buffer, it must: set the
+pname:conditionalRenderingEnable flag of
+slink:VkCommandBufferInheritanceConditionalRenderingInfoEXT, as described in
+the <<commandbuffers-recording, Command Buffer Recording>> section.
+
+Conditional rendering must: also either begin and end inside the same
+subpass of a render pass instance, or must: both begin and end outside of a
+render pass instance (i.e. contain entire render pass instances).
+
+[open,refpage='vkCmdBeginConditionalRenderingEXT',desc='Define the beginning of a conditional rendering block',type='protos']
+--
+To begin conditional rendering, call:
+
+include::{generated}/api/protos/vkCmdBeginConditionalRenderingEXT.adoc[]
+
+  * pname:commandBuffer is the command buffer into which this command will
+    be recorded.
+  * pname:pConditionalRenderingBegin is a pointer to a
+    slink:VkConditionalRenderingBeginInfoEXT structure specifying parameters
+    of conditional rendering.
+
+.Valid Usage
+****
+  * [[VUID-vkCmdBeginConditionalRenderingEXT-None-01980]]
+    Conditional rendering must: not already be
+    <<active-conditional-rendering,active>>
+****
+
+include::{generated}/validity/protos/vkCmdBeginConditionalRenderingEXT.adoc[]
+--
+
+[open,refpage='VkConditionalRenderingBeginInfoEXT',desc='Structure specifying conditional rendering begin information',type='structs']
+--
+The sname:VkConditionalRenderingBeginInfoEXT structure is defined as:
+
+include::{generated}/api/structs/VkConditionalRenderingBeginInfoEXT.adoc[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:buffer is a buffer containing the predicate for conditional
+    rendering.
+  * pname:offset is the byte offset into pname:buffer where the predicate is
+    located.
+  * pname:flags is a bitmask of tlink:VkConditionalRenderingFlagsEXT
+    specifying the behavior of conditional rendering.
+
+If the 32-bit value at pname:offset in pname:buffer memory is zero, then the
+rendering commands are discarded, otherwise they are executed as normal.
+If the value of the predicate in buffer memory changes while conditional
+rendering is active, the rendering commands may: be discarded in an
+implementation-dependent way.
+Some implementations may latch the value of the predicate upon beginning
+conditional rendering while others may read it before every rendering
+command.
+
+.Valid Usage
+****
+  * [[VUID-VkConditionalRenderingBeginInfoEXT-buffer-01981]]
+    If pname:buffer is non-sparse then it must: be bound completely and
+    contiguously to a single sname:VkDeviceMemory object
+  * [[VUID-VkConditionalRenderingBeginInfoEXT-buffer-01982]]
+    pname:buffer must: have been created with the
+    ename:VK_BUFFER_USAGE_CONDITIONAL_RENDERING_BIT_EXT usage flag set
+  * [[VUID-VkConditionalRenderingBeginInfoEXT-offset-01983]]
+    pname:offset must: be less than the size of pname:buffer by at least 32
+    bits
+  * [[VUID-VkConditionalRenderingBeginInfoEXT-offset-01984]]
+    pname:offset must: be a multiple of 4
+****
+
+include::{generated}/validity/structs/VkConditionalRenderingBeginInfoEXT.adoc[]
+--
+
+ifdef::VK_KHR_device_address_commands[]
+[open,refpage='vkCmdBeginConditionalRendering2EXT',desc='Define the beginning of a conditional rendering block',type='protos']
+--
+To begin conditional rendering, call:
+
+include::{generated}/api/protos/vkCmdBeginConditionalRendering2EXT.adoc[]
+
+  * pname:commandBuffer is the command buffer into which this command will
+    be recorded.
+  * pname:pConditionalRenderingBegin is a pointer to a
+    slink:VkConditionalRenderingBeginInfo2EXT structure specifying
+    parameters of conditional rendering.
+
+.Valid Usage
+****
+  * [[VUID-vkCmdBeginConditionalRendering2EXT-None-13063]]
+    Conditional rendering must: not already be
+    <<active-conditional-rendering,active>>
+****
+
+include::{generated}/validity/protos/vkCmdBeginConditionalRendering2EXT.adoc[]
+--
+
+[open,refpage='VkConditionalRenderingBeginInfo2EXT',desc='Structure specifying conditional rendering begin information',type='structs']
+--
+:refpage: VkConditionalRenderingBeginInfo2EXT
+
+The sname:VkConditionalRenderingBeginInfo2EXT structure is defined as:
+
+include::{generated}/api/structs/VkConditionalRenderingBeginInfo2EXT.adoc[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:addressRange is the slink:VkDeviceAddressRangeKHR containing the
+    predicate for conditional rendering.
+  * pname:addressFlags is a tlink:VkAddressCommandFlagsKHR value defining
+    the flags for the address range.
+  * pname:flags is a bitmask of tlink:VkConditionalRenderingFlagsEXT
+    specifying the behavior of conditional rendering.
+
+If the 32-bit value at pname:addressRange.address is zero, then the
+rendering commands are discarded, otherwise they are executed as normal.
+If the value of the predicate in memory changes while conditional rendering
+is active, the rendering commands may: be discarded in an
+implementation-dependent way.
+Some implementations may: latch the value of the predicate upon beginning
+conditional rendering while others may: read it before every rendering
+command.
+
+.Valid Usage
+****
+:addressRange: addressRange
+:addressFlags: addressFlags
+include::{chapters}/commonvalidity/address_flags_common.adoc[]
+  * [[VUID-VkConditionalRenderingBeginInfo2EXT-addressRange-13064]]
+    The slink:VkBuffer that pname:addressRange was queried from must: have
+    been created with ename:VK_BUFFER_USAGE_CONDITIONAL_RENDERING_BIT_EXT
+  * [[VUID-VkConditionalRenderingBeginInfo2EXT-addressRange-13065]]
+    pname:addressRange.address must: be a multiple of 4
+  * [[VUID-VkConditionalRenderingBeginInfo2EXT-addressRange-13066]]
+    pname:addressRange.size must: be greater than or equal to 4
+****
+
+include::{generated}/validity/structs/VkConditionalRenderingBeginInfo2EXT.adoc[]
+--
+endif::VK_KHR_device_address_commands[]
+
+
+[open,refpage='VkConditionalRenderingFlagBitsEXT',desc='Specify the behavior of conditional rendering',type='enums']
+--
+Bits which can: be set in
+flink:vkCmdBeginConditionalRenderingEXT::pname:flags, specifying the
+behavior of conditional rendering, are:
+
+include::{generated}/api/enums/VkConditionalRenderingFlagBitsEXT.adoc[]
+
+  * ename:VK_CONDITIONAL_RENDERING_INVERTED_BIT_EXT specifies the condition
+    used to determine whether to discard rendering commands or not.
+    That is, if the 32-bit predicate read from pname:buffer memory at
+    pname:offset is zero, the rendering commands are not discarded, and if
+    non zero, then they are discarded.
+--
+
+[open,refpage='VkConditionalRenderingFlagsEXT',desc='Bitmask of VkConditionalRenderingFlagBitsEXT',type='flags']
+--
+include::{generated}/api/flags/VkConditionalRenderingFlagsEXT.adoc[]
+
+tname:VkConditionalRenderingFlagsEXT is a bitmask type for setting a mask of
+zero or more elink:VkConditionalRenderingFlagBitsEXT.
+--
+
+[open,refpage='vkCmdEndConditionalRenderingEXT',desc='Define the end of a conditional rendering block',type='protos']
+--
+To end conditional rendering, call:
+
+include::{generated}/api/protos/vkCmdEndConditionalRenderingEXT.adoc[]
+
+  * pname:commandBuffer is the command buffer into which this command will
+    be recorded.
+
+Once ended, conditional rendering becomes inactive.
+
+.Valid Usage
+****
+  * [[VUID-vkCmdEndConditionalRenderingEXT-None-01985]]
+    Conditional rendering must: be <<active-conditional-rendering,active>>
+  * [[VUID-vkCmdEndConditionalRenderingEXT-None-01986]]
+    If conditional rendering was made
+    <<active-conditional-rendering,active>> outside of a render pass
+    instance, it must: not be ended inside a render pass instance
+  * [[VUID-vkCmdEndConditionalRenderingEXT-None-01987]]
+    If conditional rendering was made
+    <<active-conditional-rendering,active>> within a subpass it must: be
+    ended in the same subpass
+****
+
+include::{generated}/validity/protos/vkCmdEndConditionalRenderingEXT.adoc[]
+--
+endif::VK_EXT_conditional_rendering[]
+
+
+ifdef::VK_NV_mesh_shader,VK_EXT_mesh_shader[]
+[[drawing-mesh-shading]]
+== Programmable Mesh Shading
+
+In this drawing approach, primitives are assembled by the mesh shader stage.
+<<mesh, Mesh shading>> operates similarly to <<dispatch, dispatching
+compute>> as the shaders make use of workgroups.
+
+ifdef::VK_NV_mesh_shader[]
+[open,refpage='vkCmdDrawMeshTasksNV',desc='Draw mesh task work items',type='protos']
+--
+:refpage: vkCmdDrawMeshTasksNV
+
+To record a mesh tasks drawing command, call:
+
+include::{generated}/api/protos/vkCmdDrawMeshTasksNV.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command will be
+    recorded.
+  * pname:taskCount is the number of local workgroups to dispatch in the X
+    dimension.
+    Y and Z dimension are implicitly set to one.
+  * pname:firstTask is the X component of the first workgroup ID.
+
+When the command is executed, a global workgroup consisting of
+pname:taskCount local workgroups is assembled.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/draw_common.adoc[]
+include::{chapters}/commonvalidity/draw_mesh_common.adoc[]
+  * [[VUID-vkCmdDrawMeshTasksNV-taskCount-02119]]
+    pname:taskCount must: be less than or equal to
+    sname:VkPhysicalDeviceMeshShaderPropertiesNV::pname:maxDrawMeshTasksCount
+  * [[VUID-vkCmdDrawMeshTasksNV-MeshNV-07080]]
+    The current pipeline bound to ename:VK_PIPELINE_BIND_POINT_GRAPHICS
+    must: contain a shader stage using the code:MeshNV {ExecutionModel}
+****
+
+include::{generated}/validity/protos/vkCmdDrawMeshTasksNV.adoc[]
+--
+
+[open,refpage='vkCmdDrawMeshTasksIndirectNV',desc='Issue an indirect mesh tasks draw into a command buffer',type='protos']
+--
+:refpage: vkCmdDrawMeshTasksIndirectNV
+
+To record an indirect mesh tasks drawing command, call:
+
+include::{generated}/api/protos/vkCmdDrawMeshTasksIndirectNV.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command is
+    recorded.
+  * pname:buffer is the buffer containing draw parameters.
+  * pname:offset is the byte offset into pname:buffer where parameters
+    begin.
+  * pname:drawCount is the number of draws to execute, and can: be zero.
+  * pname:stride is the byte stride between successive sets of draw
+    parameters.
+
+fname:vkCmdDrawMeshTasksIndirectNV behaves similarly to
+flink:vkCmdDrawMeshTasksNV except that the parameters are read by the device
+from a buffer during execution.
+pname:drawCount draws are executed by the command, with parameters taken
+from pname:buffer starting at pname:offset and increasing by pname:stride
+bytes for each successive draw.
+The parameters of each draw are encoded in an array of
+slink:VkDrawMeshTasksIndirectCommandNV structures.
+If pname:drawCount is less than or equal to one, pname:stride is ignored.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/draw_common.adoc[]
+include::{chapters}/commonvalidity/draw_mesh_common.adoc[]
+include::{chapters}/commonvalidity/draw_dispatch_indirect_common.adoc[]
+include::{chapters}/commonvalidity/draw_indirect_drawcount.adoc[]
+  * [[VUID-vkCmdDrawMeshTasksIndirectNV-drawCount-02146]]
+    If pname:drawCount is greater than `1`, pname:stride must: be a multiple
+    of `4` and must: be greater than or equal to
+    code:sizeof(sname:VkDrawMeshTasksIndirectCommandNV)
+  * [[VUID-vkCmdDrawMeshTasksIndirectNV-drawCount-02156]]
+    If pname:drawCount is equal to `1`, [eq]#(pname:offset {plus}
+    code:sizeof(slink:VkDrawMeshTasksIndirectCommandNV))# must: be less than
+    or equal to the size of pname:buffer
+  * [[VUID-vkCmdDrawMeshTasksIndirectNV-drawCount-02157]]
+    If pname:drawCount is greater than `1`, [eq]#(pname:stride {times}
+    (pname:drawCount - 1) {plus} pname:offset {plus}
+    code:sizeof(slink:VkDrawMeshTasksIndirectCommandNV))# must: be less than
+    or equal to the size of pname:buffer
+  * [[VUID-vkCmdDrawMeshTasksIndirectNV-MeshNV-07081]]
+    The current pipeline bound to ename:VK_PIPELINE_BIND_POINT_GRAPHICS
+    must: contain a shader stage using the code:MeshNV {ExecutionModel}
+****
+
+include::{generated}/validity/protos/vkCmdDrawMeshTasksIndirectNV.adoc[]
+--
+
+[open,refpage='VkDrawMeshTasksIndirectCommandNV',desc='Structure specifying a mesh tasks draw indirect command',type='structs',xrefs='vkCmdDrawMeshTasksIndirectNV']
+--
+The sname:VkDrawMeshTasksIndirectCommandNV structure is defined as:
+
+include::{generated}/api/structs/VkDrawMeshTasksIndirectCommandNV.adoc[]
+
+  * pname:taskCount is the number of local workgroups to dispatch in the X
+    dimension.
+    Y and Z dimension are implicitly set to one.
+  * pname:firstTask is the X component of the first workgroup ID.
+
+The members of sname:VkDrawMeshTasksIndirectCommandNV have the same meaning
+as the similarly named parameters of flink:vkCmdDrawMeshTasksNV.
+
+.Valid Usage
+****
+  * [[VUID-VkDrawMeshTasksIndirectCommandNV-taskCount-02175]]
+    pname:taskCount must: be less than or equal to
+    sname:VkPhysicalDeviceMeshShaderPropertiesNV::pname:maxDrawMeshTasksCount
+****
+
+include::{generated}/validity/structs/VkDrawMeshTasksIndirectCommandNV.adoc[]
+--
+
+ifdef::VK_GRAPHICS_VERSION_1_2,VK_KHR_draw_indirect_count,VK_AMD_draw_indirect_count[]
+[open,refpage='vkCmdDrawMeshTasksIndirectCountNV',desc='Perform an indirect mesh tasks draw with the draw count sourced from a buffer',type='protos']
+--
+:refpage: vkCmdDrawMeshTasksIndirectCountNV
+
+To record an indirect mesh tasks drawing command with the draw count sourced
+from a buffer, call:
+
+include::{generated}/api/protos/vkCmdDrawMeshTasksIndirectCountNV.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command is
+    recorded.
+  * pname:buffer is the buffer containing draw parameters.
+  * pname:offset is the byte offset into pname:buffer where parameters
+    begin.
+  * pname:countBuffer is the buffer containing the draw count.
+  * pname:countBufferOffset is the byte offset into pname:countBuffer where
+    the draw count begins.
+  * pname:maxDrawCount specifies the maximum number of draws that will be
+    executed.
+    The actual number of executed draw calls is the minimum of the count
+    specified in pname:countBuffer and pname:maxDrawCount.
+  * pname:stride is the byte stride between successive sets of draw
+    parameters.
+
+fname:vkCmdDrawMeshTasksIndirectCountNV behaves similarly to
+flink:vkCmdDrawMeshTasksIndirectNV except that the draw count is read by the
+device from a buffer during execution.
+The command will read an unsigned 32-bit integer from pname:countBuffer
+located at pname:countBufferOffset and use this as the draw count.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/draw_common.adoc[]
+include::{chapters}/commonvalidity/draw_mesh_common.adoc[]
+include::{chapters}/commonvalidity/draw_dispatch_indirect_common.adoc[]
+include::{chapters}/commonvalidity/draw_indirect_count_common.adoc[]
+  * [[VUID-vkCmdDrawMeshTasksIndirectCountNV-stride-02182]]
+    pname:stride must: be a multiple of `4` and must: be greater than or
+    equal to code:sizeof(sname:VkDrawMeshTasksIndirectCommandNV)
+  * [[VUID-vkCmdDrawMeshTasksIndirectCountNV-maxDrawCount-02183]]
+    If pname:maxDrawCount is greater than or equal to `1`,
+    [eq]#(pname:stride {times} (pname:maxDrawCount - 1) {plus} pname:offset
+    {plus} code:sizeof(sname:VkDrawMeshTasksIndirectCommandNV))# must: be
+    less than or equal to the size of pname:buffer
+  * [[VUID-vkCmdDrawMeshTasksIndirectCountNV-MeshNV-07082]]
+    The current pipeline bound to ename:VK_PIPELINE_BIND_POINT_GRAPHICS
+    must: contain a shader stage using the code:MeshNV {ExecutionModel}
+****
+
+include::{generated}/validity/protos/vkCmdDrawMeshTasksIndirectCountNV.adoc[]
+--
+endif::VK_GRAPHICS_VERSION_1_2,VK_KHR_draw_indirect_count,VK_AMD_draw_indirect_count[]
+endif::VK_NV_mesh_shader[]
+
+ifdef::VK_EXT_mesh_shader[]
+[open,refpage='vkCmdDrawMeshTasksEXT',desc='Draw mesh task work items',type='protos']
+--
+:refpage: vkCmdDrawMeshTasksEXT
+
+To record a mesh tasks drawing command, call:
+
+include::{generated}/api/protos/vkCmdDrawMeshTasksEXT.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command will be
+    recorded.
+  * pname:groupCountX is the number of local workgroups to dispatch in the X
+    dimension.
+  * pname:groupCountY is the number of local workgroups to dispatch in the Y
+    dimension.
+  * pname:groupCountZ is the number of local workgroups to dispatch in the Z
+    dimension.
+
+When the command is executed, a global workgroup consisting of
+[eq]#pname:groupCountX {times} pname:groupCountY {times} pname:groupCountZ#
+local workgroups is assembled.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/draw_common.adoc[]
+include::{chapters}/commonvalidity/draw_mesh_common.adoc[]
+include::{chapters}/commonvalidity/draw_mesh_limits_common.adoc[]
+  * [[VUID-vkCmdDrawMeshTasksEXT-MeshEXT-07087]]
+    The current pipeline bound to ename:VK_PIPELINE_BIND_POINT_GRAPHICS
+    must: contain a shader stage using the code:MeshEXT {ExecutionModel}
+****
+
+include::{generated}/validity/protos/vkCmdDrawMeshTasksEXT.adoc[]
+--
+
+ifdef::VK_KHR_device_address_commands[]
+[open,refpage='vkCmdDrawMeshTasksIndirect2EXT',desc='Issue a mesh tasks draw with indirect parameters through an address range',type='protos']
+--
+:refpage: vkCmdDrawMeshTasksIndirect2EXT
+
+To record an indirect mesh tasks drawing command, call:
+
+include::{generated}/api/protos/vkCmdDrawMeshTasksIndirect2EXT.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command is
+    recorded.
+  * pname:pInfo is a pointer to a slink:VkDrawIndirect2InfoKHR structure
+    defining parameters of this command.
+
+fname:vkCmdDrawMeshTasksIndirect2EXT behaves similarly to
+flink:vkCmdDrawMeshTasksEXT except that the parameters are read by the
+device from an address range during execution.
+pname:pInfo->drawCount draws are executed by the command, with parameters
+taken from pname:pInfo->addressRange starting at pname:addressRange.address
+and increasing by pname:addressRange.stride bytes for each successive draw.
+The parameters of each draw are encoded in an array of
+slink:VkDrawMeshTasksIndirectCommandEXT structures.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/draw_common.adoc[]
+include::{chapters}/commonvalidity/draw_mesh_common.adoc[]
+  * [[VUID-vkCmdDrawMeshTasksIndirect2EXT-commandBuffer-13067]]
+    pname:commandBuffer must: not be a protected command buffer
+****
+
+include::{generated}/validity/protos/vkCmdDrawMeshTasksIndirect2EXT.adoc[]
+--
+endif::VK_KHR_device_address_commands[]
+
+[open,refpage='vkCmdDrawMeshTasksIndirectEXT',desc='Issue an indirect mesh tasks draw into a command buffer',type='protos']
+--
+:refpage: vkCmdDrawMeshTasksIndirectEXT
+
+To record an indirect mesh tasks drawing command, call:
+
+include::{generated}/api/protos/vkCmdDrawMeshTasksIndirectEXT.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command is
+    recorded.
+  * pname:buffer is the buffer containing draw parameters.
+  * pname:offset is the byte offset into pname:buffer where parameters
+    begin.
+  * pname:drawCount is the number of draws to execute, and can: be zero.
+  * pname:stride is the byte stride between successive sets of draw
+    parameters.
+
+fname:vkCmdDrawMeshTasksIndirectEXT behaves similarly to
+flink:vkCmdDrawMeshTasksEXT except that the parameters are read by the
+device from a buffer during execution.
+pname:drawCount draws are executed by the command, with parameters taken
+from pname:buffer starting at pname:offset and increasing by pname:stride
+bytes for each successive draw.
+The parameters of each draw are encoded in an array of
+slink:VkDrawMeshTasksIndirectCommandEXT structures.
+If pname:drawCount is less than or equal to one, pname:stride is ignored.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/draw_common.adoc[]
+include::{chapters}/commonvalidity/draw_mesh_common.adoc[]
+include::{chapters}/commonvalidity/draw_dispatch_indirect_common.adoc[]
+include::{chapters}/commonvalidity/draw_indirect_drawcount.adoc[]
+  * [[VUID-vkCmdDrawMeshTasksIndirectEXT-drawCount-07088]]
+    If pname:drawCount is greater than `1`, pname:stride must: be a multiple
+    of `4` and must: be greater than or equal to
+    code:sizeof(sname:VkDrawMeshTasksIndirectCommandEXT)
+  * [[VUID-vkCmdDrawMeshTasksIndirectEXT-drawCount-07089]]
+    If pname:drawCount is equal to `1`, [eq]#(pname:offset {plus}
+    code:sizeof(slink:VkDrawMeshTasksIndirectCommandEXT))# must: be less
+    than or equal to the size of pname:buffer
+  * [[VUID-vkCmdDrawMeshTasksIndirectEXT-drawCount-07090]]
+    If pname:drawCount is greater than `1`, [eq]#(pname:stride {times}
+    (pname:drawCount - 1) {plus} pname:offset {plus}
+    code:sizeof(slink:VkDrawMeshTasksIndirectCommandEXT))# must: be less
+    than or equal to the size of pname:buffer
+  * [[VUID-vkCmdDrawMeshTasksIndirectEXT-MeshEXT-07091]]
+    The current pipeline bound to ename:VK_PIPELINE_BIND_POINT_GRAPHICS
+    must: contain a shader stage using the code:MeshEXT {ExecutionModel}
+****
+
+include::{generated}/validity/protos/vkCmdDrawMeshTasksIndirectEXT.adoc[]
+--
+
+[open,refpage='VkDrawMeshTasksIndirectCommandEXT',desc='Structure specifying a mesh tasks draw indirect command',type='structs',xrefs='vkCmdDrawMeshTasksIndirectEXT']
+--
+:refpage: VkDrawMeshTasksIndirectCommandEXT
+
+The sname:VkDrawMeshTasksIndirectCommandEXT structure is defined as:
+
+include::{generated}/api/structs/VkDrawMeshTasksIndirectCommandEXT.adoc[]
+
+  * pname:groupCountX is the number of local workgroups to dispatch in the X
+    dimension.
+  * pname:groupCountY is the number of local workgroups to dispatch in the Y
+    dimension.
+  * pname:groupCountZ is the number of local workgroups to dispatch in the Z
+    dimension.
+
+The members of sname:VkDrawMeshTasksIndirectCommandEXT have the same meaning
+as the similarly named parameters of flink:vkCmdDrawMeshTasksEXT.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/draw_mesh_limits_common.adoc[]
+****
+
+include::{generated}/validity/structs/VkDrawMeshTasksIndirectCommandEXT.adoc[]
+--
+
+ifdef::VK_GRAPHICS_VERSION_1_2,VK_KHR_draw_indirect_count,VK_AMD_draw_indirect_count[]
+ifdef::VK_KHR_device_address_commands[]
+[open,refpage='vkCmdDrawMeshTasksIndirectCount2EXT',desc='Perform an indirect mesh tasks draw with the draw count sourced from an address range',type='protos']
+--
+:refpage: vkCmdDrawMeshTasksIndirectCount2EXT
+
+To record an indirect mesh tasks drawing command with the draw count sourced
+from an address range, call:
+
+include::{generated}/api/protos/vkCmdDrawMeshTasksIndirectCount2EXT.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command is
+    recorded.
+  * pname:pInfo is a pointer to a slink:VkDrawIndirectCount2InfoKHR
+    structure defining parameters of this command.
+
+fname:vkCmdDrawMeshTasksIndirectCount2EXT behaves similarly to
+flink:vkCmdDrawMeshTasksIndirect2EXT except that the draw count is read by
+the device from an address range during execution.
+The command will read an unsigned 32-bit integer from
+pname:pInfo->countAddressRange and use this as the draw count.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/draw_common.adoc[]
+include::{chapters}/commonvalidity/draw_mesh_common.adoc[]
+  * [[VUID-vkCmdDrawMeshTasksIndirectCount2EXT-commandBuffer-13068]]
+    pname:commandBuffer must: not be a protected command buffer
+  * [[VUID-vkCmdDrawMeshTasksIndirectCount2EXT-drawIndirectCount-13069]]
+    If the <<features-drawIndirectCount, pname:drawIndirectCount>> feature
+    is not enabled this function must: not be used
+****
+
+include::{generated}/validity/protos/vkCmdDrawMeshTasksIndirectCount2EXT.adoc[]
+--
+endif::VK_KHR_device_address_commands[]
+
+[open,refpage='vkCmdDrawMeshTasksIndirectCountEXT',desc='Perform an indirect mesh tasks draw with the draw count sourced from a buffer',type='protos']
+--
+:refpage: vkCmdDrawMeshTasksIndirectCountEXT
+
+To record an indirect mesh tasks drawing command with the draw count sourced
+from a buffer, call:
+
+include::{generated}/api/protos/vkCmdDrawMeshTasksIndirectCountEXT.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command is
+    recorded.
+  * pname:buffer is the buffer containing draw parameters.
+  * pname:offset is the byte offset into pname:buffer where parameters
+    begin.
+  * pname:countBuffer is the buffer containing the draw count.
+  * pname:countBufferOffset is the byte offset into pname:countBuffer where
+    the draw count begins.
+  * pname:maxDrawCount specifies the maximum number of draws that will be
+    executed.
+    The actual number of executed draw calls is the minimum of the count
+    specified in pname:countBuffer and pname:maxDrawCount.
+  * pname:stride is the byte stride between successive sets of draw
+    parameters.
+
+fname:vkCmdDrawMeshTasksIndirectCountEXT behaves similarly to
+flink:vkCmdDrawMeshTasksIndirectEXT except that the draw count is read by
+the device from a buffer during execution.
+The command will read an unsigned 32-bit integer from pname:countBuffer
+located at pname:countBufferOffset and use this as the draw count.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/draw_common.adoc[]
+include::{chapters}/commonvalidity/draw_mesh_common.adoc[]
+include::{chapters}/commonvalidity/draw_dispatch_indirect_common.adoc[]
+include::{chapters}/commonvalidity/draw_indirect_count_common.adoc[]
+  * [[VUID-vkCmdDrawMeshTasksIndirectCountEXT-stride-07096]]
+    pname:stride must: be a multiple of `4` and must: be greater than or
+    equal to code:sizeof(sname:VkDrawMeshTasksIndirectCommandEXT)
+  * [[VUID-vkCmdDrawMeshTasksIndirectCountEXT-maxDrawCount-07097]]
+    If pname:maxDrawCount is greater than or equal to `1`,
+    [eq]#(pname:stride {times} (pname:maxDrawCount - 1) {plus} pname:offset
+    {plus} code:sizeof(sname:VkDrawMeshTasksIndirectCommandEXT))# must: be
+    less than or equal to the size of pname:buffer
+  * [[VUID-vkCmdDrawMeshTasksIndirectCountEXT-MeshEXT-07100]]
+    The current pipeline bound to ename:VK_PIPELINE_BIND_POINT_GRAPHICS
+    must: contain a shader stage using the code:MeshEXT {ExecutionModel}
+****
+
+include::{generated}/validity/protos/vkCmdDrawMeshTasksIndirectCountEXT.adoc[]
+--
+endif::VK_GRAPHICS_VERSION_1_2,VK_KHR_draw_indirect_count,VK_AMD_draw_indirect_count[]
+endif::VK_EXT_mesh_shader[]
+endif::VK_NV_mesh_shader,VK_EXT_mesh_shader[]
+
+
+ifdef::VK_HUAWEI_cluster_culling_shader[]
+[[drawing-cluster-culling-shading]]
+== Programmable Cluster Culling Shading
+
+In this drawing approach, cluster are generated by the cluster culling
+shader stage.
+It operates similarly to <<dispatch, dispatching compute>> as the shaders
+make use of workgroups.
+
+ifdef::VK_HUAWEI_cluster_culling_shader[]
+[open,refpage='vkCmdDrawClusterHUAWEI',desc='Draw cluster culling work items',type='protos']
+--
+:refpage: vkCmdDrawClusterHUAWEI
+
+To record a cluster culling shader drawing command, call:
+
+include::{generated}/api/protos/vkCmdDrawClusterHUAWEI.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command will be
+    recorded.
+  * pname:groupCountX is the number of local workgroups to dispatch in the X
+    dimension.
+  * pname:groupCountY is the number of local workgroups to dispatch in the Y
+    dimension.
+  * pname:groupCountZ is the number of local workgroups to dispatch in the Z
+    dimension.
+
+When the command is executed,a global workgroup consisting of
+groupCountX*groupCountY*groupCountZ local workgroup is assembled.
+Note that the cluster culling shader pipeline only accepts
+fname:vkCmdDrawClusterHUAWEI and flink:vkCmdDrawClusterIndirectHUAWEI as
+drawing commands.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/draw_common.adoc[]
+include::{chapters}/commonvalidity/draw_mesh_common.adoc[]
+ifdef::VK_NV_mesh_shader,VK_EXT_mesh_shader[]
+  * [[VUID-vkCmdDrawClusterHUAWEI-None-07819]]
+    The pname:pipelineStatistics member used to create any active
+    <<queries-pipestats, Pipeline Statistics Query>> must: not contain
+    ename:VK_QUERY_PIPELINE_STATISTIC_TASK_SHADER_INVOCATIONS_BIT_EXT, or
+    ename:VK_QUERY_PIPELINE_STATISTIC_MESH_SHADER_INVOCATIONS_BIT_EXT
+endif::VK_NV_mesh_shader,VK_EXT_mesh_shader[]
+  * [[VUID-vkCmdDrawClusterHUAWEI-groupCountX-07820]]
+    pname:groupCountX must: be less than or equal to
+    sname:VkPhysicalDeviceClusterCullingShaderPropertiesHUAWEI::pname:maxWorkGroupCount[0]
+  * [[VUID-vkCmdDrawClusterHUAWEI-groupCountY-07821]]
+    pname:groupCountY must: be less than or equal to
+    sname:VkPhysicalDeviceClusterCullingShaderPropertiesHUAWEI::pname:maxWorkGroupCount[1]
+  * [[VUID-vkCmdDrawClusterHUAWEI-groupCountZ-07822]]
+    pname:groupCountZ must: be less than or equal to
+    sname:VkPhysicalDeviceClusterCullingShaderPropertiesHUAWEI::pname:maxWorkGroupCount[2]
+  * [[VUID-vkCmdDrawClusterHUAWEI-ClusterCullingHUAWEI-07823]]
+    The current pipeline bound to ename:VK_PIPELINE_BIND_POINT_GRAPHICS
+    must: contain a shader stage using the code:ClusterCullingHUAWEI
+    {ExecutionModel}
+****
+
+include::{generated}/validity/protos/vkCmdDrawClusterHUAWEI.adoc[]
+--
+
+[open,refpage='vkCmdDrawClusterIndirectHUAWEI',desc='Issue an indirect cluster culling draw into a command buffer',type='protos']
+--
+:refpage: vkCmdDrawClusterIndirectHUAWEI
+
+To record an indirect cluster culling drawing command, call:
+
+include::{generated}/api/protos/vkCmdDrawClusterIndirectHUAWEI.adoc[]
+
+  * pname:commandBuffer is the command buffer into which the command is
+    recorded.
+  * pname:buffer is the buffer containing draw parameters.
+  * pname:offset is the byte offset into pname:buffer where parameters
+    begin.
+
+fname:vkCmdDrawClusterIndirectHUAWEI behaves similarly to
+flink:vkCmdDrawClusterHUAWEI except that the parameters are read by the
+device from a buffer during execution.
+The parameters of the dispatch are encoded in a
+slink:VkDispatchIndirectCommand structure taken from buffer starting at
+offset.
+Note the cluster culling shader pipeline only accepts
+flink:vkCmdDrawClusterHUAWEI and fname:vkCmdDrawClusterIndirectHUAWEI as
+drawing commands.
+
+.Valid Usage
+****
+include::{chapters}/commonvalidity/draw_common.adoc[]
+include::{chapters}/commonvalidity/draw_mesh_common.adoc[]
+include::{chapters}/commonvalidity/draw_indirect_drawcount.adoc[]
+  * [[VUID-vkCmdDrawClusterIndirectHUAWEI-ClusterCullingHUAWEI-07824]]
+    The current pipeline bound to ename:VK_PIPELINE_BIND_POINT_GRAPHICS
+    must: contain a shader stage using the code:ClusterCullingHUAWEI
+    {ExecutionModel}
+  * [[VUID-vkCmdDrawClusterIndirectHUAWEI-offset-07918]]
+    pname:offset must: be a multiple of
+    slink:VkPhysicalDeviceClusterCullingShaderPropertiesHUAWEI::pname:indirectBufferOffsetAlignment
+****
+
+include::{generated}/validity/protos/vkCmdDrawClusterIndirectHUAWEI.adoc[]
+--
+endif::VK_HUAWEI_cluster_culling_shader[]
+endif::VK_HUAWEI_cluster_culling_shader[]

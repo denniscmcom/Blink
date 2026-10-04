@@ -13,7 +13,6 @@
 #include "Engine/Platform/Log.hpp"
 #include "Engine/Platform/Result.hpp"
 #include "Engine/Platform/Time.hpp"
-#include "Engine/Platform/Types.hpp"
 #include "Engine/Platform/Window.hpp"
 #include "Engine/Renderer/Renderer.hpp"
 #include "Engine/Resource/Material.hpp"
@@ -22,6 +21,7 @@
 #include "Engine/Resource/Texture.hpp"
 #include "Engine/Scene/Node.hpp"
 #include "Engine/World/Camera.hpp"
+#include "Engine/World/Stream.hpp"
 #include "Engine/World/World.hpp"
 #include "Game/Game.hpp"
 
@@ -62,7 +62,7 @@ BLK_ENTRY()
 	//
 	// `Renderer/` is the exception: it owns its own allocator because its lifetime is tied to the device rather than to
 	// the process.
-	constexpr size_t LAUNCHER_ALLOCATOR_CAPACITY = 64 * 1'024 * 1'024;
+	constexpr size_t LAUNCHER_ALLOCATOR_CAPACITY = 1'024 * 1'024 * 1'024;
 
 	blk::Allocator allocator = {};
 
@@ -85,9 +85,10 @@ BLK_ENTRY()
 		BLK_FATAL("Failed to create the window\n");
 	}
 
-	blk::Rect<unsigned> client_rect = {};
+	size_t client_size_x = 0;
+	size_t client_size_y = 0;
 
-	BLK_IF_NOT_SUCCESS(blk::get_window_client_rect(client_rect))
+	BLK_IF_NOT_SUCCESS(blk::get_window_client_size(client_size_x, client_size_y))
 	{
 		BLK_FATAL("Failed to get the window client rectangle\n");
 	}
@@ -131,32 +132,35 @@ BLK_ENTRY()
 	// Renderer.
 	// ============================================================================
 
-	BLK_IF_NOT_SUCCESS(blk::create_renderer(client_rect))
+	BLK_IF_NOT_SUCCESS(blk::create_renderer(client_size_x, client_size_y))
 	{
 		BLK_FATAL("Failed to create the renderer\n");
-	}
-
-	BLK_IF_NOT_SUCCESS(blk::bake_renderer())
-	{
-		BLK_FATAL(" Failed to bake the renderer\n");
 	}
 
 	// ============================================================================
 	// Game.
 	// ============================================================================
 
-	blk::Game_Context game_context = {};
+	blk::game::Game_Context game_context = {};
 
 	// `Game_Context` owns the world but `create_game` has no allocator to build it with, so we create it here and hand
 	// it over already usable – with its pools, its hash map and its root node.
-	BLK_IF_NOT_SUCCESS(blk::create_world(&allocator, game_context.world))
+	BLK_IF_NOT_SUCCESS(blk::create_world(&allocator, {}, game_context.world))
 	{
 		BLK_FATAL("Failed to create the game world\n");
 	}
 
-	BLK_IF_NOT_SUCCESS(blk::create_game(game_context))
+	game_context.world.settings.stream.generate = blk::game::spawn_chunk;
+
+	BLK_IF_NOT_SUCCESS(blk::game::create_game(game_context))
 	{
 		BLK_FATAL("Failed to create the game\n");
+	}
+
+	// The game fills the world settings the renderer binds once, so baking comes after it.
+	BLK_IF_NOT_SUCCESS(blk::bake_renderer(game_context.world.settings))
+	{
+		BLK_FATAL("Failed to bake the renderer\n");
 	}
 
 	// ============================================================================
@@ -165,15 +169,7 @@ BLK_ENTRY()
 
 	blk::Input_State input_state = {};
 
-	// The editor reads the input state and spawns its own camera into the game world, so both have to exist first.
-	blk::Editor_Context editor_context = {};
-
-	BLK_IF_NOT_SUCCESS(blk::create_editor_context(&allocator, &input_state, &game_context.world, editor_context))
-	{
-		BLK_FATAL("Failed to create the editor context\n");
-	}
-
-	BLK_IF_NOT_SUCCESS(blk::create_editor(editor_context))
+	BLK_IF_NOT_SUCCESS(blk::create_editor(&game_context.world, &allocator))
 	{
 		BLK_FATAL("Failed to create the editor\n");
 	}
@@ -182,8 +178,8 @@ BLK_ENTRY()
 	// Frame loop.
 	// ============================================================================
 
-	// `get_elapsed_seconds` reports the time since the timer was created, so the first delta is measured from here and
-	// not from the start of the process.
+	// `get_elapsed_seconds` reports the time since the timer was created, so the first delta is
+	// measured from here and not from the start of the process.
 	double previous_frame_seconds = 0.0;
 	blk::get_elapsed_seconds(frame_timer, previous_frame_seconds);
 
@@ -196,66 +192,66 @@ BLK_ENTRY()
 		previous_frame_seconds = current_frame_seconds;
 
 		blk::update_input(input_state);
-		blk::update_editor(editor_context, delta_time);
+		const blk::Editor_Context editor_context = blk::update_editor(input_state, delta_time);
 
-		if (!editor_context.world_context.is_game_simulation_paused)
+		if (!blk::is_game_simulation_paused())
 		{
-			blk::update_game(game_context, delta_time, input_state);
+			blk::game::update_game(game_context, delta_time, input_state);
 		}
+
+		blk::World* active_world = blk::get_active_world();
+
+		blk::Vector3 node_offset = {};
+		blk::update_world(*active_world, node_offset);
+
+		// Nothing moves nodes after this point, and both the camera view and `update_frame` read their world matrices.
+		blk::update_node_transforms(active_world->scene_graph);
 
 		// The window can be resized, so we sample the client rectangle every frame instead of reusing the one the
 		// renderer was created with.
-		BLK_IF_NOT_SUCCESS(blk::get_window_client_rect(client_rect))
+		BLK_IF_NOT_SUCCESS(blk::get_window_client_size(client_size_x, client_size_y))
 		{
 			// Without it we cannot build a projection matrix, so we skip the frame.
 			continue;
 		}
 
-		if (client_rect.y == 0)
+		if (client_size_x == 0 || client_size_y == 0)
 		{
-			// The window is minimized. There is nothing to render, and the aspect ratio would divide by zero.
+			// The window is minimized or has no area. There is nothing to render, and the projection would divide by
+			// zero.
 			continue;
 		}
 
-		// TODO (Feature): We always render the game world. `Editor_Mode::MATERIAL` has its own world and its own camera
-		// in `editor_context.material_context`, and switching to that mode currently changes the widgets but not what
-		// is on screen. The loop should pick the world and the camera from `editor_context.mode`.
+		blk::Renderer_Settings renderer_settings = {};
+		renderer_settings.is_debug_triangle_enabled = editor_context.is_showing_triangles;
 
-		blk::Camera_View camera_view = {};
-
-		if (const blk::Camera* camera = blk::get_camera(game_context.world, game_context.world.active_camera_handle))
+		if (const blk::Camera* camera = blk::get_camera(*active_world, active_world->active_camera_handle))
 		{
-			const auto aspect_ratio = static_cast<float>(client_rect.x) / static_cast<float>(client_rect.y);
+			const auto aspect_ratio = static_cast<float>(client_size_x) / static_cast<float>(client_size_y);
 
-			camera_view.view = blk::init_view_matrix(game_context.world.scene_graph, *camera);
-			camera_view.projection = blk::init_projection_matrix(*camera, aspect_ratio);
+			renderer_settings.view = blk::init_view_matrix(active_world->scene_graph, *camera);
+			renderer_settings.projection = blk::init_projection_matrix(*camera, aspect_ratio);
 
-			if (const blk::Node* camera_node =
-					blk::get_node(game_context.world, game_context.world.active_camera_handle))
+			if (const blk::Node* camera_node = blk::get_node(active_world->scene_graph, camera->node_handle))
 			{
-				camera_view.view_position = camera_node->transform.position;
+				const blk::Vector4& camera_position = camera_node->world_matrix.columns[3];
+
+				renderer_settings
+					.view_position = {.x = camera_position.x, .y = camera_position.y, .z = camera_position.z};
 			}
 		}
 
-		blk::update_frame(game_context.world.scene_graph, camera_view, game_context.world.settings);
-		blk::render_frame(game_context.world.settings);
+		blk::update_frame(active_world->scene_graph, renderer_settings, active_world->settings);
+		blk::render_frame(active_world->settings);
 	}
 
 	// ============================================================================
 	// Teardown.
 	// ============================================================================
 
-	// The order is not free:
-	//
-	// - `destroy_editor` shuts the ImGui Vulkan backend down, so it has to run before `destroy_renderer`.
-	// - `destroy_editor_context` despawns the editor camera from the game world, so it has to run before we destroy it.
-	// - The resource storages outlive the world and the renderer, because destroying either one releases resources back
-	//   into them.
-
 	blk::destroy_editor();
-	blk::destroy_editor_context(editor_context);
 
-	blk::destroy_game(game_context);
+	blk::game::destroy_game(game_context);
 	blk::destroy_world(game_context.world);
 
 	blk::destroy_renderer();

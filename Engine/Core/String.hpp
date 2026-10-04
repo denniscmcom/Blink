@@ -8,10 +8,11 @@
 #include <stddef.h>
 #include <stdio.h>
 
-/// Wrapper over `snprintf` that checks whether it was successful.
-#define BLK_IF_NOT_SNPRINTF(src, dst, max_size, format)                                                                \
-	if (const int written = snprintf(dst, max_size, format, src);                                                      \
-		written < 0 || static_cast<size_t>(written) >= max_size)
+/// Calls `snprintf` and runs the following statement if it fails or truncates.
+/// @note `format` needs at least one argument.
+#define BLK_IF_NOT_SNPRINTF(dst, max_size, format, ...)                                                                \
+	if (const int written = snprintf(dst, max_size, format, __VA_ARGS__);                                              \
+		written < 0 || static_cast<size_t>(written) >= (max_size))
 
 namespace blk
 {

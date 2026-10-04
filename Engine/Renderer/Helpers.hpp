@@ -58,4 +58,9 @@ VkPipelineShaderStageCreateInfo get_pipeline_shader_stage_create_info(
 Array<VkVertexInputBindingDescription, 1> get_vertex_uv_input_binding_descriptions();
 /// Gets vertex input attribute descriptions for `Vertex_UV`.
 Array<VkVertexInputAttributeDescription, 5> get_vertex_uv_input_attribute_descriptions();
+
+/// Gets vertex input binding descriptions for `Vertex_Spatial`.
+Array<VkVertexInputBindingDescription, 1> get_vertex_spatial_input_binding_descriptions();
+/// Gets vertex input attribute descriptions for `Vertex_Spatial`.
+Array<VkVertexInputAttributeDescription, 1> get_vertex_spatial_input_attribute_descriptions();
 }  // namespace blk

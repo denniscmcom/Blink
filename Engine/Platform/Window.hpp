@@ -27,5 +27,5 @@ Result create_window(Allocator* allocator, const char* title);
 /// Called by `Launcher/`.
 void destroy_window();
 /// Gets the window client rectangle size. The client size is the canvas that the caller can write to.
-Result get_window_client_rect(Rect<unsigned>& rect);
+Result get_window_client_size(size_t& x, size_t& y);
 }  // namespace blk

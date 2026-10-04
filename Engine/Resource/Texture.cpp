@@ -7,6 +7,7 @@
 
 #include "Engine/Core/Pool.hpp"
 #include "Engine/Core/Serial.hpp"
+#include "Engine/Core/String.hpp"
 #include "Engine/Platform/File.hpp"
 #include "Engine/Platform/Log.hpp"
 #include "Engine/Resource/Storage.hpp"
@@ -34,6 +35,24 @@ blk::destroy_texture_storage()
 }
 
 blk::Pool_Handle<blk::Texture>
+blk::load_texture(const char* stem)
+{
+	const Pool_Handle<Texture> handle = load_texture(get_resource_hash(stem, Resource_Type::TEXTURE));
+
+	// Loading by hash has no stem to store, so we store it here. This also names a texture a material already loaded.
+
+	if (Texture* texture = get_texture(handle))
+	{
+		BLK_IF_NOT_SNPRINTF(texture->metadata.stem, MAX_RESOURCE_STEM_SIZE, "%s", stem)
+		{
+			BLK_ERROR("Invalid texture stem\n");
+		}
+	}
+
+	return handle;
+}
+
+blk::Pool_Handle<blk::Texture>
 blk::load_texture(uint64_t hash)
 {
 	if (is_resource_loaded(storage, hash))
@@ -48,6 +67,17 @@ blk::load_texture(uint64_t hash)
 	BLK_IF_NOT_SUCCESS(deserialize_resource(storage.pool.allocator, Resource_Type::TEXTURE, hash, serial))
 	{
 		BLK_ERROR("Failed to deserialize texture `%llu`\n", hash);
+
+		return {};
+	}
+
+	// Read texture format.
+	Texture_Format format = {};
+
+	BLK_IF_NOT_SUCCESS(read(serial, format))
+	{
+		BLK_ERROR("Failed to read texture format\n");
+		free(*storage.pool.allocator, serial.buffer);
 
 		return {};
 	}
@@ -75,14 +105,15 @@ blk::load_texture(uint64_t hash)
 
 	// Create texture.
 	Texture texture = {};
+	texture.format = format;
 	texture.width = width;
 	texture.height = height;
 
-	// Create dynamic array to store pixel data. `width` and `height` come from the file, so we compute the pixel count
+	// Create dynamic array to store pixel data. `width` and `height` come from the file, so we compute the byte count
 	// in 64 bits to avoid overflowing.
-	const uint64_t pixel_count = static_cast<uint64_t>(width) * height;
+	const uint64_t byte_count = static_cast<uint64_t>(width) * height * get_pixel_size(format);
 
-	BLK_IF_NOT_SUCCESS(create_dyn_array(texture.pixels, storage.pool.allocator, pixel_count))
+	BLK_IF_NOT_SUCCESS(create_dyn_array(texture.pixels, storage.pool.allocator, byte_count))
 	{
 		BLK_ERROR("Failed to create dynamic array to store texture pixel data\n");
 		free(*storage.pool.allocator, serial.buffer);
@@ -90,28 +121,28 @@ blk::load_texture(uint64_t hash)
 		return {};
 	}
 
-	for (uint64_t i = 0; i < pixel_count; i++)
+	for (uint64_t i = 0; i < byte_count; i++)
 	{
-		// Read pixel color.
-		Color_RGBA<uint8_t> pixel = {};
+		// Read pixel byte.
+		uint8_t byte = 0;
 
-		BLK_IF_NOT_SUCCESS(read(serial, pixel))
+		BLK_IF_NOT_SUCCESS(read(serial, byte))
 		{
-			BLK_ERROR("Failed to read texture pixel #%llu\n", i);
+			BLK_ERROR("Failed to read texture byte #%llu\n", i);
 			destroy_dyn_array(texture.pixels);
 			free(*storage.pool.allocator, serial.buffer);
 
 			return {};
 		}
 
-		push(texture.pixels, pixel);
+		push(texture.pixels, byte);
 	}
 
 	// We have to free `serial.buffer` because it is allocated by `load_resource`.
 	free(*storage.pool.allocator, serial.buffer);
 
-	// A `.bmaterial` only stores its textures' hashes, so `load_material` has no filename to pass here. The stem stays
-	// empty and `Editor/` shows the texture unnamed.
+	// A `.bmaterial` only stores its textures' hashes, so there is no filename to pass here. The stem stays empty
+	// unless the texture is loaded by stem.
 	return store_resource(storage, texture, hash, "");
 }
 
@@ -144,4 +175,20 @@ blk::Texture*
 blk::get_texture(const Pool_Handle<Texture> handle)
 {
 	return get_resource(storage, handle);
+}
+
+size_t
+blk::get_pixel_size(const Texture_Format format)
+{
+	switch (format)
+	{
+	case Texture_Format::RGBA8:
+		return sizeof(Color_RGBA<uint8_t>);
+	case Texture_Format::R16:
+		return sizeof(uint16_t);
+	}
+
+	BLK_ERROR("Unknown texture format\n");
+
+	return 0;
 }
