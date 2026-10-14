@@ -5,14 +5,16 @@
 
 #include "Engine/Editor/Settings.hpp"
 
-#include "Engine/Core/String.hpp"
+#include "Engine/Core/Core.hpp"
 #include "Engine/Editor/Context.hpp"
 #include "Engine/Renderer/Renderer.hpp"
 #include "Engine/Resource/Material.hpp"
 #include "Engine/Resource/Mesh.hpp"
 #include "Engine/Resource/Texture.hpp"
+#include "Engine/Scene/Graph.hpp"
 #include "Engine/Scene/Node.hpp"
 
+#include <float.h>
 #include <imgui.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -71,7 +73,16 @@ blk::draw_settings(Editor_Context& context)
 				{
 					// Display node position.
 					draw_property_label("Position");
-					ImGui::DragFloat3("##Position", &node->transform.position.x, 0.01f);
+					Vector3 position = node->transform.position;
+
+					if (ImGui::DragFloat3("##Position", &position.x, 0.01f))
+					{
+						move_node(
+							context.active_world->scene_graph,
+							context.selected_node_handle,
+							position - node->transform.position
+						);
+					}
 
 					// We display rotation in degrees, so we have to convert it since we store it in radians.
 					Vector3 rotation = {};
@@ -84,9 +95,17 @@ blk::draw_settings(Editor_Context& context)
 					draw_property_label("Rotation");
 					if (ImGui::DragFloat3("##Rotation", &rotation.x, 0.1f))
 					{
-						node->transform.rotation.x = to_radians(Degrees{rotation.x}).value;
-						node->transform.rotation.y = to_radians(Degrees{rotation.y}).value;
-						node->transform.rotation.z = to_radians(Degrees{rotation.z}).value;
+						const Vector3 new_rotation = {
+							to_radians(Degrees{rotation.x}).value,
+							to_radians(Degrees{rotation.y}).value,
+							to_radians(Degrees{rotation.z}).value,
+						};
+
+						rotate_node(
+							context.active_world->scene_graph,
+							context.selected_node_handle,
+							new_rotation - node->transform.rotation
+						);
 					}
 
 					// Display node scale.
@@ -245,6 +264,24 @@ blk::draw_settings(Editor_Context& context)
 							"%.2f",
 							ImGuiSliderFlags_AlwaysClamp
 						);
+
+						ImGui::TreePop();
+					}
+				}
+				break;
+				case Node_Type::STATIC_BODY: {
+					if (ImGui::TreeNodeEx("Static body", ImGuiTreeNodeFlags_DefaultOpen))
+					{
+						// TODO (WIP):
+
+						ImGui::TreePop();
+					}
+				}
+				break;
+				case Node_Type::CAPSULE_COLLIDER: {
+					if (ImGui::TreeNodeEx("Collider", ImGuiTreeNodeFlags_DefaultOpen))
+					{
+						// TODO (WIP):
 
 						ImGui::TreePop();
 					}
@@ -466,6 +503,7 @@ blk::draw_settings(Editor_Context& context)
 
 			if (ImGui::TreeNodeEx("Terrain", ImGuiTreeNodeFlags_DefaultOpen))
 			{
+				bool terrain_settings_changed = false;
 				Terrain_Settings& terrain = context.active_world->settings.terrain;
 
 				// Terrain heightmap texture entered by stem.
@@ -494,12 +532,7 @@ blk::draw_settings(Editor_Context& context)
 					{
 						unload_texture(terrain.heightmap_handle);
 						terrain.heightmap_handle = heightmap_handle;
-						context.active_world->flags |= WORLD_TERRAIN_DIRTY_BIT;
-
-						BLK_IF_NOT_SUCCESS(bake_renderer(context.active_world->settings))
-						{
-							BLK_ERROR("Failed to bake the renderer with the new terrain heightmap\n");
-						}
+						terrain_settings_changed = true;
 					}
 					else
 					{
@@ -515,7 +548,7 @@ blk::draw_settings(Editor_Context& context)
 
 				if (ImGui::IsItemDeactivatedAfterEdit())
 				{
-					context.active_world->flags |= WORLD_TERRAIN_DIRTY_BIT;
+					terrain_settings_changed = true;
 				}
 
 				draw_property_label("Height");
@@ -523,7 +556,7 @@ blk::draw_settings(Editor_Context& context)
 
 				if (ImGui::IsItemDeactivatedAfterEdit())
 				{
-					context.active_world->flags |= WORLD_TERRAIN_DIRTY_BIT;
+					terrain_settings_changed = true;
 				}
 
 				// The loaded chunks were split with the previous resolution and chunk texel count, so the streamer
@@ -551,7 +584,7 @@ blk::draw_settings(Editor_Context& context)
 						terrain.chunk_texel_count = terrain.resolution;
 					}
 
-					context.active_world->flags |= WORLD_TERRAIN_DIRTY_BIT;
+					terrain_settings_changed = true;
 				}
 
 				// A chunk cannot be larger than the terrain, otherwise no chunk fits in it. Without a resolution there
@@ -578,7 +611,7 @@ blk::draw_settings(Editor_Context& context)
 
 				if (ImGui::IsItemDeactivatedAfterEdit())
 				{
-					context.active_world->flags |= WORLD_TERRAIN_DIRTY_BIT;
+					terrain_settings_changed = true;
 				}
 
 				// Dislay read-only valued.
@@ -643,7 +676,32 @@ blk::draw_settings(Editor_Context& context)
 					ImGuiSliderFlags_AlwaysClamp
 				);
 
+				// The skirt depth is a uniform, so edits need no rebuild.
+
+				draw_property_label("Skirt depth");
+
+				ImGui::DragFloat(
+					"##Skirt depth",
+					&terrain.skirt_depth,
+					0.1f,
+					0.0f,
+					FLT_MAX,
+					"%.1f m",
+					ImGuiSliderFlags_AlwaysClamp
+				);
+
 				ImGui::TreePop();
+
+				if (terrain_settings_changed)
+				{
+					for (size_t i = 0; i < context.active_world->scene_graph.nodes.capacity; ++i)
+					{
+						if (Pool_Slot<Node>& slot = context.active_world->scene_graph.nodes.slots[i]; slot.is_used)
+						{
+							slot.element.flags |= NODE_TERRAIN_DIRTY;
+						}
+					}
+				}
 			}
 
 			// Streamer.
@@ -673,18 +731,6 @@ blk::draw_settings(Editor_Context& context)
 					&streamer_settings.unload_radius,
 					0.1f,
 					streamer_settings.load_radius + 1,
-					INT32_MAX,
-					"%d",
-					ImGuiSliderFlags_AlwaysClamp
-				);
-
-				draw_property_label("Rebase distance");
-
-				ImGui::DragInt(
-					"##Rebase distance",
-					&streamer_settings.rebase_distance,
-					0.1f,
-					1,
 					INT32_MAX,
 					"%d",
 					ImGuiSliderFlags_AlwaysClamp

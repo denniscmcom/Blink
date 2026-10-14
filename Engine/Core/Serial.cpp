@@ -3,7 +3,10 @@
 // Licensed under the Blink Engine Source Access License, see LICENSE.txt
 // ============================================================================
 
-#include "Engine/Core/Serial.hpp"
+#ifdef BLK_NEW_API
+#else
+
+#include "Engine/Core/Core.hpp"
 
 #include "Engine/Platform/Assert.hpp"
 
@@ -17,3 +20,5 @@ blk::init_serial(char* buffer, size_t size)
 
 	return Serial{.buffer = buffer, .size = size};
 }
+
+#endif

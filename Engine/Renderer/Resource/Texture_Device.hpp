@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "Engine/Core/Pool.hpp"
+#include "Engine/Core/Core.hpp"
 #include "Engine/Renderer/Lifetime/Image.hpp"
 
 #include <vulkan/vulkan.h>
@@ -36,6 +36,6 @@ Result transfer_texture(
 	Texture_Device& texture
 );
 /// Unloads a `texture` from device.
-/// @warning The device must not be using `texture`. Call `wait_renderer_idle` first.
+/// @warning The device must not be using `texture`. Call `wait_for_device` first.
 void unload_texture_from_device(const Context& context, Arena& arena, Texture_Device& texture);
 }  // namespace blk

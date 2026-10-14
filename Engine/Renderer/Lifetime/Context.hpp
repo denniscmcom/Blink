@@ -60,6 +60,8 @@ struct Context
 	/// Sampler for lookup tables.
 	VkSampler lut_sampler = VK_NULL_HANDLE;
 
+	VkSampleCountFlagBits msaa_count = VK_SAMPLE_COUNT_8_BIT;
+
 	/// Renderer host allocator.
 	Allocator* allocator;
 };

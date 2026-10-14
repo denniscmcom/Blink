@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "Engine/Core/Pool.hpp"
+#include "Engine/Core/Core.hpp"
 
 namespace blk
 {
@@ -20,9 +20,7 @@ enum class Result;
 /// A multi-part model is several `MESH` nodes under a `SPATIAL` one.
 struct Mesh_Ref
 {
-	/// Array of mesh handles.
 	Pool_Handle<Mesh> mesh_handle;
-	/// Array of material handles.
 	Pool_Handle<Material> material_handle;
 };
 }  // namespace blk

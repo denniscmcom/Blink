@@ -5,8 +5,7 @@
 
 #pragma once
 
-#include "Engine/Core/Hash.hpp"
-#include "Engine/Core/Pool.hpp"
+#include "Engine/Core/Core.hpp"
 #include "Engine/Renderer/Lifetime/Buffer.hpp"
 #include "Engine/Renderer/Resource/Material_Device.hpp"
 #include "Engine/Renderer/Resource/Mesh_Device.hpp"

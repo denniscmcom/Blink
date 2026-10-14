@@ -43,12 +43,15 @@ struct Terrain_Constants
 	Vector2 uv_offset;
 	/// `Terrain_Ref::uv_scale`.
 	float uv_scale;
+	/// `Terrain_Ref::lod`.
+	uint32_t lod;
 };
 
-static_assert(sizeof(Terrain_Constants) == 64 + 8 + 4);
+static_assert(sizeof(Terrain_Constants) == 64 + 8 + 4 + 4);
 static_assert(offsetof(Terrain_Constants, model) == 0);
 static_assert(offsetof(Terrain_Constants, uv_offset) == 64);
 static_assert(offsetof(Terrain_Constants, uv_scale) == 64 + 8);
+static_assert(offsetof(Terrain_Constants, lod) == 64 + 8 + 4);
 
 /// Data needed by the renderer to issue a single draw command.
 ///

@@ -41,6 +41,7 @@ Result create_graphics_pipeline(
 	VkBool32 enable_depth_test,
 	VkBool32 enable_depth_write,
 	VkCompareOp depth_compare_op,
+	VkPrimitiveTopology topology,
 	Pipeline& pipeline
 );
 /// Creates a compute `pipeline`.

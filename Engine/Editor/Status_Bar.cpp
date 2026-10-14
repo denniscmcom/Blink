@@ -52,6 +52,13 @@ blk::draw_status_bar(Editor_Context& context)
 	);
 
 	ImGui::Text("Blink " BLK_ENGINE_VERSION);
+
+	// Display some performance data.
+
+	draw_horizontal_separator();
+	draw_fps();
+	draw_horizontal_separator();
+	draw_ms();
 	draw_horizontal_separator();
 
 	// Depending on `Editor_Mode` we display context-based information.
@@ -85,14 +92,6 @@ blk::draw_status_bar(Editor_Context& context)
 	}
 	break;
 	}
-
-	// Display some performance data.
-
-	draw_horizontal_separator();
-	draw_fps();
-	draw_horizontal_separator();
-	draw_ms();
-	draw_horizontal_separator();
 
 	ImGui::End();
 	ImGui::PopStyleVar();

@@ -9,6 +9,7 @@
 
 namespace blk
 {
+struct Image;
 struct Context;
 enum class Result;
 
@@ -70,7 +71,13 @@ void unmap_buffer(const Context& context, Buffer& buffer);
 /// @see `Host_Device_Buffer`.
 Result copy_buffer(const Context& context, const Buffer& src, const Buffer& dst);
 /// Uploads pixel data from host buffer into a device image (typically a texture).
-Result copy_buffer_to_image(const Context& context, const Buffer& src, VkImage dst, uint32_t width, uint32_t height);
+Result copy_buffer_to_image(
+	const Context& context,
+	const Buffer& src,
+	const Image& dst,
+	uint32_t width,
+	uint32_t height
+);
 /// Destroys `buffer`. It unmaps it first if it is mapped.
 void destroy_buffer(const Context& context, Buffer& buffer);
 }  // namespace blk

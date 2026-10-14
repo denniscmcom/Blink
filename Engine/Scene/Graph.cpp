@@ -5,24 +5,16 @@
 
 #include "Engine/Scene/Graph.hpp"
 
-#include "Engine/Core/Array.hpp"
-#include "Engine/Core/Hash.hpp"
-#include "Engine/Core/Pool.hpp"
-#include "Engine/Core/String.hpp"
+#include "Engine/Core/Core.hpp"
 #include "Engine/Platform/Allocator.hpp"
 #include "Engine/Platform/Assert.hpp"
 #include "Engine/Platform/Log.hpp"
 #include "Engine/Platform/Result.hpp"
 #include "Engine/Scene/Node.hpp"
 
-#include <stdio.h>
+#include <tracy/Tracy.hpp>
 
-namespace
-{
-// Pushes every child of `node` onto `scene_graph.stack`.
-// `node` should be a valid pointer.
-void push_children(blk::Scene_Graph& scene_graph, const blk::Node& node);
-}  // namespace
+#include <stdio.h>
 
 blk::Result
 blk::create_scene_graph(Scene_Graph& scene_graph, Allocator* allocator)
@@ -84,7 +76,7 @@ blk::destroy_scene_graph(Scene_Graph& scene_graph)
 }
 
 blk::Pool_Handle<blk::Node>
-blk::spawn_node(Scene_Graph& scene_graph, Node_Type type, const Pool_Handle<Node> parent_handle)
+blk::spawn_node(Scene_Graph& scene_graph, Physics* physics, Node_Type type, const Pool_Handle<Node> parent_handle)
 {
 	// Initialize node structure to insert.
 
@@ -101,6 +93,53 @@ blk::spawn_node(Scene_Graph& scene_graph, Node_Type type, const Pool_Handle<Node
 		return {};
 	}
 
+	// Initialize physics data is needed.
+
+	const bool is_physics_node =
+		type == Node_Type::STATIC_BODY || type == Node_Type::DYNAMIC_BODY || type == Node_Type::CAPSULE_COLLIDER;
+
+	if (is_physics_node && !BLK_VERIFY(physics))
+	{
+		return {};
+	}
+
+	// Create static body.
+
+	if (type == Node_Type::STATIC_BODY)
+	{
+		node.static_body = create_static_body(*physics, {});
+	}
+
+	// Create dynamic body.
+
+	if (type == Node_Type::DYNAMIC_BODY)
+	{
+		node.dynamic_body = create_dynamic_body(*physics, {});
+	}
+
+	// Create capsule collider.
+
+	if (type == Node_Type::CAPSULE_COLLIDER)
+	{
+		const Node* parent = get_node(scene_graph, parent_handle);
+		BLK_CHECK(parent);
+
+		if (parent->type == Node_Type::STATIC_BODY)
+		{
+			node.capsule_collider = create_capsule_collider(parent->static_body);
+		}
+		else if (parent->type == Node_Type::DYNAMIC_BODY)
+		{
+			node.capsule_collider = create_capsule_collider(parent->dynamic_body);
+		}
+		else
+		{
+			BLK_ERROR("A capsule collider can only be parented to a static or dynamic physics body\n");
+
+			return {};
+		}
+	}
+
 	const Pool_Handle<Node> node_handle = insert(scene_graph.nodes, node);
 
 	if (!BLK_VERIFY(node_handle != POOL_HANDLE_NONE<Node>))
@@ -110,6 +149,40 @@ blk::spawn_node(Scene_Graph& scene_graph, Node_Type type, const Pool_Handle<Node
 
 		return {};
 	}
+
+#ifdef BLK_EDITOR
+	// Add default editor node name.
+	switch (node.type)
+	{
+	case Node_Type::SPATIAL:
+		rename_node(scene_graph, node_handle, "Spatial");
+		break;
+	case Node_Type::MESH_REF:
+		rename_node(scene_graph, node_handle, "Mesh_Ref");
+		break;
+	case Node_Type::POINT_LIGHT:
+		rename_node(scene_graph, node_handle, "Point_Light");
+		break;
+	case Node_Type::DIRECTIONAL_LIGHT:
+		rename_node(scene_graph, node_handle, "Directional_Light");
+		break;
+	case Node_Type::TERRAIN:
+		rename_node(scene_graph, node_handle, "Terrain");
+		break;
+	case Node_Type::STATIC_BODY:
+		rename_node(scene_graph, node_handle, "Static_Body");
+		break;
+	case Node_Type::DYNAMIC_BODY:
+		rename_node(scene_graph, node_handle, "Dynamic_Body");
+		break;
+	case Node_Type::CAPSULE_COLLIDER:
+		rename_node(scene_graph, node_handle, "Capsule_Collider");
+		break;
+	case Node_Type::HEIGHTFIELD_COLLIDER:
+		rename_node(scene_graph, node_handle, "Heightfield_Collider");
+		break;
+	}
+#endif
 
 	// After inserting the node, we fetch the pointer to itself and its parent.
 
@@ -208,7 +281,7 @@ blk::despawn_subtree(Scene_Graph& scene_graph, Pool_Handle<Node> handle, Dyn_Arr
 		stack.count -= 1;
 
 		const Pool_Handle<Node> current_node_handle = stack.buffer[stack.count];
-		const Node* current_node = get(scene_graph.nodes, current_node_handle);
+		Node* current_node = get(scene_graph.nodes, current_node_handle);
 
 		if (!BLK_VERIFY(current_node))
 		{
@@ -218,6 +291,24 @@ blk::despawn_subtree(Scene_Graph& scene_graph, Pool_Handle<Node> handle, Dyn_Arr
 
 		// Push node children onto the stack to despawn them later.
 		push_children(scene_graph, *current_node);
+
+		// Destroy physics data.
+		// A body is despawned before its colliders, and destroying it destroys their shapes too.
+
+		switch (current_node->type)
+		{
+		case Node_Type::STATIC_BODY:
+			destroy_static_body(current_node->static_body);
+			break;
+		case Node_Type::DYNAMIC_BODY:
+			destroy_dynamic_body(current_node->dynamic_body);
+			break;
+		case Node_Type::HEIGHTFIELD_COLLIDER:
+			destroy_heightfield_collider(current_node->heightfield_collider);
+			break;
+		default:
+			break;
+		}
 
 		// Despawn current node.
 
@@ -357,6 +448,9 @@ blk::link_node(Scene_Graph& scene_graph, Pool_Handle<Node> handle, Pool_Handle<N
 
 	// Finally, we are the last child of our parent.
 	parent->last_child_handle = handle;
+
+	// Our transform is now relative to a different parent.
+	node->flags |= NODE_TRANSFORM_DIRTY;
 }
 
 blk::Result
@@ -393,66 +487,43 @@ blk::get_node(Scene_Graph& scene_graph, Pool_Handle<Node> handle)
 }
 
 void
-blk::update_node_transforms(Scene_Graph& scene_graph)
-{
-	if (scene_graph.root == POOL_HANDLE_NONE<Node>)
-	{
-		// We have nothing to update.
-		return;
-	}
-
-	// Get a reference to our traversal stack.
-	Dyn_Array<Pool_Handle<Node>>& stack = scene_graph.stack;
-
-	// Empty it and push the root node to start iterating.
-
-	empty(stack);
-	push(stack, scene_graph.root);
-
-	while (stack.count > 0)
-	{
-		stack.count -= 1;
-		Node* node = get(scene_graph.nodes, stack.buffer[stack.count]);
-
-		if (!BLK_VERIFY(node))
-		{
-			// This should not happen.
-			continue;
-		}
-
-		// Initialize local matrix from node transform.
-		const Matrix4 local_matrix = init_transform_matrix(node->transform);
-
-		// A node is always processed before its children are pushed, so its parent's world matrix is ready.
-
-		if (const Node* parent = get(scene_graph.nodes, node->parent_handle))
-		{
-			// We have a parent so out world matrix is its world matrix * our local.
-			node->world_matrix = parent->world_matrix * local_matrix;
-		}
-		else
-		{
-			// We do not have a parent, so our world matrix is the local.
-			node->world_matrix = local_matrix;
-		}
-
-		push_children(scene_graph, *node);
-	}
-}
-
-namespace
-{
-void
-push_children(blk::Scene_Graph& scene_graph, const blk::Node& node)
+blk::push_children(Scene_Graph& scene_graph, const Node& node)
 {
 	// Set child handle as the first child to start iterating over the list.
-	blk::Pool_Handle<blk::Node> child_handle = node.first_child_handle;
+	Pool_Handle<Node> child_handle = node.first_child_handle;
 
 	// Iterate over the sibling list pushing each sibling to the stack.
-	while (const blk::Node* child = get(scene_graph.nodes, child_handle))
+	while (const Node* child = get(scene_graph.nodes, child_handle))
 	{
 		push(scene_graph.stack, child_handle);
 		child_handle = child->next_sibling_handle;
 	}
 }
-}  // namespace
+
+void
+blk::move_node(Scene_Graph& scene_graph, Pool_Handle<Node> handle, Vector3 delta)
+{
+	Node* node = get_node(scene_graph, handle);
+
+	if (!node)
+	{
+		return;
+	}
+
+	node->transform.position += delta;
+	node->flags |= NODE_TRANSFORM_DIRTY;
+}
+
+void
+blk::rotate_node(Scene_Graph& scene_graph, Pool_Handle<Node> handle, Vector3 delta)
+{
+	Node* node = get_node(scene_graph, handle);
+
+	if (!node)
+	{
+		return;
+	}
+
+	node->transform.rotation += delta;
+	node->flags |= NODE_TRANSFORM_DIRTY;
+}

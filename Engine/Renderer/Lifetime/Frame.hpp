@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "Engine/Core/Array.hpp"
+#include "Engine/Core/Core.hpp"
 #include "Engine/Core/Math/Matrix.hpp"
 #include "Engine/Core/Math/Unit.hpp"
 #include "Engine/Core/Math/Vector.hpp"
@@ -22,6 +22,9 @@ struct Draw_Command;
 struct Context;
 struct Pipeline;
 enum class Result;
+
+/// Maximum number of line vertices a frame can hold.
+constexpr uint32_t MAX_LINE_VERTEX_BUFFER_COUNT = 2 * 1'048'576;
 
 /// A `Vector3` carrying the alignment std140 requires of a `float3` inside a uniform block.
 ///
@@ -137,11 +140,14 @@ struct Terrain_UBO
 	float chunk_size;
 	/// `Terrain_Settings::height`.
 	float terrain_height;
+	/// `Terrain_Settings::skirt_depth`.
+	float skirt_depth;
 };
 
-static_assert(sizeof(Terrain_UBO) == 8);
+static_assert(sizeof(Terrain_UBO) == 12);
 static_assert(offsetof(Terrain_UBO, chunk_size) == 0);
 static_assert(offsetof(Terrain_UBO, terrain_height) == 4);
+static_assert(offsetof(Terrain_UBO, skirt_depth) == 8);
 
 /// Initial number of draw commands a frame can hold before its arrays have to grow.
 constexpr size_t INITIAL_DRAW_COMMAND_COUNT = 64;
@@ -151,6 +157,7 @@ struct Frame
 {
 	/// Frame command buffer to record commands to.
 	VkCommandBuffer command_buffer = VK_NULL_HANDLE;
+
 	/// To synchronize device-device. The host never sees it.
 	/// Coordinates work between queue submissions without involving the host.
 	VkSemaphore semaphore = VK_NULL_HANDLE;
@@ -158,6 +165,7 @@ struct Frame
 	/// In `update_frame` the host waits until the device has finished executing this frame's previous submission.
 	/// Without it, we'd start overwriting `command_buffer` and UBO data while the device is still reading them.
 	VkFence fence = VK_NULL_HANDLE;
+
 	/// Camera buffer to store `Camera_UBO`.
 	Buffer camera_buffer;
 	/// Light buffer to store `Light_UBO`.
@@ -166,6 +174,13 @@ struct Frame
 	Buffer skybox_buffer;
 	/// Terrain buffer to store `Terrain_UBO`.
 	Buffer terrain_buffer;
+
+	/// Buffer to draw lines.
+	/// It's reset every frame, so use it for one-off debug lines or lines that change every frame.
+	Buffer line_vertex_buffer;
+	/// Number of vertices written to `line_vertex_buffer`.
+	uint32_t line_vertex_count;
+
 	/// Transmittance LUT for the skybox.
 	Image skybox_transmittance_lut;
 	/// Multiscattering LUT for the skybox.
@@ -174,17 +189,17 @@ struct Frame
 	Image skybox_sky_view_lut;
 	/// Aerial perspective LUT for the skybox.
 	Image skybox_aerial_lut;
+
 	/// The `Descriptor_Layouts::pool` the descriptor sets below were allocated from. We keep it so that `destroy_frame`
 	/// can return them to it.
 	VkDescriptorPool descriptor_pool = VK_NULL_HANDLE;
 	/// Frame descriptor set allocated from `descriptor_pool`.
 	VkDescriptorSet descriptor_set = VK_NULL_HANDLE;
+
 	/// Array of draw commands to render meshes.
 	Dyn_Array<Draw_Command> mesh_draw_commands;
 	/// Array of draw commands to render terrain.
 	Dyn_Array<Draw_Command> terrain_draw_commands;
-	/// Array of draw commands to render the skybox.
-	Dyn_Array<Draw_Command> skybox_draw_commands;
 };
 
 /// Creates `frame` data.

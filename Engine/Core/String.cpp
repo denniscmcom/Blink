@@ -3,7 +3,10 @@
 // Licensed under the Blink Engine Source Access License, see LICENSE.txt
 // ============================================================================
 
-#include "Engine/Core/String.hpp"
+#ifdef BLK_NEW_API
+#else
+
+#include "Engine/Core/Core.hpp"
 
 #include "Engine/Platform/Allocator.hpp"
 #include "Engine/Platform/Assert.hpp"
@@ -193,3 +196,5 @@ blk::concat(String& lhs, const String& rhs)
 
 	return Result::SUCCESS;
 }
+
+#endif

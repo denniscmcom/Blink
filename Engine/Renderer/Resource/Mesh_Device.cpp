@@ -116,6 +116,10 @@ blk::transfer_mesh(const Context& context, Arena& arena, const Pool_Handle<Mesh>
 
 	// Copy data from host buffer to device buffer.
 
+	// TODO (Bug): `copy_buffer` copies the whole buffer, so it also rewrites ranges a frame still in flight may be
+	// reading. Submission order alone does not order the copy after that frame, and the `vkQueueWaitIdle` in
+	// `end_one_time_commands` only runs once the copy is submitted. It works because the rewritten bytes are identical,
+	// but it is an unsynchronized write. Copying only the range written above would avoid the overlap.
 	copy_buffer(context, arena.vertex_buffer.host, arena.vertex_buffer.device);
 	copy_buffer(context, arena.index_buffer.host, arena.index_buffer.device);
 

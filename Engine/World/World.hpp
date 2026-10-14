@@ -5,8 +5,8 @@
 
 #pragma once
 
-#include "Engine/Core/Hash.hpp"
-#include "Engine/Core/Pool.hpp"
+#include "Engine/Core/Core.hpp"
+#include "Engine/Physics/World.hpp"
 #include "Engine/Scene/Graph.hpp"
 #include "Engine/World/Actor.hpp"
 #include "Engine/World/Atmosphere.hpp"
@@ -55,13 +55,6 @@ struct World_Settings
 	Stream_Settings stream;
 };
 
-/// Bits for `World::flags`.
-enum World_Flag_Bits : uint32_t
-{
-	/// A value that the terrain was built from has changed.
-	WORLD_TERRAIN_DIRTY_BIT = 1 << 0,
-};
-
 /// A `Scene_Graph` plus the gameplay data attached to some of its nodes.
 ///
 /// @warning Despawning nodes with `despawn_node(world.scene_graph, ...)` or `despawn_subtree(world.scene_graph, ...)`
@@ -86,25 +79,26 @@ struct World
 	Chunk_Coord origin;
 	/// Loaded chunks.
 	Dyn_Array<Chunk> chunks;
+	/// Reused heights of the chunk heightfield being loaded.
+	Dyn_Array<float> heightfield_samples;
 
 	Scene_Graph scene_graph;
+	Physics physics;
+
 	World_Settings settings;
-	/// Combination of `World_Flag_Bits`. `update_world` handles and clears them.
-	uint32_t flags;
 
 	Allocator* allocator;
 };
 
-// TODO (Consistency): The output comes last here, while `create_scene_graph`, `create_pool` and the `Result.hpp` example
-// put it first, followed by the allocator. Decide on one order.
+// TODO (Consistency): The output comes last here, while `create_scene_graph`, `create_pool` and the `Result.hpp`
+// example put it first, followed by the allocator. Decide on one order.
 
 /// Creates an empty `World`.
 Result create_world(Allocator* allocator, const World_Settings& settings, World& world);
 /// Destroys `world`.
 void destroy_world(World& world);
-/// Rebase the world origin based on the active camera position, and loads/unloads chunks.
-/// @param node_offset The transform offset applied to root nodes if a rebase happened.
-void update_world(World& world, Vector3& node_offset);
+/// Computes world matrices for each node, loads/unloads chunks, and syncs physics<->node transforms.
+void update_world(World& world);
 
 /// Spawns an actor into `world` and returns its handle.
 /// @param parent_handle If it's none, the actor is parented to the root.

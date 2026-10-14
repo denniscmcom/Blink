@@ -8,12 +8,16 @@
 #include "Engine/Platform/Assert.hpp"
 #include "Engine/Platform/Event.hpp"
 
+#include <tracy/Tracy.hpp>
+
 #include <stdint.h>
 #include <string.h>
 
 void
 blk::update_input(Input_State& state)
 {
+	ZoneScoped;
+
 	clear_frame_events(state);
 
 	for (Event event = poll_event(); event.type != Event_Type::NONE; event = poll_event())

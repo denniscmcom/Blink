@@ -5,7 +5,7 @@
 
 #include "Engine/Renderer/Lifetime/Frame.hpp"
 
-#include "Engine/Core/Array.hpp"
+#include "Engine/Core/Core.hpp"
 #include "Engine/Platform/Log.hpp"
 #include "Engine/Platform/Result.hpp"
 #include "Engine/Renderer/Lifetime/Buffer.hpp"
@@ -15,6 +15,7 @@
 #include "Engine/Renderer/Lifetime/Draw_Command.hpp"
 #include "Engine/Renderer/Lifetime/Sync.hpp"
 #include "Engine/Renderer/Skybox.hpp"
+#include "Engine/Resource/Mesh.hpp"
 
 #include <vulkan/vulkan.h>
 
@@ -135,6 +136,36 @@ blk::create_frame(const Context& context, const Descriptor_Layouts& layouts, Fra
 
 	frame.terrain_buffer = terrain_buffer;
 
+	// Create line buffer.
+
+	Buffer line_vertex_buffer = {};
+
+	if (const Result result = create_buffer(
+			context,
+			sizeof(Vertex_Color) * MAX_LINE_VERTEX_BUFFER_COUNT,
+			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			line_vertex_buffer
+		);
+		result != Result::SUCCESS)
+	{
+		BLK_ERROR("Failed to create line vertex buffer buffer\n");
+		destroy_frame(context, frame);
+
+		return result;
+	}
+
+	if (const Result result = map_buffer(context, line_vertex_buffer); result != Result::SUCCESS)
+	{
+		BLK_ERROR("Failed to map line vertex buffer buffer\n");
+		destroy_buffer(context, line_vertex_buffer);
+		destroy_frame(context, frame);
+
+		return result;
+	}
+
+	frame.line_vertex_buffer = line_vertex_buffer;
+
 	// The following images are created with `VK_IMAGE_USAGE_TRANSFER_DST_BIT` because of `render_frame`: when
 	// `World_Settings` disables the pass that fills this LUT, it clears the image instead of dispatching, so the
 	// shaders sampling it see black rather than whatever the last enabled frame left behind.
@@ -155,6 +186,8 @@ blk::create_frame(const Context& context, const Descriptor_Layouts& layouts, Fra
 			VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 			VK_IMAGE_ASPECT_COLOR_BIT,
+			1,
+			VK_SAMPLE_COUNT_1_BIT,
 			skybox_transmittance_lut
 		);
 		result != Result::SUCCESS)
@@ -183,6 +216,8 @@ blk::create_frame(const Context& context, const Descriptor_Layouts& layouts, Fra
 			VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 			VK_IMAGE_ASPECT_COLOR_BIT,
+			1,
+			VK_SAMPLE_COUNT_1_BIT,
 			skybox_multiscattering_lut
 		);
 		result != Result::SUCCESS)
@@ -211,6 +246,8 @@ blk::create_frame(const Context& context, const Descriptor_Layouts& layouts, Fra
 			VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 			VK_IMAGE_ASPECT_COLOR_BIT,
+			1,
+			VK_SAMPLE_COUNT_1_BIT,
 			skybox_sky_view_lut
 		);
 		result != Result::SUCCESS)
@@ -239,6 +276,8 @@ blk::create_frame(const Context& context, const Descriptor_Layouts& layouts, Fra
 			VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 			VK_IMAGE_ASPECT_COLOR_BIT,
+			1,
+			VK_SAMPLE_COUNT_1_BIT,
 			skybox_aerial_lut
 		);
 		result != Result::SUCCESS)
@@ -489,16 +528,6 @@ blk::create_frame(const Context& context, const Descriptor_Layouts& layouts, Fra
 		return result;
 	}
 
-	if (const Result result =
-			create_dyn_array(frame.skybox_draw_commands, context.allocator, INITIAL_DRAW_COMMAND_COUNT);
-		result != Result::SUCCESS)
-	{
-		BLK_ERROR("Failed to create frame skybox draw commands array\n");
-		destroy_frame(context, frame);
-
-		return result;
-	}
-
 	return Result::SUCCESS;
 }
 
@@ -509,7 +538,6 @@ blk::destroy_frame(const Context& context, Frame& frame)
 
 	destroy_dyn_array(frame.mesh_draw_commands);
 	destroy_dyn_array(frame.terrain_draw_commands);
-	destroy_dyn_array(frame.skybox_draw_commands);
 
 	// Destroy descriptor set.
 

@@ -5,9 +5,9 @@
 
 #pragma once
 
+#include "Engine/Core/Core.hpp"
 #include "Engine/Core/Math/Color.hpp"
 #include "Engine/Core/Math/Vector.hpp"
-#include "Engine/Core/Pool.hpp"
 
 namespace blk
 {

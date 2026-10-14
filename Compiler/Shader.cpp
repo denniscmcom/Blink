@@ -5,7 +5,7 @@
 
 #include "Compiler/Shader.hpp"
 
-#include "Engine/Core/Serial.hpp"
+#include "Engine/Core/Core.hpp"
 #include "Engine/Resource/Shader.hpp"
 #include "Engine/Resource/Storage.hpp"
 

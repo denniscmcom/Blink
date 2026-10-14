@@ -5,12 +5,12 @@
 
 #pragma once
 
-#include "Engine/Core/Array.hpp"
-#include "Engine/Core/Hash.hpp"
-#include "Engine/Core/Pool.hpp"
+#include "Engine/Core/Core.hpp"
 
 namespace blk
 {
+struct Vector3;
+struct Physics;
 enum class Node_Type;
 enum class Result;
 struct Node;
@@ -39,8 +39,14 @@ void destroy_scene_graph(Scene_Graph& scene_graph);
 
 /// Spawns a node and appends it as the last child of `parent_handle`, or of the root if `parent_handle` is none. O(1).
 /// @param parent_handle If it's none, the node is parented to the root.
+/// @param physics Should be a valid points if `type` is any physics node.
 /// @warning Returns none on failure.
-Pool_Handle<Node> spawn_node(Scene_Graph& scene_graph, Node_Type type, Pool_Handle<Node> parent_handle);
+Pool_Handle<Node> spawn_node(
+	Scene_Graph& scene_graph,
+	Physics* physics,
+	Node_Type type,
+	Pool_Handle<Node> parent_handle
+);
 
 /// Despawns a single node. Its children are appended as the last children of its parent.
 /// @warning The root cannot be despawned.
@@ -64,11 +70,13 @@ void link_node(Scene_Graph& scene_graph, Pool_Handle<Node> handle, Pool_Handle<N
 /// Renames a node.
 /// @param name A unique null-terminated literal string.
 Result rename_node(Scene_Graph& scene_graph, Pool_Handle<Node> handle, const char* name);
-
 /// Returns the node, or `nullptr` if `handle` is none or stale.
 Node* get_node(Scene_Graph& scene_graph, Pool_Handle<Node> handle);
+/// Pushes every child of `node` onto `scene_graph.stack`.
+void push_children(Scene_Graph& scene_graph, const Node& node);
 
-/// Updates `Node::world_matrix` for every node, root-down.
-/// @note Call once per frame.
-void update_node_transforms(Scene_Graph& scene_graph);
+/// Moves a node by `delta`.
+void move_node(Scene_Graph& scene_graph, Pool_Handle<Node> handle, Vector3 delta);
+/// Rotation a node by `delta`.
+void rotate_node(Scene_Graph& scene_graph, Pool_Handle<Node> handle, Vector3 delta);
 }  // namespace blk

@@ -5,10 +5,8 @@
 
 #include "Engine/Resource/Mesh.hpp"
 
+#include "Engine/Core/Core.hpp"
 #include "Engine/Core/Math/Constants.hpp"
-#include "Engine/Core/Pool.hpp"
-#include "Engine/Core/Serial.hpp"
-#include "Engine/Core/String.hpp"
 #include "Engine/Platform/Log.hpp"
 #include "Engine/Resource/Storage.hpp"
 
@@ -258,9 +256,9 @@ blk::compute_uv_sphere(const float radius, const uint32_t segment_count, const u
 }
 
 blk::Pool_Handle<blk::Mesh>
-blk::compute_grid(const uint32_t quad_count)
+blk::compute_grid(const uint32_t quad_count, const float border_height)
 {
-	if (!BLK_VERIFY(quad_count > 0))
+	if (!BLK_VERIFY(quad_count > 0) || !BLK_VERIFY(border_height >= 0.0f))
 	{
 		return {};
 	}
@@ -269,7 +267,7 @@ blk::compute_grid(const uint32_t quad_count)
 	// mesh hash.
 	char stem[MAX_RESOURCE_STEM_SIZE];
 
-	BLK_IF_NOT_SNPRINTF(stem, sizeof(stem), "Grid:%u", quad_count)
+	BLK_IF_NOT_SNPRINTF(stem, sizeof(stem), "Grid:%u:%g", quad_count, static_cast<double>(border_height))
 	{
 		BLK_ERROR("Failed to format grid stem\n");
 
@@ -289,9 +287,14 @@ blk::compute_grid(const uint32_t quad_count)
 	Mesh mesh = {};
 
 	// Both counts are known up front, so we allocate them exactly. `quad_count` quads per side need `quad_count + 1`
-	// vertices per side, and every quad pushes two triangles.
-	const size_t vertex_count = (static_cast<size_t>(quad_count) + 1) * (static_cast<size_t>(quad_count) + 1);
-	const size_t index_count = static_cast<size_t>(quad_count) * quad_count * 6;
+	// vertices per side, and every quad pushes two triangles. The wall adds a copy of each of the `4 * quad_count`
+	// border vertices and one quad per border segment.
+	const bool has_border = border_height > 0.0f;
+	const size_t border_count = has_border ? static_cast<size_t>(quad_count) * 4 : 0;
+
+	const size_t vertex_count =
+		(static_cast<size_t>(quad_count) + 1) * (static_cast<size_t>(quad_count) + 1) + border_count;
+	const size_t index_count = static_cast<size_t>(quad_count) * quad_count * 6 + border_count * 6;
 
 	BLK_IF_NOT_SUCCESS(create_dyn_array(mesh.vertices, storage.pool.allocator, vertex_count))
 	{
@@ -352,6 +355,70 @@ blk::compute_grid(const uint32_t quad_count)
 			push(mesh.indices, forward_right);
 			push(mesh.indices, forward);
 		}
+	}
+
+	if (!has_border)
+	{
+		return store_resource(storage, mesh, hash, stem);
+	}
+
+	// Compute the wall.
+	// The border is walked counter-clockwise seen from above, starting at (0, 0): along the -Z, +X, +Z and -X edges,
+	// `quad_count` vertices each. Each step copies a border vertex down and joins it to the previous one with a quad.
+	// The walk takes one extra step back to (0, 0) to close the last quad.
+
+	const uint32_t wall_base = row_size * row_size;
+	const uint32_t wall_count = static_cast<uint32_t>(border_count);
+
+	uint32_t previous_top = 0;
+
+	for (uint32_t i = 0; i <= wall_count; i++)
+	{
+		const uint32_t step = i % quad_count;
+		uint32_t top = 0;
+
+		switch ((i / quad_count) % 4)
+		{
+		case 0:
+			top = step;
+			break;
+		case 1:
+			top = step * row_size + quad_count;
+			break;
+		case 2:
+			top = quad_count * row_size + quad_count - step;
+			break;
+		default:
+			top = (quad_count - step) * row_size;
+			break;
+		}
+
+		if (i < wall_count)
+		{
+			Vertex_UV vertex = mesh.vertices.buffer[top];
+			vertex.position.y = -border_height;
+
+			push(mesh.vertices, vertex);
+		}
+
+		if (i > 0)
+		{
+			// The triangles follow the grid's winding as if the grid were folded down over the border, so the wall
+			// faces outward.
+
+			const uint32_t previous_bottom = wall_base + i - 1;
+			const uint32_t bottom = wall_base + i % wall_count;
+
+			push(mesh.indices, previous_bottom);
+			push(mesh.indices, bottom);
+			push(mesh.indices, previous_top);
+
+			push(mesh.indices, bottom);
+			push(mesh.indices, top);
+			push(mesh.indices, previous_top);
+		}
+
+		previous_top = top;
 	}
 
 	// Store mesh in `storage`.

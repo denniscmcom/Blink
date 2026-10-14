@@ -179,6 +179,18 @@ blk::create_context(Allocator* allocator, HWND window)
 			continue;
 		}
 
+		if (physical_device_properties.properties.apiVersion < VK_API_VERSION_1_3)
+		{
+			BLK_DEBUG("Physical device does not support Vulkan 1.3 or higher\n");
+			continue;
+		}
+
+		if (!(physical_device_properties.properties.limits.framebufferColorSampleCounts & VK_SAMPLE_COUNT_8_BIT))
+		{
+			BLK_DEBUG("Physical device does not support MSAAx8\n");
+			continue;
+		}
+
 		if (!physical_device_features.features.geometryShader)
 		{
 			BLK_DEBUG("Physical device does not support geometry shaders\n");
@@ -191,9 +203,9 @@ blk::create_context(Allocator* allocator, HWND window)
 			continue;
 		}
 
-		if (physical_device_properties.properties.apiVersion < VK_API_VERSION_1_3)
+		if (!physical_device_features.features.wideLines)
 		{
-			BLK_DEBUG("Physical device does not support Vulkan 1.3 or higher\n");
+			BLK_DEBUG("Physical device does not support wide lines\n");
 			continue;
 		}
 
@@ -367,6 +379,9 @@ blk::create_context(Allocator* allocator, HWND window)
 	device_required_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
 	device_required_features.pNext = &device_required_vulkan_11_features;
 	device_required_features.features.samplerAnisotropy = VK_TRUE;
+	device_required_features.features.wideLines = VK_TRUE;
+	// TODO (Consistency): This is needed just by `Shaders/FS_Debug_Triangles.slang`, so I may want to disable it in
+	// release.
 	device_required_features.features.geometryShader = VK_TRUE;
 
 	VkDeviceQueueCreateInfo device_queue_create_info = {};
@@ -442,6 +457,7 @@ blk::create_context(Allocator* allocator, HWND window)
 	texture_sampler_create_info.maxAnisotropy = physical_device_properties.limits.maxSamplerAnisotropy;
 	texture_sampler_create_info.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
 	texture_sampler_create_info.compareOp = VK_COMPARE_OP_ALWAYS;
+	texture_sampler_create_info.maxLod = VK_LOD_CLAMP_NONE;
 
 	VkSampler texture_sampler = VK_NULL_HANDLE;
 

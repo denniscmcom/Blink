@@ -28,9 +28,6 @@ constexpr float MAX_SPEED = 5'000.0f;
 /// Pitch is clamped just short of 90 degrees. At exactly straight up or down the forward vector becomes parallel to
 /// `world_up`, so their cross product collapses to zero and the right vector is undefined.
 constexpr float PITCH_LIMIT = 1.55f;
-
-/// Current camera speed.
-float speed = 0.0f;
 }  // namespace
 
 void
@@ -42,27 +39,30 @@ blk::update_editor_camera(const Editor_Context& context, const Input_State& inpu
 		return;
 	}
 
-	// Get camera node to update transform.
+	// Update node transform.
 
 	Camera* camera = get_camera(*context.active_world, context.active_world->active_camera_handle);
-	BLK_CHECK(camera);
 
+	BLK_CHECK(camera);
 	Node* camera_node = get_node(context.active_world->scene_graph, camera->node_handle);
 
 	// TODO (Knowledge): This is copy pasted from the internet and I do not currently understand all of it.
 
 	// Mouse right increases yaw, which rotates `+Z` towards `+X`. Mouse down increases pitch, which tilts `+Z` down.
-	camera_node->transform.rotation.y += static_cast<float>(input_state.mouse_delta_x) * MOUSE_SENSITIVITY;
-	camera_node->transform.rotation.x += static_cast<float>(input_state.mouse_delta_y) * MOUSE_SENSITIVITY;
+	Vector3 camera_rotation_delta = {};
+	camera_rotation_delta.y += static_cast<float>(input_state.mouse_delta_x) * MOUSE_SENSITIVITY;
+	camera_rotation_delta.x += static_cast<float>(input_state.mouse_delta_y) * MOUSE_SENSITIVITY;
 
 	if (camera_node->transform.rotation.x > PITCH_LIMIT)
 	{
-		camera_node->transform.rotation.x = PITCH_LIMIT;
+		camera_rotation_delta.x = PITCH_LIMIT;
 	}
 	else if (camera_node->transform.rotation.x < -PITCH_LIMIT)
 	{
-		camera_node->transform.rotation.x = -PITCH_LIMIT;
+		camera_rotation_delta.x = -PITCH_LIMIT;
 	}
+
+	rotate_node(context.active_world->scene_graph, camera->node_handle, camera_rotation_delta);
 
 	// Initialize the rotation matrix.
 	const Matrix4 rotation_matrix = init_rotation_matrix(camera_node->transform.rotation);
@@ -139,6 +139,8 @@ blk::update_editor_camera(const Editor_Context& context, const Input_State& inpu
 		velocity += world_up;
 	}
 
+	float& speed = context.active_viewport_toggles->editor_camera_speed;
+
 	// Mouse wheel up increases the speed and down decreases it.
 
 	if (input_state.mouse_wheel_delta != 0.0f)
@@ -158,6 +160,7 @@ blk::update_editor_camera(const Editor_Context& context, const Input_State& inpu
 	if (compute_vector_magnitude_squared(velocity) > 0.0f)
 	{
 		velocity = compute_unit_vector(velocity);
-		camera_node->transform.position += speed * static_cast<float>(delta_time) * velocity;
+		const Vector3 camera_move_delta = speed * static_cast<float>(delta_time) * velocity;
+		move_node(context.active_world->scene_graph, camera->node_handle, camera_move_delta);
 	}
 }

@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "Engine/Core/Pool.hpp"
+#include "Engine/Core/Core.hpp"
 #include "Engine/World/World.hpp"
 
 #include <imgui.h>
@@ -34,6 +34,20 @@ enum class Editor_Mode
 	PREFAB,
 };
 
+/// Viewport modifiers.
+struct Viewport_Toggles
+{
+	/// Show triangle meshes toggle.
+	bool is_showing_triangles;
+	/// Show physics debug lines.
+	bool is_showing_physics_world;
+	/// Show world axis.
+	bool is_showing_world_axis = true;
+
+	/// Editor camera speed in meters per second.
+	float editor_camera_speed = 10.0f;
+};
+
 /// Context for `Editor_Mode::WORLD`.
 struct Editor_World_Context
 {
@@ -51,6 +65,8 @@ struct Editor_World_Context
 	/// Editor camera is active.
 	/// In this mode, the in-game or editor camera could be active.
 	bool is_editor_camera_active = true;
+
+	Viewport_Toggles viewport_toggles;
 };
 
 /// Context for `Editor_Mode::MATERIAL`.
@@ -62,10 +78,15 @@ struct Editor_Material_Context
 	/// The world to author the material.
 	World world;
 
+	/// Show triangle meshes toggle.
+	bool is_showing_triangles;
+
 	/// Material settings widget position.
 	ImVec2 material_settings_position;
 	/// Material settings widget size.
 	ImVec2 material_settings_size;
+
+	Viewport_Toggles viewport_toggles;
 };
 
 /// Context for `Editor_Mode::PREFAB`.
@@ -76,6 +97,8 @@ struct Editor_Prefab_Context
 
 	/// The world to author the prefab.
 	World world;
+
+	Viewport_Toggles viewport_toggles;
 };
 
 struct Editor_Context
@@ -90,6 +113,8 @@ struct Editor_Context
 	Editor_Mode mode = Editor_Mode::WORLD;
 	/// Active world based on `mode`.
 	World* active_world;
+	/// Viewport toggles for the current `Editor_Mode`.
+	Viewport_Toggles* active_viewport_toggles;
 
 	/// Pointer to main editor font.
 	ImFont* main_font;
@@ -119,9 +144,6 @@ struct Editor_Context
 	bool is_showing_console = true;
 	/// Statistics widget is visible.
 	bool is_showing_stats = true;
-
-	/// Show triangle meshes toggle.
-	bool is_showing_triangles;
 
 	/// Toolbar widget position.
 	ImVec2 toolbar_position;

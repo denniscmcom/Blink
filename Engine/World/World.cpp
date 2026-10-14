@@ -5,20 +5,24 @@
 
 #include "Engine/World/World.hpp"
 
-#include "Engine/Core/Array.hpp"
-#include "Engine/Core/Hash.hpp"
-#include "Engine/Core/Pool.hpp"
-#include "Engine/Core/String.hpp"
+#include "Engine/Core/Core.hpp"
+#include "Engine/Physics/Body.hpp"
+#include "Engine/Physics/Collider.hpp"
+#include "Engine/Physics/World.hpp"
 #include "Engine/Platform/Assert.hpp"
 #include "Engine/Platform/Log.hpp"
 #include "Engine/Platform/Result.hpp"
+#include "Engine/Renderer/Renderer.hpp"
 #include "Engine/Resource/Mesh.hpp"
+#include "Engine/Resource/Texture.hpp"
 #include "Engine/Scene/Graph.hpp"
 #include "Engine/Scene/Node.hpp"
 #include "Engine/World/Actor.hpp"
 #include "Engine/World/Camera.hpp"
 #include "Engine/World/Prop.hpp"
 #include "Engine/World/Terrain.hpp"
+
+#include <tracy/Tracy.hpp>
 
 #include <math.h>
 #include <stdint.h>
@@ -45,12 +49,14 @@ void despawn_attached_entity(blk::World& world, blk::Pool_Handle<blk::Node> node
 void update_terrain_lod(const blk::Terrain_Settings& settings, int32_t distance, uint32_t& lod);
 }  // namespace
 
+// TODO (WIP): I should keep in sync the body that Box3D moves based on the simulation and my nodes.
+
 blk::Result
 blk::create_world(Allocator* allocator, const World_Settings& settings, World& world)
 {
 	if (!BLK_VERIFY(allocator) || !BLK_VERIFY(settings.terrain.chunk_texel_count > 0) ||
 		!BLK_VERIFY(settings.stream.unload_radius > settings.stream.load_radius) ||
-		!BLK_VERIFY(settings.stream.rebase_distance > 0) || !BLK_VERIFY(settings.stream.max_loads_per_update > 0))
+		!BLK_VERIFY(settings.stream.max_loads_per_update > 0))
 	{
 		return Result::INVALID_ARGUMENTS;
 	}
@@ -71,6 +77,10 @@ blk::create_world(Allocator* allocator, const World_Settings& settings, World& w
 	world = {};
 	world.allocator = allocator;
 	world.settings = settings;
+
+	// Create physics.
+
+	world.physics = create_physics_world();
 
 	// Create pools.
 
@@ -101,7 +111,7 @@ blk::create_world(Allocator* allocator, const World_Settings& settings, World& w
 		const uint32_t quad_count = settings.terrain.chunk_texel_count >> i;
 
 		Pool_Handle<Mesh>& grid_handle = world.settings.terrain.chunk_grid_handles.buffer[i];
-		grid_handle = compute_grid(quad_count > 0 ? quad_count : 1);
+		grid_handle = compute_grid(quad_count > 0 ? quad_count : 1, 1.0f);
 
 		if (grid_handle == POOL_HANDLE_NONE<Mesh>)
 		{
@@ -145,6 +155,21 @@ blk::create_world(Allocator* allocator, const World_Settings& settings, World& w
 		return result;
 	}
 
+	// Create heightfield sample array.
+	// A chunk heightfield has a grid line on each side of every texel. If `chunk_texel_count` is raised later, the
+	// array grows.
+
+	const size_t heightfield_line_count = static_cast<size_t>(settings.terrain.chunk_texel_count) + 1;
+
+	if (const Result result =
+			create_dyn_array(world.heightfield_samples, allocator, heightfield_line_count * heightfield_line_count);
+		result != Result::SUCCESS)
+	{
+		destroy_world(world);
+
+		return result;
+	}
+
 	// Create scene graph.
 
 	if (const Result result = create_scene_graph(world.scene_graph, allocator); result != Result::SUCCESS)
@@ -156,7 +181,7 @@ blk::create_world(Allocator* allocator, const World_Settings& settings, World& w
 
 	// Spawn environment node.
 
-	const Pool_Handle<Node> environment_handle = spawn_node(world.scene_graph, Node_Type::SPATIAL, {});
+	const Pool_Handle<Node> environment_handle = spawn_node(world.scene_graph, nullptr, Node_Type::SPATIAL, {});
 
 	if (environment_handle == POOL_HANDLE_NONE<Node>)
 	{
@@ -174,7 +199,7 @@ blk::create_world(Allocator* allocator, const World_Settings& settings, World& w
 	// Spawn sun node.
 
 	const Pool_Handle<Node> sun_handle =
-		spawn_node(world.scene_graph, Node_Type::DIRECTIONAL_LIGHT, environment_handle);
+		spawn_node(world.scene_graph, nullptr, Node_Type::DIRECTIONAL_LIGHT, environment_handle);
 
 	if (sun_handle == POOL_HANDLE_NONE<Node>)
 	{
@@ -192,9 +217,8 @@ blk::create_world(Allocator* allocator, const World_Settings& settings, World& w
 	// TODO (Bug): `sun` is not checked for null.
 	Node* sun = get_node(world.scene_graph, sun_handle);
 
-	// TODO (Bug): these look like degrees, but `Transform::rotation` is in radians.
-	sun->transform.rotation.x = 40.0f;
-	sun->transform.rotation.y = 90.0f;
+	sun->transform.rotation.x = to_radians(Degrees{40.0f}).value;
+	sun->transform.rotation.y = to_radians(Degrees{90.0f}).value;
 
 	world.settings.atmosphere.sun_node_handle = sun_handle;
 
@@ -219,23 +243,108 @@ blk::destroy_world(World& world)
 	// Destroy dynamic array.
 	destroy_dyn_array(world.despawned_nodes);
 	destroy_dyn_array(world.chunks);
+	destroy_dyn_array(world.heightfield_samples);
 
 	world = {};
 }
 
 void
-blk::update_world(World& world, Vector3& node_offset)
+blk::update_world(World& world)
 {
-	node_offset = {};
+	ZoneScoped;
 
-	// Handle and clear flags.
+	if (world.scene_graph.root == POOL_HANDLE_NONE<Node>)
+	{
+		// We have nothing to update.
+		return;
+	}
 
-	if (world.flags & WORLD_TERRAIN_DIRTY_BIT)
+	// TODO (WIP): Pass delta time.
+
+	// TODO (WIP): Read Box3D events and apply to my node transform.
+
+	// Iterate each node and clean up its flags.
+
+	// Get a reference to our traversal stack.
+	Dyn_Array<Pool_Handle<Node>>& stack = world.scene_graph.stack;
+
+	// Empty it and push the root node to start iterating.
+
+	empty(stack);
+	push(stack, world.scene_graph.root);
+
+	bool should_despawn_chunks = false;
+
+	while (stack.count > 0)
+	{
+		stack.count -= 1;
+		const Pool_Handle<Node> node_handle = stack.buffer[stack.count];
+		Node* node = get(world.scene_graph.nodes, node_handle);
+
+		if (!BLK_VERIFY(node))
+		{
+			// This should not happen.
+			continue;
+		}
+
+		if (node->flags & NODE_TRANSFORM_DIRTY)
+		{
+			// Recompute world matrix.
+
+			// Initialize local matrix from node transform.
+			const Matrix4 local_matrix = init_transform_matrix(node->transform);
+
+			// A node is always processed before its children are pushed, so its parent's world matrix is ready.
+
+			if (const Node* parent = get(world.scene_graph.nodes, node->parent_handle))
+			{
+				// We have a parent so out world matrix is its world matrix * our local.
+				node->world_matrix = parent->world_matrix * local_matrix;
+			}
+			else
+			{
+				// We do not have a parent, so our world matrix is the local.
+				node->world_matrix = local_matrix;
+			}
+
+			// Sync node and physics transform.
+
+			if (node->type == Node_Type::STATIC_BODY)
+			{
+				set_body_transform(node->static_body, node->world_matrix);
+			}
+
+			if (node->type == Node_Type::CAPSULE_COLLIDER)
+			{
+				set_collider_transform(node->capsule_collider, local_matrix);
+			}
+
+			// Children are relative to this node, so their world matrices are stale too.
+
+			Pool_Handle<Node> child_handle = node->first_child_handle;
+
+			while (Node* child = get(world.scene_graph.nodes, child_handle))
+			{
+				child->flags |= NODE_TRANSFORM_DIRTY;
+				child_handle = child->next_sibling_handle;
+			}
+		}
+
+		if (node->flags & NODE_TERRAIN_DIRTY)
+		{
+			should_despawn_chunks = true;
+		}
+
+		node->flags = {};
+		push_children(world.scene_graph, *node);
+	}
+
+	if (should_despawn_chunks)
 	{
 		despawn_chunks(world);
 	}
 
-	world.flags = 0;
+	// Unload/load nodes.
 
 	// Get active camera node.
 
@@ -256,8 +365,7 @@ blk::update_world(World& world, Vector3& node_offset)
 	}
 
 	// Compute which chunk the focus position is in, relative to the origin.
-	// The camera can be parented to any node, so we use its world position. `update_node_transforms` runs after this
-	// function, so it lags one frame, which does not matter for streaming.
+	// The camera can be parented to any node, so we use its world position.
 
 	float chunk_size = compute_chunk_size(world.settings.terrain);
 
@@ -270,45 +378,6 @@ blk::update_world(World& world, Vector3& node_offset)
 	Chunk_Coord local = {};
 	local.x = static_cast<int32_t>(floorf(camera_node->world_matrix.columns[3].x / chunk_size));
 	local.z = static_cast<int32_t>(floorf(camera_node->world_matrix.columns[3].z / chunk_size));
-
-	// Rebase origin if needed.
-
-	const Node* root = get_node(world.scene_graph, world.scene_graph.root);
-
-	if (!BLK_VERIFY(root))
-	{
-		// This should not happen.
-		return;
-	}
-
-	if (abs(local.x) >= world.settings.stream.rebase_distance || abs(local.z) >= world.settings.stream.rebase_distance)
-	{
-		BLK_DEBUG("Rebasing origin: %i, %i\n", local.x, local.z);
-
-		// Move `world.origin` to `local`.
-
-		world.origin.x += local.x;
-		world.origin.z += local.z;
-
-		// Every node under root moves the other way by the same distance, so nothing changes visually.
-		// Node children follow their root.
-
-		node_offset.x = -static_cast<float>(local.x) * chunk_size;
-		node_offset.z = -static_cast<float>(local.z) * chunk_size;
-
-		Pool_Handle<Node> child_handle = root->first_child_handle;
-
-		while (Node* child = get_node(world.scene_graph, child_handle))
-		{
-			child->transform.position.x += node_offset.x;
-			child->transform.position.z += node_offset.z;
-
-			child_handle = child->next_sibling_handle;
-		}
-
-		// `local` is now at origin (0, 0).
-		local = {};
-	}
 
 	// Convert the focus chunk from "relative to origin" to its absolute coordinate in the grid world.
 
@@ -365,7 +434,11 @@ blk::update_world(World& world, Vector3& node_offset)
 	// Counter of chunks loaded to compare against `settings.max_loads_per_update`.
 	int32_t chunks_loaded_count = 0;
 
-	// TODO (Performance): Keep in mind that these three nested loops may cause problems.
+	// The heightmap is the whole world, so chunks are only loaded inside it.
+	const int32_t chunk_count =
+		static_cast<int32_t>(world.settings.terrain.resolution / world.settings.terrain.chunk_texel_count);
+
+	// TODO (Performance): Keep in mind that these three nested loops may cause problems O(N^2).
 
 	for (int32_t ring = 0; ring <= world.settings.stream.load_radius; ++ring)
 	{
@@ -382,6 +455,12 @@ blk::update_world(World& world, Vector3& node_offset)
 				Chunk_Coord coord = {};
 				coord.x = absolute.x + dx;
 				coord.z = absolute.z + dz;
+
+				if (coord.x < 0 || coord.z < 0 || coord.x >= chunk_count || coord.z >= chunk_count)
+				{
+					// Outside the heightmap.
+					continue;
+				}
 
 				// Skip chunks already loaded by previous frames.
 				bool is_loaded = false;
@@ -405,7 +484,7 @@ blk::update_world(World& world, Vector3& node_offset)
 
 				// Spawn the chunk root.
 
-				const Pool_Handle<Node> chunk_handle = spawn_node(world.scene_graph, Node_Type::SPATIAL, {});
+				const Pool_Handle<Node> chunk_handle = spawn_node(world.scene_graph, nullptr, Node_Type::SPATIAL, {});
 
 				if (chunk_handle == POOL_HANDLE_NONE<Node>)
 				{
@@ -444,49 +523,99 @@ blk::update_world(World& world, Vector3& node_offset)
 				}
 
 				// Generate terrain.
+				// The chunk root sits at the chunk's corner, so the terrain node stays at its origin.
 
-				const uint32_t chunk_count =
-					world.settings.terrain.resolution / world.settings.terrain.chunk_texel_count;
+				const Pool_Handle<Node> terrain_handle =
+					spawn_node(world.scene_graph, nullptr, Node_Type::TERRAIN, chunk_handle);
+				Node* terrain = get_node(world.scene_graph, terrain_handle);
 
-				const bool is_inside_terrain = coord.x >= 0 && coord.z >= 0 &&
-											   coord.x < static_cast<int32_t>(chunk_count) &&
-											   coord.z < static_cast<int32_t>(chunk_count);
-
-				Pool_Handle<Node> terrain_handle = {};
-
-				if (is_inside_terrain)
+				if (!terrain)
 				{
-					// The chunk root sits at the chunk's corner, so the terrain node stays at its origin.
-
-					terrain_handle = spawn_node(world.scene_graph, Node_Type::TERRAIN, chunk_handle);
-					Node* terrain = get_node(world.scene_graph, terrain_handle);
-
-					if (!terrain)
+					BLK_ERROR("Failed to spawn the terrain node of chunk %d, %d\n", coord.x, coord.z);
+				}
+				else
+				{
+					BLK_IF_NOT_SUCCESS(rename_node(world.scene_graph, terrain_handle, "Terrain"))
 					{
-						BLK_ERROR("Failed to spawn the terrain node of chunk %d, %d\n", coord.x, coord.z);
+						BLK_ERROR("Failed to rename the terrain node\n");
 					}
-					else
+
+					// Each chunk covers its own square of the heightmap.
+
+					const float uv_scale = 1.0f / static_cast<float>(chunk_count);
+
+					terrain->terrain_ref.uv_offset = Vector2{
+						.x = static_cast<float>(coord.x) * uv_scale,
+						.y = static_cast<float>(coord.z) * uv_scale,
+					};
+
+					terrain->terrain_ref.uv_scale = uv_scale;
+
+					// Starting from the coarsest LOD, the update only moves finer, so the chunk gets the LOD of its
+					// distance without hysteresis. `ring` is that distance.
+					terrain->terrain_ref.lod = static_cast<uint32_t>(TERRAIN_LOD_COUNT - 1);
+					update_terrain_lod(world.settings.terrain, ring, terrain->terrain_ref.lod);
+
+					// Generate the terrain collider.
+					// It reads the same heightmap texels as `VS_Terrain.slang`, so it matches the terrain at its
+					// finest LOD.
+
+					const Texture* heightmap = get_texture(world.settings.terrain.heightmap_handle);
+
+					if (heightmap && heightmap->format == Texture_Format::R16)
 					{
-						BLK_IF_NOT_SUCCESS(rename_node(world.scene_graph, terrain_handle, "Terrain"))
+						const Pool_Handle<Node> body_handle =
+							spawn_node(world.scene_graph, &world.physics, Node_Type::STATIC_BODY, terrain_handle);
+						const Pool_Handle<Node> collider_handle =
+							spawn_node(world.scene_graph, &world.physics, Node_Type::HEIGHTFIELD_COLLIDER, body_handle);
+
+						// Spawning may move nodes in memory, so we get both after spawning.
+
+						const Node* body = get_node(world.scene_graph, body_handle);
+						Node* collider = get_node(world.scene_graph, collider_handle);
+
+						if (!body || !collider)
 						{
-							BLK_ERROR("Failed to rename the terrain node\n");
+							BLK_ERROR("Failed to spawn the terrain collider of chunk %d, %d\n", coord.x, coord.z);
 						}
+						else
+						{
+							// The chunk shares its edge grid lines with its neighbours, as the vertex shader does.
 
-						// Each chunk covers its own square of the heightmap.
+							const uint32_t texel_count = world.settings.terrain.chunk_texel_count;
+							const uint32_t line_count = texel_count + 1;
+							const auto* texels = reinterpret_cast<const uint16_t*>(heightmap->pixels.buffer);
 
-						const float uv_scale = 1.0f / static_cast<float>(chunk_count);
+							empty(world.heightfield_samples);
 
-						terrain->terrain_ref.uv_offset = Vector2{
-							.x = static_cast<float>(coord.x) * uv_scale,
-							.y = static_cast<float>(coord.z) * uv_scale,
-						};
+							for (uint32_t z = 0; z < line_count; ++z)
+							{
+								for (uint32_t x = 0; x < line_count; ++x)
+								{
+									// Clamp to the heightmap edges and flip the row, as `VS_Terrain.slang` does.
 
-						terrain->terrain_ref.uv_scale = uv_scale;
+									uint32_t texel_x = static_cast<uint32_t>(coord.x) * texel_count + x;
+									uint32_t texel_z = static_cast<uint32_t>(coord.z) * texel_count + z;
 
-						// Starting from the coarsest LOD, the update only moves finer, so the chunk gets the LOD of
-						// its distance without hysteresis. `ring` is that distance.
-						terrain->terrain_ref.lod = static_cast<uint32_t>(TERRAIN_LOD_COUNT - 1);
-						update_terrain_lod(world.settings.terrain, ring, terrain->terrain_ref.lod);
+									texel_x = texel_x < heightmap->width ? texel_x : heightmap->width - 1;
+									texel_z = texel_z < heightmap->height ? texel_z : heightmap->height - 1;
+
+									const uint32_t row = heightmap->height - 1 - texel_z;
+									const float texel = static_cast<float>(texels[row * heightmap->width + texel_x]);
+
+									// An `R16_UNORM` value of 1 is `height` meters.
+									push(world.heightfield_samples, texel / UINT16_MAX * world.settings.terrain.height);
+								}
+							}
+
+							collider->heightfield_collider = create_heightfield_collider(
+								body->static_body,
+								world.heightfield_samples.buffer,
+								line_count,
+								world.settings.terrain.height,
+								world.settings.terrain.width / static_cast<float>(world.settings.terrain.resolution)
+							);
+						}
 					}
 				}
 
@@ -533,7 +662,16 @@ blk::spawn_camera(World& world, Pool_Handle<Node> parent_handle)
 blk::Pool_Handle<blk::Prop>
 blk::spawn_prop(World& world, Pool_Handle<Node> parent_handle)
 {
-	return spawn_entity<Prop>(world, parent_handle);
+	const Pool_Handle<Prop> prop_handle = spawn_entity<Prop>(world, parent_handle);
+	const Prop* prop = get_prop(world, prop_handle);
+	BLK_CHECK(prop);
+
+	const Pool_Handle<Node> static_body_handle =
+		spawn_node(world.scene_graph, &world.physics, Node_Type::STATIC_BODY, prop->node_handle);
+
+	spawn_node(world.scene_graph, &world.physics, Node_Type::CAPSULE_COLLIDER, static_body_handle);
+
+	return prop_handle;
 }
 
 void
@@ -617,7 +755,7 @@ spawn_entity(blk::World& world, blk::Pool_Handle<blk::Node> parent_handle)
 	// Spawns spatial node.
 
 	const blk::Pool_Handle<blk::Node> node_handle =
-		spawn_node(world.scene_graph, blk::Node_Type::SPATIAL, parent_handle);
+		spawn_node(world.scene_graph, nullptr, blk::Node_Type::SPATIAL, parent_handle);
 
 	if (!BLK_VERIFY(node_handle != blk::POOL_HANDLE_NONE<blk::Node>))
 	{
@@ -638,16 +776,19 @@ spawn_entity(blk::World& world, blk::Pool_Handle<blk::Node> parent_handle)
 	{
 		entity_handle = insert(world.actors, entity);
 		entity_ref.type = blk::Entity_Type::ACTOR;
+		rename_node(world.scene_graph, node_handle, "Actor");
 	}
 	else if constexpr (std::is_same_v<Type, blk::Camera>)
 	{
 		entity_handle = insert(world.cameras, entity);
 		entity_ref.type = blk::Entity_Type::CAMERA;
+		rename_node(world.scene_graph, node_handle, "Camera");
 	}
 	else if constexpr (std::is_same_v<Type, blk::Prop>)
 	{
 		entity_handle = insert(world.props, entity);
 		entity_ref.type = blk::Entity_Type::PROP;
+		rename_node(world.scene_graph, node_handle, "Prop");
 	}
 	else
 	{

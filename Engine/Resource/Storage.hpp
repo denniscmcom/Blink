@@ -5,8 +5,7 @@
 
 #pragma once
 
-#include "Engine/Core/Hash.hpp"
-#include "Engine/Core/Pool.hpp"
+#include "Engine/Core/Core.hpp"
 #include "Engine/Platform/Allocator.hpp"
 #include "Engine/Platform/Assert.hpp"
 

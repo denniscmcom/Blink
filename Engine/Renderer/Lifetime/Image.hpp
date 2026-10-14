@@ -26,6 +26,8 @@ struct Image
 	VkDeviceMemory memory = VK_NULL_HANDLE;
 	/// Vulkan image format.
 	VkFormat format;
+	/// Image mip level count.
+	uint32_t mip_level_count;
 };
 
 /// Creates an `image`.
@@ -40,6 +42,8 @@ Result create_image(
 	VkImageUsageFlags usage,
 	VkMemoryPropertyFlags properties,
 	VkImageAspectFlags aspect,
+	uint32_t mip_level_count,
+	VkSampleCountFlagBits sample_count,
 	Image& image
 );
 /// Destroys an `image`.

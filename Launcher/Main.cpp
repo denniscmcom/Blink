@@ -26,6 +26,7 @@
 #include "Game/Game.hpp"
 
 #include <Windows.h>
+#include <tracy/Tracy.hpp>
 
 /// The entry point of the engine.
 ///
@@ -157,12 +158,6 @@ BLK_ENTRY()
 		BLK_FATAL("Failed to create the game\n");
 	}
 
-	// The game fills the world settings the renderer binds once, so baking comes after it.
-	BLK_IF_NOT_SUCCESS(blk::bake_renderer(game_context.world.settings))
-	{
-		BLK_FATAL("Failed to bake the renderer\n");
-	}
-
 	// ============================================================================
 	// Editor.
 	// ============================================================================
@@ -192,20 +187,16 @@ BLK_ENTRY()
 		previous_frame_seconds = current_frame_seconds;
 
 		blk::update_input(input_state);
-		const blk::Editor_Context editor_context = blk::update_editor(input_state, delta_time);
+		blk::Editor_Context editor_context = blk::update_editor(input_state, delta_time);
 
 		if (!blk::is_game_simulation_paused())
 		{
+			ZoneScopedN("Update game");
 			blk::game::update_game(game_context, delta_time, input_state);
 		}
 
 		blk::World* active_world = blk::get_active_world();
-
-		blk::Vector3 node_offset = {};
-		blk::update_world(*active_world, node_offset);
-
-		// Nothing moves nodes after this point, and both the camera view and `update_frame` read their world matrices.
-		blk::update_node_transforms(active_world->scene_graph);
+		blk::update_world(*active_world);
 
 		// The window can be resized, so we sample the client rectangle every frame instead of reusing the one the
 		// renderer was created with.
@@ -222,27 +213,149 @@ BLK_ENTRY()
 			continue;
 		}
 
-		blk::Renderer_Settings renderer_settings = {};
-		renderer_settings.is_debug_triangle_enabled = editor_context.is_showing_triangles;
+		// Initialize frame descriptor.
+		blk::Frame_Descriptor frame_descriptor = {};
 
 		if (const blk::Camera* camera = blk::get_camera(*active_world, active_world->active_camera_handle))
 		{
 			const auto aspect_ratio = static_cast<float>(client_size_x) / static_cast<float>(client_size_y);
 
-			renderer_settings.view = blk::init_view_matrix(active_world->scene_graph, *camera);
-			renderer_settings.projection = blk::init_projection_matrix(*camera, aspect_ratio);
+			frame_descriptor.view = blk::init_view_matrix(active_world->scene_graph, *camera);
+			frame_descriptor.projection = blk::init_projection_matrix(*camera, aspect_ratio);
 
 			if (const blk::Node* camera_node = blk::get_node(active_world->scene_graph, camera->node_handle))
 			{
 				const blk::Vector4& camera_position = camera_node->world_matrix.columns[3];
-
-				renderer_settings
-					.view_position = {.x = camera_position.x, .y = camera_position.y, .z = camera_position.z};
+				frame_descriptor.view_position = {camera_position.x, camera_position.y, camera_position.z};
 			}
 		}
 
-		blk::update_frame(active_world->scene_graph, renderer_settings, active_world->settings);
-		blk::render_frame(active_world->settings);
+		const blk::Atmosphere_Settings& atmosphere = active_world->settings.atmosphere;
+
+		if (blk::Node* sun = get_node(active_world->scene_graph, atmosphere.sun_node_handle))
+		{
+			// `begin_render_frame` rebuilds the rotation as `{elevation, azimuth, 0}`, so elevation is the `x` (pitch)
+			// component and azimuth the `y` (yaw) one.
+			frame_descriptor.sun_azimuth = blk::Radians{sun->transform.rotation.y};
+			frame_descriptor.sun_elevation = blk::Radians{sun->transform.rotation.x};
+			frame_descriptor.sun_radius = blk::to_radians(blk::Degrees{sun->transform.scale.x});
+			frame_descriptor.sun_intensity = sun->directional_light.intensity;
+		}
+
+		frame_descriptor.ground_albedo = {
+			atmosphere.ground_albedo.r,
+			atmosphere.ground_albedo.g,
+			atmosphere.ground_albedo.b,
+		};
+
+		frame_descriptor.planet_radius = blk::Radians{atmosphere.planet_radius};
+		frame_descriptor.atmosphere_radius = blk::Radians{atmosphere.atmosphere_radius};
+
+		frame_descriptor.rayleigh_scattering = atmosphere.rayleigh_scattering;
+		frame_descriptor.rayleigh_scale = atmosphere.rayleigh_scale;
+
+		frame_descriptor.ozone_absorption = atmosphere.ozone_absorption;
+		frame_descriptor.ozone_mid_point = atmosphere.ozone_mid_point;
+		frame_descriptor.ozone_low_point = atmosphere.ozone_low_point;
+
+		frame_descriptor.mie_scattering = atmosphere.mie_scattering;
+		frame_descriptor.mie_absorption = atmosphere.mie_absorption;
+		frame_descriptor.mie_asymmetry = atmosphere.mie_asymmetry;
+		frame_descriptor.mie_scale = atmosphere.mie_scale;
+
+		const blk::Terrain_Settings& terrain = active_world->settings.terrain;
+
+		frame_descriptor.terrain_heightmap_handle = terrain.heightmap_handle;
+		frame_descriptor.terrain_chunk_size = blk::compute_chunk_size(terrain);
+		frame_descriptor.terrain_height = terrain.height;
+		frame_descriptor.skirt_depth = terrain.skirt_depth;
+
+#ifdef BLK_DEBUG_TARGET
+		frame_descriptor.is_debug_triangle_enabled = editor_context.active_viewport_toggles->is_showing_triangles;
+		frame_descriptor.is_skybox_transmittance_enabled = atmosphere.enable_transmittance;
+		frame_descriptor.is_skybox_multiscattering_enabled = atmosphere.enable_multiscattering;
+		frame_descriptor.is_sky_view_enabled = atmosphere.enable_sky_view;
+		frame_descriptor.is_skybox_aerial_enabled = atmosphere.enable_aerial;
+#endif
+
+		// Render.
+
+		blk::begin_render_frame(frame_descriptor);
+
+		if (editor_context.active_viewport_toggles->is_showing_world_axis)
+		{
+			blk::draw_world_axis();
+		}
+
+		if (editor_context.active_viewport_toggles->is_showing_physics_world)
+		{
+			blk::draw_physics_debug(active_world->physics);
+		}
+
+		for (size_t i = 0; i < active_world->scene_graph.nodes.capacity; ++i)
+		{
+			const blk::Pool_Slot<blk::Node>& slot = active_world->scene_graph.nodes.slots[i];
+
+			if (!slot.is_used)
+			{
+				continue;
+			}
+
+			const blk::Node& node = slot.element;
+
+			switch (node.type)
+			{
+			case blk::Node_Type::SPATIAL: {
+				// Nothing to do.
+			}
+			break;
+			case blk::Node_Type::MESH_REF: {
+				const blk::Mesh_Descriptor descriptor = {
+					.world_matrix = node.world_matrix,
+					.mesh_handle = node.mesh_ref.mesh_handle,
+					.material_handle = node.mesh_ref.material_handle,
+				};
+
+				blk::draw_mesh(descriptor);
+			}
+			break;
+			case blk::Node_Type::POINT_LIGHT: {
+				// Nothing yet.
+			}
+			break;
+			case blk::Node_Type::DIRECTIONAL_LIGHT: {
+				// Nothing yet. The sun is handled by the frame descriptor.
+			}
+			break;
+			case blk::Node_Type::TERRAIN: {
+				const blk::Terrain_Chunk_Descriptor descriptor = {
+					.world_matrix = node.world_matrix,
+					.grid_handle = active_world->settings.terrain.chunk_grid_handles.buffer[node.terrain_ref.lod],
+					// Terrain has no material yet, so it renders with the fallback one.
+					.material_handle = {},
+					.uv_offset = node.terrain_ref.uv_offset,
+					.uv_scale = node.terrain_ref.uv_scale,
+					.lod = node.terrain_ref.lod,
+				};
+
+				blk::draw_terrain_chunk(descriptor);
+			}
+			break;
+			case blk::Node_Type::STATIC_BODY: {
+				// Nothing yet.
+			}
+			break;
+			case blk::Node_Type::CAPSULE_COLLIDER: {
+				// Nothing yet.
+			}
+			break;
+			}
+		}
+
+		blk::end_render_frame();
+
+		// Tracy: This should be at the end of the frame loop.
+		FrameMark;
 	}
 
 	// ============================================================================

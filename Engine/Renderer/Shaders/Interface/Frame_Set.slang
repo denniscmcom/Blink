@@ -59,6 +59,7 @@ struct Terrain_UBO
 {
 	float chunk_size;
 	float terrain_height;
+	float skirt_depth;
 };
 
 // Descriptor set 1: individual set created for each frame in flight.

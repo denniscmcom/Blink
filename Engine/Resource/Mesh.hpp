@@ -5,9 +5,9 @@
 
 #pragma once
 
-#include "Engine/Core/Array.hpp"
+#include "Engine/Core/Core.hpp"
+#include "Engine/Core/Math/Color.hpp"
 #include "Engine/Core/Math/Vector.hpp"
-#include "Engine/Core/Pool.hpp"
 #include "Engine/Resource/Storage.hpp"
 
 #include <stdint.h>
@@ -27,6 +27,15 @@ struct Vertex_UV
 	Vector3 bitangent;
 	/// Vertex's UV coordinates.
 	Vector2 texture_coord;
+};
+
+/// A vertex with position and color components.
+struct Vertex_Color
+{
+	/// Vertex's position.
+	Vector3 position;
+	/// Vertex's color.
+	Color_RGB<float> color;
 };
 
 /// A vertex with a spatial component.
@@ -74,5 +83,7 @@ Pool_Handle<Mesh> compute_uv_sphere(float radius, uint32_t segment_count, uint32
 /// Computes a procedural flat grid on the XZ plane, from (0, 0, 0) to (1, 0, 1), facing +Y, and loads it into memory.
 /// Its texture coordinates match its XZ position.
 /// @param quad_count Number of quads per side.
-Pool_Handle<Mesh> compute_grid(uint32_t quad_count);
+/// @param border_height Height of a wall around the grid's border, facing outward and hanging down to
+/// y = -border_height. Each wall vertex copies the border vertex above it except for its Y. Zero adds no wall.
+Pool_Handle<Mesh> compute_grid(uint32_t quad_count, float border_height);
 }  // namespace blk

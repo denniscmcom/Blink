@@ -5,12 +5,12 @@
 
 #include "Engine/Resource/Texture.hpp"
 
-#include "Engine/Core/Pool.hpp"
-#include "Engine/Core/Serial.hpp"
-#include "Engine/Core/String.hpp"
+#include "Engine/Core/Core.hpp"
 #include "Engine/Platform/File.hpp"
 #include "Engine/Platform/Log.hpp"
 #include "Engine/Resource/Storage.hpp"
+
+#include <math.h>
 
 namespace
 {
@@ -175,6 +175,24 @@ blk::Texture*
 blk::get_texture(const Pool_Handle<Texture> handle)
 {
 	return get_resource(storage, handle);
+}
+
+uint32_t
+blk::compute_image_mip_chain(Pool_Handle<Texture> handle)
+{
+	const Texture* texture = get_texture(handle);
+
+	if (!texture)
+	{
+		// The original image.
+		return 1;
+	}
+
+	// How many times the largest image dimension can be divided by two.
+	const float dimension_count = log2f(fmaxf(texture->width, texture->height));
+
+	// `floorf` handles cases where the largest dimension is not a power of two.
+	return static_cast<uint32_t>(floorf(dimension_count)) + 1;
 }
 
 size_t

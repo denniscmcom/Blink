@@ -5,7 +5,7 @@
 
 #include "Compiler/Material.hpp"
 
-#include "Engine/Core/Serial.hpp"
+#include "Engine/Core/Core.hpp"
 #include "Engine/Resource/Material.hpp"
 
 void

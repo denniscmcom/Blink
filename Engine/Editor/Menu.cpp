@@ -5,7 +5,7 @@
 
 #include "Engine/Editor/Menu.hpp"
 
-#include "Engine/Core/Array.hpp"
+#include "Engine/Core/Core.hpp"
 #include "Engine/Editor/Console.hpp"
 #include "Engine/Editor/Context.hpp"
 #include "Engine/Editor/Scene_Graph.hpp"

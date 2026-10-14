@@ -5,7 +5,7 @@
 
 #include "Engine/Renderer/Resource/Material_Device.hpp"
 
-#include "Engine/Core/Array.hpp"
+#include "Engine/Core/Core.hpp"
 #include "Engine/Platform/Log.hpp"
 #include "Engine/Platform/Result.hpp"
 #include "Engine/Renderer/Lifetime/Buffer.hpp"

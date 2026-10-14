@@ -37,9 +37,16 @@ fs_main(VS_Skybox_Output input) : SV_Target
 
 	// Composite the sun disk over it.
 
-	float cos_theta = dot(direction, sun_direction);
+	// Angular distance from the sun center, measured as the chord between the two unit vectors. For small angles it
+	// matches the angle, and it keeps precision where cos(theta) is too close to 1 to resolve the edge.
+	float sun_distance = length(direction - sun_direction);
+	float sun_chord_radius = 2.0f * sin(skybox_ubo.sun_radius * 0.5f);
 
-	if (cos_theta >= cos(skybox_ubo.sun_radius))
+	// Fade the edge over one pixel footprint instead of cutting it hard. The derivative is taken before the branch,
+	// where the whole quad is still active.
+	float sun_coverage = saturate((sun_chord_radius - sun_distance) / max(fwidth(sun_distance), 1e-6f) + 0.5f);
+
+	if (sun_coverage > 0.0f)
 	{
 		// Convert view height to kilometers.
 		// When view height is close to 0 (on the planet surface), artifacts may happen.
@@ -74,7 +81,12 @@ fs_main(VS_Skybox_Output input) : SV_Target
 
 			// The level is named because only part of a quad reaches this branch, which leaves the derivatives an
 			// implicit lookup would need undefined. The LUT has a single level, so it samples the same texels anyway.
-			luminance += skybox_transmittance_lut.SampleLevel(transmittance_uv, 0.0f).rgb * skybox_ubo.sun_intensity;
+			float3 sun_luminance =
+				skybox_transmittance_lut.SampleLevel(transmittance_uv, 0.0f).rgb * skybox_ubo.sun_intensity;
+
+			// The output is clamped to [0, 1] with no tone mapping, and the sun is far brighter than 1, so scaling it
+			// by coverage would still clamp to white. Blending against the clamped result keeps the edge in range.
+			luminance = lerp(luminance, saturate(luminance + sun_luminance), sun_coverage);
 		}
 	}
 

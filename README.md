@@ -28,7 +28,7 @@ everything.
 
 Implemented features are still evolving and may change.
 
-- Physically-based forward rendering
+- Physically based forward rendering with MSAA
 - Dynamic sky and atmosphere
 - World streaming with terrain LOD
 - Asset compilation to optimized binary formats
@@ -45,12 +45,13 @@ Each layer may only depend on the layers above it in this list:
   - `Core/`: math library, data structures, and algorithms
   - `Input/`: high-level input system
   - `Resource/`: asset management and storage
-  - `Scene/`: low-level hierarchical representation of a world
-  - `World/`: high-level gameplay representation of a world
   - `Renderer/`: Vulkan renderer
+  - `Physics/`: physics wrapper
+  - `Scene/`: low-level hierarchical representation of a world
     - `Lifetime/`: Vulkan resources grouped by lifetime
     - `Resource/`: high-level resources
     - `Shaders/`: shader code
+  - `World/`: high-level gameplay representation of a world
   - `Editor/`: editor
 - `Compiler/`: asset compiler
 - `Launcher/`: main entry point that links `Engine` and `Game`.
@@ -69,6 +70,7 @@ Other:
 
 - `Research/`: reference papers for the techniques used
 - `Demos/`: small sample projects that show specific features
+- `Issues/`: issue tracking system
 
 ## Coding standard
 

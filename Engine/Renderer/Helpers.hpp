@@ -38,7 +38,8 @@ void transition_image_layout(
 	VkAccessFlags2 dst_access,
 	VkPipelineStageFlags2 src_stage,
 	VkPipelineStageFlags2 dst_stage,
-	VkImageAspectFlags image_aspect
+	VkImageAspectFlags image_aspect,
+	uint32_t mip_level_count
 );
 
 /// Thin wrapper around beginning a `VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT` command buffer.
@@ -58,6 +59,11 @@ VkPipelineShaderStageCreateInfo get_pipeline_shader_stage_create_info(
 Array<VkVertexInputBindingDescription, 1> get_vertex_uv_input_binding_descriptions();
 /// Gets vertex input attribute descriptions for `Vertex_UV`.
 Array<VkVertexInputAttributeDescription, 5> get_vertex_uv_input_attribute_descriptions();
+
+/// Gets vertex input binding descriptions for `Vertex_Color`.
+Array<VkVertexInputBindingDescription, 1> get_vertex_color_input_binding_descriptions();
+/// Gets vertex input attribute descriptions for `Vertex_Color`.
+Array<VkVertexInputAttributeDescription, 2> get_vertex_color_input_attribute_descriptions();
 
 /// Gets vertex input binding descriptions for `Vertex_Spatial`.
 Array<VkVertexInputBindingDescription, 1> get_vertex_spatial_input_binding_descriptions();

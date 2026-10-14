@@ -23,10 +23,13 @@ blk::create_image(
 	VkImageUsageFlags usage,
 	VkMemoryPropertyFlags properties,
 	VkImageAspectFlags aspect,
+	uint32_t mip_level_count,
+	VkSampleCountFlagBits sample_count,
 	Image& image
 )
 {
 	image = {};
+	image.mip_level_count = mip_level_count;
 
 	// Create Vulkan image.
 
@@ -43,13 +46,13 @@ blk::create_image(
 	image_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 	image_create_info.format = format;
 	image_create_info.extent = extent;
-	image_create_info.mipLevels = 1;
+	image_create_info.mipLevels = mip_level_count;
 	image_create_info.arrayLayers = 1;
-	image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
 	image_create_info.tiling = tiling;
 	image_create_info.usage = usage;
 	image_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	image_create_info.imageType = is_volume ? VK_IMAGE_TYPE_3D : VK_IMAGE_TYPE_2D;
+	image_create_info.samples = sample_count;
 
 	VkImage vk_image = VK_NULL_HANDLE;
 
@@ -113,7 +116,7 @@ blk::create_image(
 	VkImageSubresourceRange range = {};
 	range.aspectMask = aspect;
 	range.baseMipLevel = 0;
-	range.levelCount = 1;
+	range.levelCount = mip_level_count;
 	range.baseArrayLayer = 0;
 	range.layerCount = 1;
 

@@ -5,9 +5,8 @@
 
 #pragma once
 
-#include "Engine/Core/Array.hpp"
+#include "Engine/Core/Core.hpp"
 #include "Engine/Core/Math/Color.hpp"
-#include "Engine/Core/Pool.hpp"
 #include "Engine/Resource/Storage.hpp"
 
 namespace blk
@@ -69,4 +68,6 @@ Pool_Handle<Texture> load_texture(const Texture& texture);
 void unload_texture(Pool_Handle<Texture> handle);
 /// Gets a pointer to a texture's data.
 Texture* get_texture(Pool_Handle<Texture> handle);
+/// Computes the mip chain for a given texture.
+uint32_t compute_image_mip_chain(Pool_Handle<Texture> handle);
 }  // namespace blk

@@ -5,7 +5,7 @@
 
 #include "Engine/Resource/Storage.hpp"
 
-#include "Engine/Core/Serial.hpp"
+#include "Engine/Core/Core.hpp"
 #include "Engine/Platform/File.hpp"
 #include "Engine/Resource/Material.hpp"
 #include "Engine/Resource/Mesh.hpp"

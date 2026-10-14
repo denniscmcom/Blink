@@ -63,12 +63,13 @@ blk::transition_image_layout(
 	VkAccessFlags2 dst_access,
 	VkPipelineStageFlags2 src_stage,
 	VkPipelineStageFlags2 dst_stage,
-	VkImageAspectFlags image_aspect
+	VkImageAspectFlags image_aspect,
+	uint32_t mip_level_count
 )
 {
 	VkImageSubresourceRange range = {};
 	range.aspectMask = image_aspect;
-	range.levelCount = 1;
+	range.levelCount = mip_level_count;
 	range.layerCount = 1;
 
 	VkImageMemoryBarrier2 barrier = {};
@@ -200,6 +201,37 @@ blk::get_vertex_uv_input_attribute_descriptions()
 			.binding = 0,
 			.format = VK_FORMAT_R32G32_SFLOAT,
 			.offset = offsetof(Vertex_UV, texture_coord),
+		},
+	}};
+}
+
+blk::Array<VkVertexInputBindingDescription, 1>
+blk::get_vertex_color_input_binding_descriptions()
+{
+	return {{
+		{
+			.binding = 0,
+			.stride = sizeof(Vertex_Color),
+			.inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
+		},
+	}};
+}
+
+blk::Array<VkVertexInputAttributeDescription, 2>
+blk::get_vertex_color_input_attribute_descriptions()
+{
+	return {{
+		{
+			.location = 0,
+			.binding = 0,
+			.format = VK_FORMAT_R32G32B32_SFLOAT,
+			.offset = offsetof(Vertex_Color, position),
+		},
+		{
+			.location = 1,
+			.binding = 0,
+			.format = VK_FORMAT_R32G32B32_SFLOAT,
+			.offset = offsetof(Vertex_Color, color),
 		},
 	}};
 }

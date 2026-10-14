@@ -1,0 +1,470 @@
+{
+	"auto_complete":
+	{
+		"selected_items":
+		[
+			[
+				"queue",
+				"queque_family_properties_count"
+			],
+			[
+				"VkDescripto",
+				"VkDescriptorSet"
+			],
+			[
+				"MAX",
+				"MAX_FRAMES_IN_FLIGHT"
+			],
+			[
+				"uniform",
+				"uniform_buffer_descriptor_set_layout"
+			],
+			[
+				"uniform_buffer_descriptor_set",
+				"uniform_buffer_descriptor_set_layout_create_info"
+			],
+			[
+				"selected_phys",
+				"selected_physical_device_memory_type_index"
+			],
+			[
+				"vertex_buffer",
+				"vertex_buffer_memory_allocate_info"
+			],
+			[
+				"selected",
+				"selected_physical_device_memory_type_index"
+			],
+			[
+				"selected_physical_de",
+				"selected_physical_device_memory_type_index"
+			],
+			[
+				"swapcha",
+				"swapchain_image_index"
+			],
+			[
+				"swap",
+				"swapchain"
+			],
+			[
+				"present",
+				"present_complete_semaphore"
+			],
+			[
+				"swapchain",
+				"swapchain_images"
+			],
+			[
+				"shader_st",
+				"shader_stages_count"
+			],
+			[
+				"pipeline_dynamic_stat",
+				"pipeline_dynamic_states"
+			],
+			[
+				"pipeline_la",
+				"pipeline_layout_create_info"
+			],
+			[
+				"pipeline_dyna",
+				"pipeline_dynamic_state_create_info"
+			],
+			[
+				"pipeline_colo",
+				"pipeline_color_blend_state_create_info"
+			],
+			[
+				"pipeline",
+				"pipeline_dynamic_state_count"
+			],
+			[
+				"surface",
+				"surface_formats"
+			],
+			[
+				"selecte",
+				"selected_surface_present_mode_index"
+			],
+			[
+				"swapch",
+				"swapchain_image_count"
+			],
+			[
+				"selec",
+				"selected_surface_present_mode_index"
+			],
+			[
+				"surface_",
+				"surface_present_mode_count"
+			],
+			[
+				"sele",
+				"selected_surface_format_index"
+			],
+			[
+				"surface_for",
+				"surface_format_count"
+			],
+			[
+				"required",
+				"required_device_extension_properties_count"
+			],
+			[
+				"device_extension",
+				"device_extension_properties_count"
+			],
+			[
+				"device",
+				"device_supports_graphics"
+			],
+			[
+				"queue_family_proper",
+				"queque_family_properties_count"
+			],
+			[
+				"queue_family_p",
+				"queue_family_properties_count"
+			],
+			[
+				"queu",
+				"queue_family_properties_count"
+			],
+			[
+				"physi",
+				"physical_device_properties"
+			],
+			[
+				"physical",
+				"physical_device_properties"
+			],
+			[
+				"device_extes",
+				"device_extension_properties_count"
+			],
+			[
+				"que",
+				"queque_family_property_count"
+			],
+			[
+				"str",
+				"string.h"
+			],
+			[
+				"physicalDe",
+				"physical_device_features"
+			],
+			[
+				"physica",
+				"physical_device_features"
+			],
+			[
+				"phys",
+				"physical_device_properties"
+			],
+			[
+				"physical_device_",
+				"physical_device_properties"
+			],
+			[
+				"phy",
+				"physical_device_count"
+			],
+			[
+				"debug",
+				"debug_utils_messenger_create_info"
+			],
+			[
+				"blk_",
+				"blk_vulkan_debug_callback"
+			],
+			[
+				"valida",
+				"validation_layer_count"
+			]
+		]
+	},
+	"build_system": "",
+	"build_system_choices":
+	[
+	],
+	"build_varint": "",
+	"command_palette":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+			[
+				"wra",
+				"Wrap Paragraph"
+			],
+			[
+				"wrap",
+				"Wrap Paragraph"
+			],
+			[
+				"w",
+				"Wrap Paragraph"
+			],
+			[
+				"wr",
+				"Wrap Paragraph"
+			],
+			[
+				"wrp",
+				"Wrap at Ruler"
+			],
+			[
+				":wa",
+				":w - Save"
+			],
+			[
+				"package",
+				"Package Control: Install Package"
+			]
+		],
+		"width": 0.0
+	},
+	"console":
+	{
+		"height": 0.0,
+		"history":
+		[
+		]
+	},
+	"distraction_free":
+	{
+		"menu_visible": true,
+		"show_minimap": false,
+		"show_open_files": false,
+		"show_tabs": false,
+		"side_bar_visible": false,
+		"status_bar_visible": false
+	},
+	"file_history":
+	[
+		"/C/Users/Dennis/Dev/DCM-Systems/Blink/Issues/Index.md",
+		"/C/Users/Dennis/Dev/DCM-Systems/Blink/README.md",
+		"/C/Users/Dennis/Dev/DCM-Systems/Blink/Issues/+Use_Tracy/Index.md",
+		"/C/Users/Dennis/Dev/DCM-Systems/Blink/Issues/+Vertex_For_Terrain/Index.md",
+		"/C/Users/Dennis/Dev/DCM-Systems/Blink/Issues/+Asset_Packing/Index.md",
+		"/C/Users/Dennis/Dev/DCM-Systems/Blink/Issues/+VMA_Vulkan_Allocator/Index.md",
+		"/C/Users/Dennis/Dev/DCM-Systems/Blink/Issues/+Meaningful_Log_Messages/Index.md",
+		"/C/Users/Dennis/Dev/DCM-Systems/Blink/Issues/+Vulkan_Profiles/Index.md",
+		"/C/Users/Dennis/Dev/DCM-Systems/Blink/Issues/+Designated_Initializers/Index.md",
+		"/C/Users/Dennis/Dev/DCM-Systems/Blink/Issues/+Use_Member_Functions/Index.md",
+		"/C/Users/Dennis/Dev/DCM-Systems/Blink/Issues/+Revise_Error_Results/Index.md",
+		"/C/Users/Dennis/Dev/DCM-Systems/Blink/Issues/+Strong_Module_Boundaries/Index.md",
+		"/C/Users/Dennis/Dev/DCM-Systems/Blink/Issues/+Unit_Tests/Index.md",
+		"/C/Users/Dennis/Dev/DCM-Systems/Blink/CMake/BlkConfig.cmake",
+		"/C/Users/Dennis/Dev/DCM-Systems/Blink/CMakeLists.txt",
+		"/C/Users/Dennis/Dev/DCM-Systems/Blink/Issues/+Dynamic_Global_Illumination/Index.md",
+		"/C/Users/Dennis/Dev/DCM-Systems/Blink/Issues/+IBL/Index.md",
+		"/C/Users/Dennis/Dev/DCM-Systems/Blink/Issues/Skybox_Sun_Luminance/Index.md",
+		"/C/Users/Dennis/Dev/DCM-Systems/Blink/Issues/+Shadows/Index.md",
+		"/C/Users/Dennis/Dev/DCM-Systems/Blink/Issues/+World_Serialization/Index.md",
+		"/C/Users/Dennis/Dev/DCM-Systems/Blink/Issues/+Resource_Reference_Counting/Index.md",
+		"/C/Users/Dennis/Dev/DCM-Systems/Blink/Issues/+Prefab_Serialization/Index.md",
+		"/C/Users/Dennis/Dev/DCM-Systems/Blink/Issues/+Basic_Character_Movement/Index.md",
+		"/C/Users/Dennis/Dev/DCM-Systems/Blink/Issues/+General_Allocator/Index.md",
+		"/C/Users/Dennis/Dev/DCM-Systems/Blink/Issues/Resource_Reference_Counting/Index.md",
+		"/C/Users/Dennis/Dev/DCM-Systems/Blink/TODO.md",
+		"/C/Users/Dennis/Dev/DCM-Systems/Blink/External/tracy-0.14.1/manual/tracy.md",
+		"/C/Users/Dennis/AppData/Local/Temp/World.hpp-rev109.svn000.tmp.hpp",
+		"/C/Users/Dennis/AppData/Local/Temp/World.cpp-rev109.svn000.tmp.cpp",
+		"/C/Users/Dennis/AppData/Local/Temp/Terrain.hpp-rev109.svn000.tmp.hpp",
+		"/C/Users/Dennis/AppData/Local/Temp/Chunk.hpp-rev109.svn000.tmp.hpp",
+		"/C/Users/Dennis/AppData/Local/Temp/Streamer.cpp-rev109.svn000.tmp.cpp",
+		"/C/Users/Dennis/Downloads/files/Streamer.cpp",
+		"/C/Users/Dennis/Downloads/files/Streamer.hpp",
+		"/C/Users/Dennis/Downloads/files/World.cpp",
+		"/C/Users/Dennis/Downloads/files/World.hpp",
+		"/C/Users/Dennis/Downloads/files/Graph.cpp",
+		"/C/Users/Dennis/Dev/Tests/Unreal/Empty/Source/Empty.Target.cs",
+		"/C/Users/Dennis/Downloads/Gaea-BC812712.qkey",
+		"/C/Users/Dennis/Downloads/files/Graph.hpp",
+		"/C/Users/Dennis/Downloads/files/Node.hpp",
+		"/C/Users/Dennis/Dev/Tests/Unreal/Empty/Config/DefaultEngine.ini",
+		"/C/Users/Dennis/Dev/DCM-Systems/Blink/.claude/CLAUDE.md",
+		"/C/Users/Dennis/Desktop/English_Notes/2026-09-09.md",
+		"/C/Users/Dennis/Desktop/English_Notes/2026-09-08.md",
+		"/C/Users/Dennis/Desktop/English_Notes/2026-09-01.md",
+		"/C/Users/Dennis/Desktop/English.md",
+		"/C/Users/Dennis/Dev/DCM-Systems/Aze/Source/Example.cpp",
+		"/C/Users/Dennis/Dev/DCM-Systems/Aze/Source/Example.h",
+		"/C/Users/Dennis/Dev/DCM-Systems/Aze/Source/Register_Types.cpp",
+		"/C/Users/Dennis/Dev/DCM-Systems/Aze/Source/Register_Types.h",
+		"/C/Users/Dennis/Dev/DCM-Systems/Aze/SConstruct",
+		"/C/Users/Dennis/Dev/DCM-Systems/Aze/Source/register_types.cpp",
+		"/C/Users/Dennis/Dev/DCM-Systems/Aze/Source/register_types.h",
+		"/C/Users/Dennis/Dev/DCM-Systems/Aze/Binaries/aze.gdextension",
+		"/C/Users/Dennis/Dev/DCM-Systems/blink.bak/public/blink/runtime/core/hash_map.hpp",
+		"/C/Users/Dennis/Dev/DCM-Systems/blink.bak/runtime/core/allocator.cpp",
+		"/C/Users/Dennis/Dev/DCM-Systems/blink.bak/public/blink/runtime/core/array.hpp",
+		"/C/Users/Dennis/Dev/DCM-Systems/blink.bak/public/blink/runtime/core/allocator.hpp",
+		"/C/Users/Dennis/Dev/DCM-Systems/Blink/.idea/workspace.xml",
+		"/C/Users/Dennis/Dev/DCM-Systems/Blink/.idea/vcs.xml",
+		"/C/Users/Dennis/Dev/DCM-Systems/Blink/.idea/modules.xml",
+		"/C/Users/Dennis/Dev/DCM-Systems/Blink/.idea/misc.xml",
+		"/C/Users/Dennis/Dev/DCM-Systems/Blink/.idea/editor.xml",
+		"/C/Users/Dennis/Dev/Personal/dotfiles/git/win32/config",
+		"/C/Users/Dennis/Dev/Personal/dotfiles/git/macos/config",
+		"/C/Users/Dennis/Downloads/Erasmus-La-Laguna/index.html",
+		"/C/Users/Dennis/Downloads/ErasmusLaLaguna_v3.html",
+		"/C/Users/Dennis/AppData/Roaming/Blender Foundation/Blender/4.5/scripts/presets/operator/export_scene.fbx/Blink_Engine_Mesh.py",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/TODO.md",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/README.md",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink-Git/.gitignore",
+		"/C/Users/Dennis/Dev/personal/website/content/blog/index.md",
+		"/C/Users/Dennis/Dev/personal/website/content/blog/010-knowing-when-abstractions-are-needed.md",
+		"/C/Users/Dennis/Dev/personal/website/Makefile",
+		"/C/Users/Dennis/Dev/personal/website/content/blog/009-basic-cpp-data-structures-in-my-game.md",
+		"/C/Users/Dennis/Dev/personal/website/content/blog/010-knowing-when-abstractions-are-needed",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/Renderer/Renderer.cpp",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/Renderer/Buffer.hpp",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/Renderer/Command.cpp",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/Renderer/Buffer.cpp",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Launcher/CMakeLists.txt",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/Renderer/Command.hpp",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/Core/Math/Matrix.hpp",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/Core/Math/Vector.hpp",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/Renderer/Device.hpp",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/Renderer/Device.cpp",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/Renderer/Surface.cpp",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/Renderer/Surface.hpp",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/Renderer/Instance.cpp",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/Renderer/Instance.hpp",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/Renderer/Debug.hpp",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/Renderer/Debug.cpp",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/Renderer/Renderer.hpp",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/Renderer/CMakeLists.txt",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/Platform/CMakeLists.txt",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/Core/Math/CMakeLists.txt",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/CMakeLists.txt",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/Renderer/Callback.hpp",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/Renderer/Swapchain.hpp",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/Renderer/Swapchain.cpp",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/Renderer/Pipeline.hpp",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/Renderer/Pipeline.cpp",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/Renderer/Buffer_.hpp",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/Renderer/Device_.hpp",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/Renderer/Pipeline_.hpp",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/Renderer/Swapchain_.hpp",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/Core/Math/Matrix.cpp",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/Renderer/Shaders/shader.slang",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/Platform/File.hpp",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/Platform/File.cpp",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/Platform/Debug.hpp",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/Platform/Log.hpp",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/Platform/Debug_Win32.cpp",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/Platform/Log_Win32.cpp",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/.vs/launch.vs.json",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/Core/Math.hpp",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/Core/Math.cpp",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Launcher/Main.cpp",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/Renderer/Shaders/CMakeLists.txt",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/CMakePresets.json",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Demos/001HelloWorld/Game.hpp",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/Math.hpp",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/Renderer.hpp",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/Renderer.cpp",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Launcher/Main_Win32.cpp",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Engine/Log_Win32.cpp",
+		"/C/Users/Dennis/Dev/dcm-systems/Blink/Demos/001HelloWorld/Game.cpp"
+	],
+	"find":
+	{
+		"height": 37.0
+	},
+	"find_in_files":
+	{
+		"height": 128.0,
+		"where_history":
+		[
+		]
+	},
+	"find_state":
+	{
+		"case_sensitive": true,
+		"find_history":
+		[
+		],
+		"highlight": true,
+		"in_selection": false,
+		"preserve_case": false,
+		"regex": false,
+		"replace_history":
+		[
+		],
+		"reverse": false,
+		"scrollbar_highlights": true,
+		"show_context": true,
+		"use_buffer2": true,
+		"use_gitignore": true,
+		"whole_word": false,
+		"wrap": true
+	},
+	"incremental_find":
+	{
+		"height": 37.0
+	},
+	"input":
+	{
+		"height": 49.0
+	},
+	"menu_visible": true,
+	"output.find_results":
+	{
+		"height": 0.0,
+		"history":
+		[
+		]
+	},
+	"pinned_build_system": "",
+	"replace":
+	{
+		"height": 70.0
+	},
+	"save_all_on_build": true,
+	"select_file":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"select_project":
+	{
+		"height": 500.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 380.0
+	},
+	"select_symbol":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"settings":
+	{
+	},
+	"show_minimap": true,
+	"show_open_files": false,
+	"show_tabs": true,
+	"side_bar_visible": true,
+	"side_bar_width": 254.0,
+	"status_bar_visible": true,
+	"template_settings":
+	{
+	}
+}

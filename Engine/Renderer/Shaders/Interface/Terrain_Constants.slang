@@ -12,6 +12,7 @@ struct Terrain_Constants
 	column_major float4x4 model;
 	float2 uv_offset;
 	float uv_scale;
+	uint lod;
 };
 
 [[vk::push_constant]]

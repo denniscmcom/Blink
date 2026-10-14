@@ -5,8 +5,7 @@
 
 #include "Engine/Renderer/Lifetime/Pipeline.hpp"
 
-#include "Engine/Core/Array.hpp"
-#include "Engine/Core/Pool.hpp"
+#include "Engine/Core/Core.hpp"
 #include "Engine/Platform/Log.hpp"
 #include "Engine/Platform/Result.hpp"
 #include "Engine/Renderer/Lifetime/Context.hpp"
@@ -56,6 +55,7 @@ blk::create_graphics_pipeline(
 	VkBool32 enable_depth_test,
 	VkBool32 enable_depth_write,
 	VkCompareOp depth_compare_op,
+	VkPrimitiveTopology topology,
 	Pipeline& pipeline
 )
 {
@@ -74,7 +74,7 @@ blk::create_graphics_pipeline(
 
 	VkPipelineInputAssemblyStateCreateInfo pipeline_input_assembly_state_create_info = {};
 	pipeline_input_assembly_state_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-	pipeline_input_assembly_state_create_info.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	pipeline_input_assembly_state_create_info.topology = topology;
 
 	// Viewport.
 
@@ -99,13 +99,13 @@ blk::create_graphics_pipeline(
 	//
 	// The two inversions cancel, so counter-clockwise is correct here.
 	pipeline_rasterization_state_create_info.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-	pipeline_rasterization_state_create_info.lineWidth = 1.0f;
+	pipeline_rasterization_state_create_info.lineWidth = 2.0f;
 
 	// Multisampling.
 
 	VkPipelineMultisampleStateCreateInfo pipeline_multisample_state_create_info = {};
 	pipeline_multisample_state_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-	pipeline_multisample_state_create_info.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+	pipeline_multisample_state_create_info.rasterizationSamples = context.msaa_count;
 
 	// Depth/stencil.
 

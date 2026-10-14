@@ -5,7 +5,7 @@
 
 #include "Engine/Editor/Toolbar.hpp"
 
-#include "Engine/Core/Array.hpp"
+#include "Engine/Core/Core.hpp"
 #include "Engine/Editor/Context.hpp"
 #include "Engine/Scene/Node.hpp"
 #include "Engine/World/World.hpp"
@@ -183,11 +183,54 @@ blk::draw_toolbar(Editor_Context& context)
 	break;
 	}
 
+	BLK_CHECK(context.active_viewport_toggles);
+
 	// Viewport options.
 
 	draw_separator();
 
-	draw_toggle_button(ICON_MD_GRID_ON "", "Show triangles", context.is_showing_triangles, button_size);
+	char camera_speed_label[32];
+
+	BLK_IF_NOT_SNPRINTF(
+		camera_speed_label,
+		sizeof(camera_speed_label),
+		ICON_MD_SPEED " %.1f m/s###Camera_Speed",
+		context.active_viewport_toggles->editor_camera_speed
+	)
+	{
+		BLK_ERROR("Failed to copy camera speed to local variable\n");
+	}
+
+	ImGui::BeginDisabled();
+	draw_button(camera_speed_label, "Free camera speed. Use the mouse wheel to change it", ImVec2(0.0f, button_size.y));
+	ImGui::EndDisabled();
+
+	ImGui::SameLine();
+
+	draw_toggle_button(
+		ICON_MD_OPEN_WITH "",
+		"Show world axis",
+		context.active_viewport_toggles->is_showing_world_axis,
+		button_size
+	);
+
+	ImGui::SameLine();
+
+	draw_toggle_button(
+		ICON_MD_CHANGE_HISTORY "",
+		"Show triangles",
+		context.active_viewport_toggles->is_showing_triangles,
+		button_size
+	);
+
+	ImGui::SameLine();
+
+	draw_toggle_button(
+		ICON_MD_SPORTS_BASEBALL "",
+		"Show physics world",
+		context.active_viewport_toggles->is_showing_physics_world,
+		button_size
+	);
 
 	ImGui::End();
 }
@@ -249,8 +292,12 @@ draw_spawn_entity_buttons(blk::Editor_Context& context, const ImVec2& button_siz
 
 	if (draw_button(ICON_MD_LIGHTBULB "", "Spawn a point light", button_size))
 	{
-		if (spawn_node(context.active_world->scene_graph, blk::Node_Type::POINT_LIGHT, context.selected_node_handle) ==
-			blk::POOL_HANDLE_NONE<blk::Node>)
+		if (spawn_node(
+				context.active_world->scene_graph,
+				nullptr,
+				blk::Node_Type::POINT_LIGHT,
+				context.selected_node_handle
+			) == blk::POOL_HANDLE_NONE<blk::Node>)
 		{
 			BLK_ERROR("Failed to spawn point light\n");
 		}
@@ -264,6 +311,7 @@ draw_spawn_entity_buttons(blk::Editor_Context& context, const ImVec2& button_siz
 	{
 		if (spawn_node(
 				context.active_world->scene_graph,
+				nullptr,
 				blk::Node_Type::DIRECTIONAL_LIGHT,
 				context.selected_node_handle
 			) == blk::POOL_HANDLE_NONE<blk::Node>)

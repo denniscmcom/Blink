@@ -39,23 +39,30 @@ vs_main(VS_Vertex_UV input)
 	float vertex_height = load_height(terrain_heightmap, texel, heightmap_size, terrain_ubo.terrain_height);
 
 	// We have vertex height, however we need to compute the slopes for later.
-	// To achieve that, we get the height of the four texels around the vertex.
+	// To achieve that, we get the height of the four neighbouring vertices. LOD `i` places a vertex every `2^i` texels,
+	// so sampling one texel away would give a coarse chunk the normals of detail its triangles do not show.
 	//
 	// Following the same logic as before when computing the current texel, we flip forward and back. Image rows count
 	// downward but the engine convention is +Z forward (up seen from above).
 
-	float height_left = load_height(terrain_heightmap, texel - int2(1, 0), heightmap_size, terrain_ubo.terrain_height);
-	float height_right = load_height(terrain_heightmap, texel + int2(1, 0), heightmap_size, terrain_ubo.terrain_height);
-	float height_back = load_height(terrain_heightmap, texel + int2(0, 1), heightmap_size, terrain_ubo.terrain_height);
-	float height_forward = load_height(terrain_heightmap, texel - int2(0, 1), heightmap_size, terrain_ubo.terrain_height);
+	int vertex_step = 1 << terrain_constants.lod;
 
-	// In other to compute the slopes, we need the texel size in meters.
-	float2 texel_size = terrain_ubo.chunk_size / (terrain_constants.uv_scale * float2(heightmap_size));
+	float height_left =
+		load_height(terrain_heightmap, texel - int2(vertex_step, 0), heightmap_size, terrain_ubo.terrain_height);
+	float height_right =
+		load_height(terrain_heightmap, texel + int2(vertex_step, 0), heightmap_size, terrain_ubo.terrain_height);
+	float height_back =
+		load_height(terrain_heightmap, texel + int2(0, vertex_step), heightmap_size, terrain_ubo.terrain_height);
+	float height_forward =
+		load_height(terrain_heightmap, texel - int2(0, vertex_step), heightmap_size, terrain_ubo.terrain_height);
+
+	// In other to compute the slopes, we need the vertex spacing in meters.
+	float2 vertex_spacing = vertex_step * terrain_ubo.chunk_size / (terrain_constants.uv_scale * float2(heightmap_size));
 
 	// Now we compute the slopes.
 
-	float slope_x = (height_right - height_left) / (2.0f * texel_size.x);
-	float slope_z = (height_forward - height_back) / (2.0f * texel_size.y);
+	float slope_x = (height_right - height_left) / (2.0f * vertex_spacing.x);
+	float slope_z = (height_forward - height_back) / (2.0f * vertex_spacing.y);
 
 	// With the slopes, we can compute the tangent, bitangent and normal of the vertex.
 	// The tangent and bitangent follow the surface along X and Z, and their cross product is the normal. Terrain nodes
@@ -64,6 +71,10 @@ vs_main(VS_Vertex_UV input)
 	float3 tangent = normalize(float3(1.0f, slope_x, 0.0f));
 	float3 bitangent = normalize(float3(0.0f, slope_z, 1.0f));
 	float3 normal = normalize(float3(-slope_x, 1.0f, -slope_z));
+
+	// The grid's border wall, whose vertices sit at y = -1, hangs below the chunk's edges as a skirt covering the
+	// cracks between chunks of different LODs. It keeps the edge's normal so it is lit like the terrain above it.
+	vertex_height += input.position.y * terrain_ubo.skirt_depth;
 
 	// Compute vertex position in model space: where it sits in meters, relative to the chunk's corner.
 	float3 local_position = float3(grid.x * terrain_ubo.chunk_size, vertex_height, grid.y * terrain_ubo.chunk_size);

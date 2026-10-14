@@ -28,9 +28,6 @@ struct Stream_Settings
 	/// stays until it is past `unload_radius`, so moving back and forth across a chunk border does not load and unload
 	/// the same row of chunks every step.
 	int32_t unload_radius = 5;
-	/// When the focus chunk gets this many chunks from the origin, the origin moves to it.
-	/// keeps float positions small to avoid rounding errors.
-	int32_t rebase_distance = 8;
 	/// Maximum number of chunks spawned per `update_streamer` call.
 	///
 	/// Must be greater than zero. Spreads the spawn cost of a chunk over several frames. Nearest chunks load first, so

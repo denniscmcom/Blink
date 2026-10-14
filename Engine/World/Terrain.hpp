@@ -5,8 +5,7 @@
 
 #pragma once
 
-#include "Engine/Core/Array.hpp"
-#include "Engine/Core/Pool.hpp"
+#include "Engine/Core/Core.hpp"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -15,6 +14,10 @@ namespace blk
 {
 struct Mesh;
 struct Texture;
+
+// TODO (Consistency): Right now the world origin is at a corner of the terrain.
+// Instead, we may want to generate the terrain arround the world origin at (0, 0, 0), so the origin is at the center of
+// the map.
 
 /// Number of LODs in `Terrain_Settings::chunk_grid_handles`. LOD `i` has `chunk_texel_count >> i` quads per side.
 constexpr size_t TERRAIN_LOD_COUNT = 5;
@@ -38,6 +41,9 @@ struct Terrain_Settings
 	/// Must not be negative. The gap is hysteresis: moving back and forth across a chunk border does not switch the
 	/// same chunks between two LODs every step.
 	int32_t lod_hysteresis = 1;
+	/// Depth in meters of the skirt hanging below each chunk's edges, covering the cracks between chunks of different
+	/// LODs. Must cover the largest height error of the coarsest LOD.
+	float skirt_depth = 8.0f;
 	/// A `Texture_Format::R16` heightmap.
 	Pool_Handle<Texture> heightmap_handle;
 	/// Width of the terrain definition in meters.

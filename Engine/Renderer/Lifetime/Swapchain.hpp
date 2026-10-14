@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "Engine/Core/Array.hpp"
+#include "Engine/Core/Core.hpp"
 #include "Engine/Renderer/Lifetime/Context.hpp"
 
 #include <vulkan/vulkan.h>

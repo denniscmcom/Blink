@@ -5,12 +5,14 @@
 
 #include "Engine/Renderer/Lifetime/Buffer.hpp"
 
+#include "Engine/Core/Core.hpp"
 #include "Engine/Platform/Assert.hpp"
 #include "Engine/Platform/Log.hpp"
 #include "Engine/Platform/Result.hpp"
 #include "Engine/Renderer/Helpers.hpp"
 #include "Engine/Renderer/Lifetime/Command.hpp"
 #include "Engine/Renderer/Lifetime/Context.hpp"
+#include "Image.hpp"
 
 blk::Result
 blk::create_buffer(
@@ -207,7 +209,7 @@ blk::Result
 blk::copy_buffer_to_image(
 	const Context& context,
 	const Buffer& src,
-	VkImage dst,
+	const Image& dst,
 	const uint32_t width,
 	const uint32_t height
 )
@@ -221,14 +223,15 @@ blk::copy_buffer_to_image(
 	// `dst` layout starts as `UNDEFINED` and we transition it to `TRANSFER_DST_OPTIMAL`.
 	transition_image_layout(
 		command_buffer,
-		dst,
+		dst.image,
 		VK_IMAGE_LAYOUT_UNDEFINED,
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 		{},
 		VK_ACCESS_2_TRANSFER_WRITE_BIT,
 		VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
 		VK_PIPELINE_STAGE_2_TRANSFER_BIT,
-		VK_IMAGE_ASPECT_COLOR_BIT
+		VK_IMAGE_ASPECT_COLOR_BIT,
+		dst.mip_level_count
 	);
 
 	// Copy the bufffer into the image.
@@ -238,23 +241,119 @@ blk::copy_buffer_to_image(
 	region.imageSubresource.layerCount = 1;
 	region.imageExtent = {.width = width, .height = height, .depth = 1};
 
-	vkCmdCopyBufferToImage(command_buffer, src.buffer, dst, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+	vkCmdCopyBufferToImage(command_buffer, src.buffer, dst.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
-	// Transition the image for shader sampling.
-	transition_image_layout(
-		command_buffer,
-		dst,
-		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		VK_ACCESS_2_TRANSFER_WRITE_BIT,
-		VK_ACCESS_2_SHADER_READ_BIT,
-		VK_PIPELINE_STAGE_2_TRANSFER_BIT,
-		VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-		VK_IMAGE_ASPECT_COLOR_BIT
-	);
+	// Generate mip maps.
+
+	VkImageSubresourceRange mip_range = {};
+	mip_range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	mip_range.layerCount = 1;
+	mip_range.levelCount = 1;
+
+	VkImageMemoryBarrier2 mip_barrier = {};
+	mip_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+	mip_barrier.image = dst.image;
+	mip_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	mip_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	mip_barrier.subresourceRange = mip_range;
+
+	VkDependencyInfo dependency_info = {};
+	dependency_info.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+	dependency_info.imageMemoryBarrierCount = 1;
+
+	auto mip_width = static_cast<int32_t>(width);
+	auto mip_height = static_cast<int32_t>(height);
+
+	if (dst.mip_level_count > 1)
+	{
+		VkFormatProperties properties = {};
+		vkGetPhysicalDeviceFormatProperties(context.physical_device, dst.format, &properties);
+
+		if (!BLK_VERIFY(properties.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT))
+		{
+			return Result::INVALID_ARGUMENTS;
+		}
+	}
+
+	for (uint32_t i = 1; i < dst.mip_level_count; ++i)
+	{
+		// Image barrier to generate mip map.
+
+		mip_barrier.subresourceRange.baseMipLevel = i - 1;
+		mip_barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+		mip_barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+		mip_barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+		mip_barrier.dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
+		mip_barrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+		mip_barrier.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+
+		dependency_info.pImageMemoryBarriers = &mip_barrier;
+		vkCmdPipelineBarrier2(command_buffer, &dependency_info);
+
+		// Blit image.
+
+		VkImageBlit blit = {};
+		blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		blit.srcSubresource.mipLevel = i - 1;
+		blit.srcSubresource.layerCount = 1;
+		blit.srcOffsets[1] = {.x = mip_width, .y = mip_height, .z = 1};
+		blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		blit.dstSubresource.mipLevel = i;
+		blit.dstSubresource.layerCount = 1;
+		blit.dstOffsets[1].x = mip_width > 1 ? mip_width / 2 : 1;
+		blit.dstOffsets[1].y = mip_height > 1 ? mip_height / 2 : 1;
+		blit.dstOffsets[1].z = 1;
+
+		vkCmdBlitImage(
+			command_buffer,
+			dst.image,
+			VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			dst.image,
+			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			1,
+			&blit,
+			VK_FILTER_LINEAR
+		);
+
+		// Image barrier for shader sampling.
+
+		mip_barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+		mip_barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		mip_barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
+		mip_barrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+		mip_barrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+		mip_barrier.dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+
+		dependency_info.pImageMemoryBarriers = &mip_barrier;
+		vkCmdPipelineBarrier2(command_buffer, &dependency_info);
+
+		// Compute next mip dimensions.
+
+		if (1 < mip_width)
+		{
+			mip_width /= 2;
+		}
+
+		if (1 < mip_height)
+		{
+			mip_height /= 2;
+		}
+	}
+
+	// Last mip level.
+
+	mip_barrier.subresourceRange.baseMipLevel = dst.mip_level_count - 1;
+	mip_barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+	mip_barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	mip_barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+	mip_barrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+	mip_barrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+	mip_barrier.dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+
+	dependency_info.pImageMemoryBarriers = &mip_barrier;
+	vkCmdPipelineBarrier2(command_buffer, &dependency_info);
 
 	end_one_time_commands(context, command_buffer);
-
 	destroy_command_buffer(context, context.transient_command_pool, command_buffer);
 
 	return Result::SUCCESS;

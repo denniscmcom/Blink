@@ -15,6 +15,13 @@ struct VS_Vertex_UV
 	float2 texture_coord;
 };
 
+/// It should match the host-side `Vertex_Color` struct.
+struct VS_Vertex_Color
+{
+	float3 position;
+	float3 color;
+};
+
 /// It should match the host-side `Vertex_Spatial` struct.
 struct VS_Vertex_Spatial
 {

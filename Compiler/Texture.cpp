@@ -7,7 +7,7 @@
 
 #include "Compiler/Texture.hpp"
 
-#include "Engine/Core/Serial.hpp"
+#include "Engine/Core/Core.hpp"
 #include "Engine/Platform/Log.hpp"
 #include "Engine/Resource/Storage.hpp"
 #include "Engine/Resource/Texture.hpp"

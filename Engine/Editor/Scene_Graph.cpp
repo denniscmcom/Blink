@@ -5,7 +5,7 @@
 
 #include "Engine/Editor/Scene_Graph.hpp"
 
-#include "Engine/Core/Pool.hpp"
+#include "Engine/Core/Core.hpp"
 #include "Engine/Editor/Context.hpp"
 #include "Engine/Platform/Application.hpp"
 #include "Engine/Platform/Assert.hpp"

@@ -5,8 +5,7 @@
 
 #include "Engine/Editor/Editor.hpp"
 
-#include "Engine/Core/Pool.hpp"
-#include "Engine/Core/String.hpp"
+#include "Engine/Core/Core.hpp"
 #include "Engine/Editor/Camera.hpp"
 #include "Engine/Editor/Context.hpp"
 #include "Engine/Editor/Menu.hpp"
@@ -29,6 +28,7 @@
 #include <imgui.h>
 #include <imgui_impl_vulkan.h>
 #include <imgui_impl_win32.h>
+#include <tracy/Tracy.hpp>
 
 #include <stdio.h>
 
@@ -88,7 +88,7 @@ blk::create_editor(World* game_world, Allocator* allocator)
 
 	const Pool_Handle<Mesh> sphere_mesh_handle = compute_uv_sphere(1.0f, 64, 32);
 	const Pool_Handle<Node> sphere_node_handle =
-		spawn_node(context.material_context.world.scene_graph, Node_Type::MESH_REF, {});
+		spawn_node(context.material_context.world.scene_graph, nullptr, Node_Type::MESH_REF, {});
 
 	BLK_CHECK(rename_node(context.material_context.world.scene_graph, sphere_node_handle, "Sphere") == Result::SUCCESS);
 
@@ -245,22 +245,26 @@ blk::create_editor(World* game_world, Allocator* allocator)
 blk::Editor_Context
 blk::update_editor(const Input_State& input_state, const double delta_time)
 {
+	ZoneScoped;
 	// We only handle global input here and delegates the rest to its own widgets.
 
-	// Set active world based on mode.
+	// Set active world and viewport toggles based on mode.
 
 	switch (context.mode)
 	{
 	case Editor_Mode::WORLD: {
 		context.active_world = context.world_context.world;
+		context.active_viewport_toggles = &context.world_context.viewport_toggles;
 	}
 	break;
 	case Editor_Mode::MATERIAL: {
 		context.active_world = &context.material_context.world;
+		context.active_viewport_toggles = &context.material_context.viewport_toggles;
 	}
 	break;
 	case Editor_Mode::PREFAB: {
 		context.active_world = &context.prefab_context.world;
+		context.active_viewport_toggles = &context.prefab_context.viewport_toggles;
 	}
 	break;
 	}
@@ -344,10 +348,18 @@ blk::get_active_world()
 }
 
 void
+blk::draw_world_axis()
+{
+	draw_line({0.0f, 0.0f, 0.0f}, {10'000.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f});
+	draw_line({0.0f, 0.0f, 0.0f}, {0.0f, 10'000.0f, 0.0f}, {0.0f, 1.0f, 0.0f});
+	draw_line({0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 10'000.0f}, {0.0f, 0.0f, 1.0f});
+}
+
+void
 blk::destroy_editor()
 {
 	// `ImGui_ImplVulkan_Shutdown` destroys GPU resources, so we wait for the GPU to finish.
-	wait_renderer_idle();
+	wait_for_device();
 
 	ImGui_ImplVulkan_Shutdown();
 	ImGui_ImplWin32_Shutdown();

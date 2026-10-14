@@ -3,7 +3,10 @@
 // Licensed under the Blink Engine Source Access License, see LICENSE.txt
 // ============================================================================
 
-#include "Engine/Core/Hash.hpp"
+#ifdef BLK_NEW_API
+#else
+
+#include "Engine/Core/Core.hpp"
 
 #include <stdint.h>
 #include <string.h>
@@ -44,3 +47,4 @@ blk::hash_fnv1a(uint64_t value)
 	// cross-platform determinism (e.g. serialized asset IDs).
 	return hash_fnv1a(reinterpret_cast<const char*>(&value), sizeof(value));
 }
+#endif

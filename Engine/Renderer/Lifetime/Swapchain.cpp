@@ -5,7 +5,7 @@
 
 #include "Engine/Renderer/Lifetime/Swapchain.hpp"
 
-#include "Engine/Core/Array.hpp"
+#include "Engine/Core/Core.hpp"
 #include "Engine/Platform/Log.hpp"
 #include "Engine/Platform/Result.hpp"
 #include "Engine/Renderer/Helpers.hpp"

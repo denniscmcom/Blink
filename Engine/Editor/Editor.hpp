@@ -24,4 +24,6 @@ Editor_Context update_editor(const Input_State& input_state, double delta_time);
 bool is_game_simulation_paused();
 /// Gets the current active world.
 World* get_active_world();
+/// Draws the world axis at the world origin.
+void draw_world_axis();
 }  // namespace blk
